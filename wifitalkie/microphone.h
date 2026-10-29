@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Ashhar Farhan
+//
+// microphone.h — the microphone, read by the ADC. See microphone.c.
+
+#pragma once
+
+#include <stdint.h>
+
+#include "telephone.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// what the last whole second of the microphone was
+struct microphone_levels {
+	int peak;
+	int rms;
+	int samples_a_second;
+};
+
+void microphone_open(void);
+void microphone_poll(long now);
+int microphone_frame(int16_t samples[TELEPHONE_FRAME_SAMPLES]);
+void microphone_levels(struct microphone_levels *levels);
+
+#ifdef __cplusplus
+}
+#endif

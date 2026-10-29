@@ -1,0 +1,4 @@
+build/
+tests/test_units
+tests/voip_tool
+__pycache__/
