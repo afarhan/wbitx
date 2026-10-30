@@ -13,12 +13,15 @@
 // a capacitor, 1 mH and 1 uF for 32 ohms, 470 uH and 2.2 uF for 16, about
 // 5 kHz, its impedance the earbuds' so that they damp it; 10 ohms before it
 // holds the pin's current down with the earbuds out, and 220 uF keeps the
-// middle level, 1.65 V, out of the earbuds. A timer interrupts DOUBLE_RATE_HZ times a
-// second and sets the next duty from the ring, which the loop keeps filled
-// RING_FILLED_MOST ahead; an empty ring holds the duty at the middle,
-// silence. The interrupt writes the LEDC's registers itself, through the
-// HAL's inline functions, since the driver's calls take locks that an
-// interrupt may not.
+// middle level, 1.65 V, out of the earbuds.
+//
+// A timer interrupts PLAYBACK_RATE_HZ times a second, every fifth cycle of
+// the PWM, both counted from the same 80 MHz, and sets the next duty from
+// the ring, which the loop keeps filled RING_MS ahead; an empty ring holds
+// the duty at the middle, silence. The interrupt writes the LEDC's
+// registers itself, through the HAL's inline functions, since the driver's
+// calls take locks that an interrupt may not. playback.c makes the duties,
+// why at that rate is written there.
 //
 // THE QUEUE
 //
@@ -30,16 +33,16 @@
 //
 // The two clocks are met by reading the queue at a pace a little faster or
 // slower than one sample a sample, between 0.99 and 1.01, set from how full
-// the queue has been, and taking each sample between two by a straight line
-// between them. The author heard crackle in the web page's player on
-// 12 October 2026 when it dropped a whole sample in a hundred to keep up;
-// so here no whole sample is ever dropped or repeated while an over plays.
-// Only a queue gone past MOST_MS, the internet having held up packets and
-// let them go at once, is cut back to TARGET_MS, once.
+// the queue has been; playback.c's filter makes the samples between. The
+// author heard crackle in the web page's player on 12 October 2026 when it
+// dropped a whole sample in a hundred to keep up; so here no whole sample
+// is ever dropped or repeated while an over plays. Only a queue gone past
+// MOST_MS, the internet having held up packets and let them go at once, is
+// cut back to TARGET_MS, once.
 //
-// Each sample read is made two by telephone.c's filter, VOL is put on, and
-// they go to the ring. While the PTT is down the queue is emptied and kept
-// empty: the talkie is one way at a time.
+// VOL is put on each sample made, and playback.c makes it a duty for the
+// ring. While the PTT is down the queue is emptied and kept empty: the
+// talkie is one way at a time.
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -53,22 +56,22 @@
 #include "soc/ledc_struct.h"
 
 #include "pins.h"
+#include "playback.h"
 #include "settings.h"
 #include "speaker.h"
 #include "telephone.h"
 
 #define PWM_BITS LEDC_TIMER_8_BIT
 #define PWM_HZ 312500
-#define PWM_MIDDLE 128
-#define PWM_MOST 255
+#define PWM_MIDDLE PLAYBACK_DUTY_MIDDLE
 #define PWM_CHANNEL LEDC_CHANNEL_0
 #define PWM_TIMER LEDC_TIMER_0
 #define PWM_MODE LEDC_LOW_SPEED_MODE
-#define PWM_SHIFT 8
 #define TIMER_HZ 8000000
-#define TICKS_A_SAMPLE (TIMER_HZ / DOUBLE_RATE_HZ)
-#define RING_SAMPLES 1024
-#define RING_FILLED_MOST 512
+#define TICKS_A_SAMPLE (TIMER_HZ / PLAYBACK_RATE_HZ)
+#define RING_SAMPLES 4096
+#define RING_MS 32
+#define RING_FILLED_MOST (PLAYBACK_RATE_HZ / 1000 * RING_MS)
 #define QUEUE_SAMPLES 4096
 #define SAMPLES_A_MS (TELEPHONE_RATE_HZ / 1000)
 #define START_MS 80
@@ -87,13 +90,16 @@ static volatile uint32_t ring_out;
 static int16_t queue[QUEUE_SAMPLES];
 static uint32_t queue_in;
 static uint32_t queue_out;
-static uint32_t fraction;
 static int32_t fill_smoothed;
 static int is_playing;
 static int is_muted;
 static long taken_ms;
-static struct telephone_up up;
+static struct playback play;
 static gptimer_handle_t timer;
+
+_Static_assert(PWM_HZ % PLAYBACK_RATE_HZ == 0, "each sample is held for whole cycles of the PWM");
+_Static_assert(TIMER_HZ % PLAYBACK_RATE_HZ == 0, "the timer counts a whole number to each sample");
+_Static_assert(RING_FILLED_MOST < RING_SAMPLES, "the ring holds what the loop keeps ahead");
 static uint32_t count_gap_samples;
 static uint32_t count_cut;
 
@@ -147,7 +153,8 @@ void speaker_open(void) {
 		.on_alarm = next_duty,
 	};
 
-	telephone_up_begin(&up);
+	playback_open();
+	playback_begin(&play);
 	ledc_timer_config(&pwm_timer);
 	ledc_channel_config(&pwm);
 	gpio_set_drive_capability(PIN_SPEAKER, GPIO_DRIVE_CAP_3);
@@ -164,9 +171,8 @@ static uint32_t queue_fill(void) {
 
 static void queue_empty(void) {
 	queue_out = queue_in;
-	fraction = 0;
 	is_playing = 0;
-	telephone_up_begin(&up);
+	playback_begin(&play);
 }
 
 void speaker_take(const uint8_t *ulaw, long now) {
@@ -185,14 +191,8 @@ void speaker_take(const uint8_t *ulaw, long now) {
 	taken_ms = now;
 }
 
-static void ring_put(int16_t sample) {
-	int32_t duty = PWM_MIDDLE + ((int32_t)sample * (int32_t)settings.volume / SETTINGS_LEVEL_MOST >> PWM_SHIFT);
-
-	if (duty < 0)
-		duty = 0;
-	if (duty > PWM_MOST)
-		duty = PWM_MOST;
-	ring[ring_in % RING_SAMPLES] = (uint8_t)duty;
+static void ring_put(uint8_t duty) {
+	ring[ring_in % RING_SAMPLES] = duty;
 	ring_in++;
 }
 
@@ -211,40 +211,38 @@ static uint32_t pace(void) {
 	return (uint32_t)(PACE_ONE + off);
 }
 
-static int16_t queue_read(uint32_t step) {
-	int32_t first = queue[queue_out % QUEUE_SAMPLES];
-	int32_t second = queue[(queue_out + 1) % QUEUE_SAMPLES];
-	int16_t sample = (int16_t)(first + (((second - first) * (int32_t)fraction) >> 16));
+// the next of the queue's samples, or silence in a gap
+static int16_t queue_next(void) {
+	int16_t sample;
 
-	fraction += step;
-	queue_out += fraction >> 16;
-	fraction &= PACE_ONE - 1;
+	if (queue_fill() == 0) {
+		count_gap_samples++;
+		return 0;
+	}
+	sample = queue[queue_out % QUEUE_SAMPLES];
+	queue_out++;
 	return sample;
 }
 
 void speaker_poll(long now) {
-	int16_t two[2];
-	int16_t sample;
+	int32_t level;
 	uint32_t step;
 
 	if (!is_playing && queue_fill() >= START_MS * SAMPLES_A_MS) {
 		is_playing = 1;
 		fill_smoothed = (int32_t)queue_fill() << FILL_FRACTION_SHIFT;
 	}
-	if (is_playing && queue_fill() < 2 && now - taken_ms > END_MS)
+	if (is_playing && queue_fill() == 0 && now - taken_ms > END_MS)
 		queue_empty();
 	if (!is_playing)
 		return;
-	step = pace();
+	step = (uint32_t)((uint64_t)pace() * TELEPHONE_RATE_HZ / PLAYBACK_RATE_HZ);
 	while (ring_in - ring_out < RING_FILLED_MOST) {
-		sample = 0;
-		if (queue_fill() >= 2)
-			sample = queue_read(step);
-		else
-			count_gap_samples++;
-		telephone_up_make(&up, sample, two);
-		ring_put(two[0]);
-		ring_put(two[1]);
+		while (playback_wants(&play))
+			playback_push(&play, queue_next());
+		// a full-scale sample at VOL 100 is 128 steps of duty, in 256ths
+		level = (int32_t)playback_make(&play, step) * (int32_t)settings.volume / SETTINGS_LEVEL_MOST;
+		ring_put(playback_duty(&play, level));
 	}
 }
 

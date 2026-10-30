@@ -7,9 +7,10 @@
 //
 // my.sbitx.net's repeater carries the telephone's sound: G.711 mu-law, a
 // byte a sample, 8000 a second, 160 bytes to a packet of twenty
-// milliseconds. The microphone is read, and the speaker driven, at twice
-// that, 16000 a second, so that what lies above 4 kHz can be filtered off
-// in numbers rather than left to fold down among the speech.
+// milliseconds. The microphone is read at twice that, 16000 a second, so
+// that what lies above 4 kHz can be filtered off in numbers rather than
+// left to fold down among the speech. The speaker's way, up to 62500 a
+// second, is playback.c's.
 //
 // MU-LAW
 //
@@ -20,12 +21,9 @@
 //
 // THE FILTER
 //
-// One low-pass filter serves both ways: 32 taps of a windowed sinc 3.6 kHz
-// wide at 16000 a second, the shape zbitxre's gateway uses at 48000. Going
-// down, every second sample of the filtered sound is kept. Going up, each
-// sample of the telephone's becomes two, each made by its own sixteen of
-// the taps, and each sixteen add up to one so that a steady level comes up
-// the level it was.
+// 32 taps of a windowed sinc 3.6 kHz wide at 16000 a second, the shape
+// zbitxre's gateway uses at 48000; every second sample of the filtered
+// sound is kept.
 //
 // The ESP32-C3 has no floating point unit, so the taps are worked out once
 // in floating point and kept as whole numbers, TAP_ONE being one; samples
@@ -39,8 +37,6 @@
 #include "telephone.h"
 
 #define TAPS TELEPHONE_TAPS
-#define TAPS_A_PHASE TELEPHONE_TAPS_A_PHASE
-#define STEP (DOUBLE_RATE_HZ / TELEPHONE_RATE_HZ)
 #define CUTOFF_HZ 3600.0
 #define HAMMING_A 0.54
 #define HAMMING_B 0.46
@@ -53,7 +49,6 @@
 #define INT16_MOST 32767
 
 static int32_t taps[TAPS];
-static int32_t taps_up[STEP][TAPS_A_PHASE];
 static int16_t linear[ULAW_CODES];
 
 uint8_t telephone_ulaw_of(int sample) {
@@ -96,7 +91,6 @@ void telephone_open(void) {
 	double x;
 	int value;
 	int size;
-	int phase;
 	int i;
 
 	for (i = 0; i < TAPS; i++) {
@@ -107,13 +101,6 @@ void telephone_open(void) {
 	}
 	for (i = 0; i < TAPS; i++)
 		taps[i] = (int32_t)lrint(shape[i] / sum * TAP_ONE);
-	for (phase = 0; phase < STEP; phase++) {
-		sum = 0;
-		for (i = 0; i < TAPS_A_PHASE; i++)
-			sum += shape[phase + STEP * i];
-		for (i = 0; i < TAPS_A_PHASE; i++)
-			taps_up[phase][i] = (int32_t)lrint(shape[phase + STEP * i] / sum * TAP_ONE);
-	}
 	for (i = 0; i < ULAW_CODES; i++) {
 		value = ~i & 0xff;
 		size = (((value & 0x0f) << 3) + ULAW_BIAS) << ((value & 0x70) >> 4);
@@ -151,33 +138,4 @@ int telephone_down_take(struct telephone_down *d, int16_t sample, int16_t *out) 
 	}
 	*out = clipped((sum + TAP_ONE / 2) >> TAP_SHIFT);
 	return 1;
-}
-
-void telephone_up_begin(struct telephone_up *u) {
-	memset(u, 0, sizeof(*u));
-}
-
-// a sample at 8000 a second becomes two at 16000
-void telephone_up_make(struct telephone_up *u, int16_t sample, int16_t out[2]) {
-	int32_t sum;
-	int phase;
-	int tap;
-	int at;
-
-	u->at++;
-	if (u->at == TAPS_A_PHASE)
-		u->at = 0;
-	u->past[u->at] = sample;
-	for (phase = 0; phase < STEP; phase++) {
-		// taps_up[phase][tap] multiplies the sample tap back from the newest
-		sum = 0;
-		at = u->at;
-		for (tap = 0; tap < TAPS_A_PHASE; tap++) {
-			sum += taps_up[phase][tap] * u->past[at];
-			at--;
-			if (at < 0)
-				at = TAPS_A_PHASE - 1;
-		}
-		out[phase] = clipped((sum + TAP_ONE / 2) >> TAP_SHIFT);
-	}
 }

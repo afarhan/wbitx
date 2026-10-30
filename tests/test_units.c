@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Ashhar Farhan
 //
 // test_units.c — the talkie's code that knows nothing of the ESP32, tried on
-// this computer: mu-law, the filters, the cookie and the stretch.
+// this computer: mu-law, the filters, the duty, the cookie and the stretch.
 //
 //     make check
 //
@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "../wifitalkie/auth.h"
+#include "../wifitalkie/playback.h"
 #include "../wifitalkie/telephone.h"
 
 #define SETTLE_SAMPLES 200
@@ -27,6 +28,13 @@
 #define PASS_TOLERANCE_DB 1.0
 #define STOP_LEAST_DB 30.0
 #define STEP_ROUNDS 777
+#define PLAYBACK_SETTLE_SAMPLES 2000
+#define PLAYBACK_MEASURE_SAMPLES 62500
+#define HIGH_PASS_HZ 3000.0
+#define IMAGE_LEAST_DB 50.0
+#define SPEECH_TAPS 255
+#define QUIET_LEVEL (12.0 * 256.0)
+#define SHAPING_LEAST_DB 20.0
 
 static int failures;
 
@@ -103,28 +111,99 @@ static void test_down(void) {
 	expect(decibels(folded / TEST_AMPLITUDE) < -STOP_LEAST_DB, "down keeps 5 kHz from folding");
 }
 
-static void test_up(void) {
-	struct telephone_up u;
-	double kept[2 * MEASURE_SAMPLES];
-	int16_t out[2];
+// a tone at 8000 a second, made 62500 by playback.c, its level and the
+// size of its image at the telephone's rate less it
+static void playback_sizes(double hz, double *passed, double *image) {
+	struct playback p;
+	static double kept[PLAYBACK_MEASURE_SAMPLES];
+	uint32_t step = (uint32_t)((uint64_t)PLAYBACK_ONE * TELEPHONE_RATE_HZ / PLAYBACK_RATE_HZ);
+	double off = (double)step * PLAYBACK_RATE_HZ / PLAYBACK_ONE / TELEPHONE_RATE_HZ;
+	int pushed = 0;
+	int made;
+
+	playback_begin(&p);
+	for (made = 0; made < PLAYBACK_SETTLE_SAMPLES + PLAYBACK_MEASURE_SAMPLES; made++) {
+		while (playback_wants(&p)) {
+			playback_push(&p, (int16_t)lrint(TEST_AMPLITUDE * sin(2.0 * M_PI * hz * pushed / TELEPHONE_RATE_HZ)));
+			pushed++;
+		}
+		if (made >= PLAYBACK_SETTLE_SAMPLES)
+			kept[made - PLAYBACK_SETTLE_SAMPLES] = playback_make(&p, step);
+		else
+			playback_make(&p, step);
+	}
+	// step is rounded, so the tone comes out a hair off its frequency
+	*passed = size_at(kept, PLAYBACK_MEASURE_SAMPLES, hz * off, PLAYBACK_RATE_HZ);
+	*image = size_at(kept, PLAYBACK_MEASURE_SAMPLES, (TELEPHONE_RATE_HZ - hz) * off, PLAYBACK_RATE_HZ);
+}
+
+static void test_playback(void) {
 	double passed;
 	double image;
+	double high;
+	double high_image;
+
+	playback_sizes(PASS_HZ, &passed, &image);
+	playback_sizes(HIGH_PASS_HZ, &high, &high_image);
+	printf("playback: 1 kHz at %+.2f dB, its image at 7 kHz at %+.1f dB; 3 kHz at %+.2f dB, its image at 5 kHz at %+.1f dB\n",
+		decibels(passed / TEST_AMPLITUDE), decibels(image / TEST_AMPLITUDE),
+		decibels(high / TEST_AMPLITUDE), decibels(high_image / TEST_AMPLITUDE));
+	expect(fabs(decibels(passed / TEST_AMPLITUDE)) < PASS_TOLERANCE_DB, "playback passes 1 kHz at its level");
+	expect(fabs(decibels(high / TEST_AMPLITUDE)) < PASS_TOLERANCE_DB, "playback passes 3 kHz at its level");
+	expect(decibels(image / TEST_AMPLITUDE) < -IMAGE_LEAST_DB, "playback keeps the image at 7 kHz down");
+	expect(decibels(high_image / TEST_AMPLITUDE) < -IMAGE_LEAST_DB, "playback keeps the image at 5 kHz down");
+}
+
+// the power below 4 kHz of a run of errors, by a long windowed sinc in
+// floating point
+static double speech_power(const double *errors, int count) {
+	double shape[SPEECH_TAPS];
+	double wide = 2.0 * (TELEPHONE_RATE_HZ / 2) / PLAYBACK_RATE_HZ;
+	double centre = (SPEECH_TAPS - 1) / 2.0;
+	double power = 0;
+	double sum;
+	double x;
+	int i;
+	int tap;
+
+	for (tap = 0; tap < SPEECH_TAPS; tap++) {
+		x = tap - centre;
+		if (x == 0)
+			shape[tap] = wide;
+		else
+			shape[tap] = sin(M_PI * wide * x) / (M_PI * x);
+		shape[tap] *= 0.54 - 0.46 * cos(2.0 * M_PI * tap / (SPEECH_TAPS - 1));
+	}
+	for (i = SPEECH_TAPS; i < count; i++) {
+		sum = 0;
+		for (tap = 0; tap < SPEECH_TAPS; tap++)
+			sum += shape[tap] * errors[i - tap];
+		power += sum * sum;
+	}
+	return power / (count - SPEECH_TAPS);
+}
+
+// a quiet tone, as VOL 10 makes it, rounded to steps of duty plainly and by
+// playback_duty(): the latter's error must be far less below 4 kHz
+static void test_duty(void) {
+	struct playback p;
+	static double shaped[PLAYBACK_MEASURE_SAMPLES];
+	static double plain[PLAYBACK_MEASURE_SAMPLES];
+	double level;
+	double gain;
+	int duty;
 	int i;
 
-	telephone_up_begin(&u);
-	for (i = 0; i < SETTLE_SAMPLES + MEASURE_SAMPLES; i++) {
-		telephone_up_make(&u, (int16_t)lrint(TEST_AMPLITUDE * sin(2.0 * M_PI * PASS_HZ * i / TELEPHONE_RATE_HZ)), out);
-		if (i < SETTLE_SAMPLES)
-			continue;
-		kept[2 * (i - SETTLE_SAMPLES)] = out[0];
-		kept[2 * (i - SETTLE_SAMPLES) + 1] = out[1];
+	playback_begin(&p);
+	for (i = 0; i < PLAYBACK_MEASURE_SAMPLES; i++) {
+		level = QUIET_LEVEL * sin(2.0 * M_PI * PASS_HZ * i / PLAYBACK_RATE_HZ);
+		duty = playback_duty(&p, (int32_t)lrint(level)) - PLAYBACK_DUTY_MIDDLE;
+		shaped[i] = duty * 256.0 - level;
+		plain[i] = floor(level / 256.0 + 0.5) * 256.0 - level;
 	}
-	passed = size_at(kept, 2 * MEASURE_SAMPLES, PASS_HZ, DOUBLE_RATE_HZ);
-	image = size_at(kept, 2 * MEASURE_SAMPLES, TELEPHONE_RATE_HZ - PASS_HZ, DOUBLE_RATE_HZ);
-	printf("up: 1 kHz at %+.2f dB, its image at 7 kHz at %+.1f dB\n",
-		decibels(passed / TEST_AMPLITUDE), decibels(image / TEST_AMPLITUDE));
-	expect(fabs(decibels(passed / TEST_AMPLITUDE)) < PASS_TOLERANCE_DB, "up passes 1 kHz at its level");
-	expect(decibels(image / TEST_AMPLITUDE) < -STOP_LEAST_DB, "up keeps the image at 7 kHz down");
+	gain = 10.0 * log10(speech_power(plain, PLAYBACK_MEASURE_SAMPLES) / speech_power(shaped, PLAYBACK_MEASURE_SAMPLES));
+	printf("duty: the rounding's error below 4 kHz is %.1f dB less than plain rounding's\n", gain);
+	expect(gain > SHAPING_LEAST_DB, "the duty's rounding error is pushed above the speech");
 }
 
 static uint8_t counted_byte(void) {
@@ -161,9 +240,11 @@ static void test_stretch(void) {
 
 int main(void) {
 	telephone_open();
+	playback_open();
 	test_ulaw();
 	test_down();
-	test_up();
+	test_playback();
+	test_duty();
 	test_cookie();
 	test_stretch();
 	if (failures == 0)
