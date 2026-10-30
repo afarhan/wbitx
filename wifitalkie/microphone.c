@@ -24,6 +24,13 @@
 // The samples of each second are measured for LEVELS, the peak and the rms
 // after MIC and how many came, which says whether the ADC keeps the rate
 // it was asked for: the packets go at the rate the microphone makes them.
+//
+// On 30 October 2026 the ADC was twice found giving nothing from the start;
+// at other starts it ran. When it was next caught, it had stopped just as
+// the WiFi came up, whose radio's calibration uses the same SAR ADC: that
+// is the likeliest cause, not yet proved. So the results the driver gives
+// are counted, those not of our channel too, and an ADC that has given
+// nothing for STALL_MS is stopped and started again, and says so.
 
 #include <string.h>
 
@@ -45,6 +52,7 @@
 #define MIC_AS_IT_CAME 50
 #define INT16_MOST 32767
 #define MS_A_SECOND 1000
+#define STALL_MS 500
 
 static adc_continuous_handle_t handle;
 static adc_channel_t channel;
@@ -59,6 +67,10 @@ static int filled;
 static int peak;
 static int64_t squares;
 static int counted;
+static int results_a_second;
+static int strangers_a_second;
+static long last_result_ms;
+static unsigned restarts;
 static long second_began_ms;
 static struct microphone_levels last_second;
 
@@ -66,6 +78,7 @@ void microphone_open(void) {
 	adc_continuous_handle_cfg_t store = {
 		.max_store_buf_size = STORE_BYTES,
 		.conv_frame_size = FRAME_BYTES,
+		.flags.flush_pool = 1,
 	};
 	adc_digi_pattern_config_t pattern;
 	adc_continuous_config_t config;
@@ -161,14 +174,30 @@ void microphone_poll(long now) {
 	if (!is_open)
 		return;
 	while (adc_continuous_read(handle, results, sizeof(results), &got, 0) == ESP_OK) {
+		last_result_ms = now;
 		for (i = 0; i + SOC_ADC_DIGI_RESULT_BYTES <= got; i += SOC_ADC_DIGI_RESULT_BYTES) {
 			result = (adc_digi_output_data_t *)&results[i];
+			results_a_second++;
 			if (result->type2.unit == 0 && result->type2.channel == channel)
 				take((int)result->type2.data);
+			else
+				strangers_a_second++;
 		}
+	}
+	if (now - last_result_ms > STALL_MS) {
+		restarts++;
+		console_say("MIC: THE ADC GAVE NOTHING FOR %d MS, STARTED AGAIN (%u)", STALL_MS, restarts);
+		adc_continuous_stop(handle);
+		adc_continuous_start(handle);
+		last_result_ms = now;
 	}
 	if (now - second_began_ms < MS_A_SECOND)
 		return;
+	last_second.results = results_a_second;
+	last_second.strangers = strangers_a_second;
+	last_second.restarts = restarts;
+	results_a_second = 0;
+	strangers_a_second = 0;
 	last_second.peak = peak;
 	last_second.rms = 0;
 	if (counted > 0)

@@ -246,10 +246,23 @@ void speaker_poll(long now) {
 	}
 }
 
+// the timer is stopped while the speaker is muted, the PWM held at the
+// middle: its interrupts, 62500 a second, draw current from the supply in
+// pulses the microphone hears, folded by the ADC's 16000 a second to
+// about 1.6 kHz, as was found on 30 October 2026
 void speaker_mute(int is_muting) {
+	if (is_muting == is_muted)
+		return;
 	is_muted = is_muting;
-	if (is_muted)
-		queue_empty();
+	if (!is_muted) {
+		gptimer_start(timer);
+		return;
+	}
+	queue_empty();
+	gptimer_stop(timer);
+	ring_out = ring_in;
+	ledc_set_duty(PWM_MODE, PWM_CHANNEL, PWM_MIDDLE);
+	ledc_update_duty(PWM_MODE, PWM_CHANNEL);
 }
 
 void speaker_describe(char *text, int room) {

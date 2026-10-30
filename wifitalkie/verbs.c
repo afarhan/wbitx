@@ -129,8 +129,9 @@ static void say_status(void) {
 	speaker_describe(text, sizeof(text));
 	console_say("SPEAKER %s", text);
 	microphone_levels(&levels);
-	console_say("MIC %u, PEAK %d RMS %d, ADC %d A SECOND", (unsigned)settings.mic, levels.peak,
-		levels.rms, levels.samples_a_second);
+	console_say("MIC %u, PEAK %d RMS %d, ADC %d A SECOND (%d READ, %d STRANGE, %u RESTARTS)",
+		(unsigned)settings.mic, levels.peak, levels.rms, levels.samples_a_second,
+		levels.results, levels.strangers, levels.restarts);
 }
 
 static void level_set(const char *what, const char *word, uint32_t *level) {
@@ -293,6 +294,7 @@ void verbs_poll(long now) {
 		return;
 	levels_shown_ms = now;
 	microphone_levels(&levels);
-	console_say("LEVELS PEAK %d RMS %d ADC %d A SECOND", levels.peak, levels.rms,
-		levels.samples_a_second);
+	console_say("LEVELS PEAK %d RMS %d ADC %d A SECOND (%d READ, %d STRANGE, %u RESTARTS)",
+		levels.peak, levels.rms, levels.samples_a_second, levels.results, levels.strangers,
+		levels.restarts);
 }

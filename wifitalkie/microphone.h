@@ -18,6 +18,9 @@ struct microphone_levels {
 	int peak;
 	int rms;
 	int samples_a_second;
+	int results;
+	int strangers;
+	unsigned restarts;
 };
 
 void microphone_open(void);
