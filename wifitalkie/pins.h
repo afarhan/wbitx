@@ -10,13 +10,15 @@
 // DOWN, ENTER. GPIO9 is also the board's BOOT button, so BOOT is UP once
 // the board has started; GPIO8 is also its blue lamp, which lights while
 // MENU is held, and the talkie's lamp is now on the display. The PTT is GPIO21, UART0's TX, which the ROM drives at reset:
-// it has 1k in series. GPIO2 (MUTE), GPIO5 (the right channel) and GPIO0
-// (the headset's microphone) are for what is still to be built.
+// it has 1k in series. GPIO4 and GPIO5 are the headset's left and right.
+// GPIO2 (MUTE) and GPIO0 (the headset's microphone) are for what is still
+// to be built.
 
 #pragma once
 
 #define PIN_MICROPHONE 3
-#define PIN_SPEAKER 4
+#define PIN_SPEAKER_LEFT 4
+#define PIN_SPEAKER_RIGHT 5
 #define PIN_DISPLAY_SDA 6
 #define PIN_DISPLAY_SCL 7
 #define PIN_KEY_MENU 8

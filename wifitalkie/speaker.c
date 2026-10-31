@@ -5,8 +5,10 @@
 //
 // THE OUTPUT
 //
-// The C3 has no DAC. PIN_SPEAKER carries PWM from the LEDC at PWM_HZ, 8
-// bits, far above hearing. It drives earbuds, 16 to 32 ohms, without an
+// The C3 has no DAC. PIN_SPEAKER_LEFT and PIN_SPEAKER_RIGHT, the headset
+// jack's two sides, carry PWM from two channels of the LEDC on one timer, at
+// PWM_HZ, 8 bits, far above hearing. The VoIP is one voice, so both are
+// given the same duty; music in stereo could one day give each its own. It drives earbuds, 16 to 32 ohms, without an
 // amplifier: the pin is set to its strongest drive, so that it is little
 // more than its few tens of ohms. Outside the chip, a resistor in the way
 // would lose the level the earbuds need, so the filter is an inductor and
@@ -64,7 +66,8 @@
 #define PWM_BITS LEDC_TIMER_8_BIT
 #define PWM_HZ 312500
 #define PWM_MIDDLE PLAYBACK_DUTY_MIDDLE
-#define PWM_CHANNEL LEDC_CHANNEL_0
+#define PWM_LEFT LEDC_CHANNEL_0
+#define PWM_RIGHT LEDC_CHANNEL_1
 #define PWM_TIMER LEDC_TIMER_0
 #define PWM_MODE LEDC_LOW_SPEED_MODE
 #define TIMER_HZ 8000000
@@ -103,6 +106,16 @@ _Static_assert(RING_FILLED_MOST < RING_SAMPLES, "the ring holds what the loop ke
 static uint32_t count_gap_samples;
 static uint32_t count_cut;
 
+static inline void IRAM_ATTR duty_set(ledc_channel_t channel, uint32_t duty) {
+	ledc_ll_set_duty_int_part(&LEDC, PWM_MODE, channel, duty);
+	ledc_ll_set_duty_direction(&LEDC, PWM_MODE, channel, LEDC_DUTY_DIR_INCREASE);
+	ledc_ll_set_duty_num(&LEDC, PWM_MODE, channel, 1);
+	ledc_ll_set_duty_cycle(&LEDC, PWM_MODE, channel, 1);
+	ledc_ll_set_duty_scale(&LEDC, PWM_MODE, channel, 0);
+	ledc_ll_set_duty_start(&LEDC, PWM_MODE, channel, true);
+	ledc_ll_ls_channel_update(&LEDC, PWM_MODE, channel);
+}
+
 static bool IRAM_ATTR next_duty(gptimer_handle_t t, const gptimer_alarm_event_data_t *event, void *context) {
 	uint32_t duty = PWM_MIDDLE;
 
@@ -113,13 +126,8 @@ static bool IRAM_ATTR next_duty(gptimer_handle_t t, const gptimer_alarm_event_da
 		duty = ring[ring_out % RING_SAMPLES];
 		ring_out++;
 	}
-	ledc_ll_set_duty_int_part(&LEDC, PWM_MODE, PWM_CHANNEL, duty);
-	ledc_ll_set_duty_direction(&LEDC, PWM_MODE, PWM_CHANNEL, LEDC_DUTY_DIR_INCREASE);
-	ledc_ll_set_duty_num(&LEDC, PWM_MODE, PWM_CHANNEL, 1);
-	ledc_ll_set_duty_cycle(&LEDC, PWM_MODE, PWM_CHANNEL, 1);
-	ledc_ll_set_duty_scale(&LEDC, PWM_MODE, PWM_CHANNEL, 0);
-	ledc_ll_set_duty_start(&LEDC, PWM_MODE, PWM_CHANNEL, true);
-	ledc_ll_ls_channel_update(&LEDC, PWM_MODE, PWM_CHANNEL);
+	duty_set(PWM_LEFT, duty);
+	duty_set(PWM_RIGHT, duty);
 	return false;
 }
 
@@ -131,10 +139,18 @@ void speaker_open(void) {
 		.freq_hz = PWM_HZ,
 		.clk_cfg = LEDC_AUTO_CLK,
 	};
-	ledc_channel_config_t pwm = {
-		.gpio_num = PIN_SPEAKER,
+	ledc_channel_config_t left = {
+		.gpio_num = PIN_SPEAKER_LEFT,
 		.speed_mode = PWM_MODE,
-		.channel = PWM_CHANNEL,
+		.channel = PWM_LEFT,
+		.timer_sel = PWM_TIMER,
+		.duty = PWM_MIDDLE,
+		.hpoint = 0,
+	};
+	ledc_channel_config_t right = {
+		.gpio_num = PIN_SPEAKER_RIGHT,
+		.speed_mode = PWM_MODE,
+		.channel = PWM_RIGHT,
 		.timer_sel = PWM_TIMER,
 		.duty = PWM_MIDDLE,
 		.hpoint = 0,
@@ -156,8 +172,10 @@ void speaker_open(void) {
 	playback_open();
 	playback_begin(&play);
 	ledc_timer_config(&pwm_timer);
-	ledc_channel_config(&pwm);
-	gpio_set_drive_capability(PIN_SPEAKER, GPIO_DRIVE_CAP_3);
+	ledc_channel_config(&left);
+	ledc_channel_config(&right);
+	gpio_set_drive_capability(PIN_SPEAKER_LEFT, GPIO_DRIVE_CAP_3);
+	gpio_set_drive_capability(PIN_SPEAKER_RIGHT, GPIO_DRIVE_CAP_3);
 	gptimer_new_timer(&timer_config, &timer);
 	gptimer_set_alarm_action(timer, &alarm);
 	gptimer_register_event_callbacks(timer, &callbacks, NULL);
@@ -261,8 +279,10 @@ void speaker_mute(int is_muting) {
 	queue_empty();
 	gptimer_stop(timer);
 	ring_out = ring_in;
-	ledc_set_duty(PWM_MODE, PWM_CHANNEL, PWM_MIDDLE);
-	ledc_update_duty(PWM_MODE, PWM_CHANNEL);
+	ledc_set_duty(PWM_MODE, PWM_LEFT, PWM_MIDDLE);
+	ledc_update_duty(PWM_MODE, PWM_LEFT);
+	ledc_set_duty(PWM_MODE, PWM_RIGHT, PWM_MIDDLE);
+	ledc_update_duty(PWM_MODE, PWM_RIGHT);
 }
 
 void speaker_describe(char *text, int room) {
