@@ -8,7 +8,8 @@
 // speaks on the kilohertz of its FREQ is heard here, and what is said here
 // with the PTT down is heard by every radio on that kilohertz with VOIP
 // online. It has no radio of its own. For this first one, it is set from
-// the laptop, a verb a line over USB; verbs.c has them.
+// the laptop, a verb a line over USB, verbs.c has them, and from its own
+// display and four keys, screen.c.
 //
 // One loop and no tasks of its own: each module is polled in turn, and none
 // waits, but the handshake with my.sbitx.net, when the line is being made
@@ -26,9 +27,11 @@
 //     voip.c           the stream by UDP, what is sent and heard
 //     voip_packet.c    the packet
 //     microphone.c     the ADC, down to 8000 a second
-//     speaker.c        the queue, up to 16000 a second, the PWM
+//     speaker.c        the queue and the PWM, playback.c the 62500 a second
 //     telephone.c      mu-law and the filter
 //     ptt.c            the PTT and the lamp
+//     screen.c         the display and the keys: display.c, font.c, keys.c,
+//                      button.c
 //     pins.h           where the parts go
 
 #include <Arduino.h>
@@ -37,6 +40,7 @@
 #include "microphone.h"
 #include "network.h"
 #include "ptt.h"
+#include "screen.h"
 #include "service.h"
 #include "settings.h"
 #include "speaker.h"
@@ -51,6 +55,7 @@ void setup() {
 	settings_load();
 	telephone_open();
 	ptt_open();
+	screen_open();
 	speaker_open();
 	microphone_open();
 	service_open();
@@ -71,5 +76,6 @@ void loop() {
 	service_poll(now);
 	voip_poll(now);
 	speaker_poll(now);
+	screen_poll(now);
 	vTaskDelay(TICKS_GIVEN_UP);
 }

@@ -258,6 +258,12 @@ void voip_describe(char *text, int room_size) {
 	snprintf(text, room_size, "ONLINE");
 }
 
+// whether an over is being heard, and whose
+int voip_hearing(char *callsign, int room_size) {
+	snprintf(callsign, room_size, "%s", speaker_callsign);
+	return is_hearing;
+}
+
 void voip_counts(char *text, int room_size) {
 	snprintf(text, room_size, "SENT %u HEARD %u REFUSED %u DROPPED %u",
 		(unsigned)count_sent, (unsigned)count_heard, (unsigned)count_refused,

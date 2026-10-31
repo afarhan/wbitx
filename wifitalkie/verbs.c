@@ -10,6 +10,7 @@
 // in capitals, and says what it was set to, or why not.
 //
 //     WIFI <ssid> <password>    join this access point, and keep it
+//     SCAN                      the access points in hearing
 //     CALL <callsign>           the owner's callsign at my.sbitx.net
 //     GRID <locator>            the grid said to my.sbitx.net
 //     FREQ <hz>                 the dial: its kilohertz is the room
@@ -200,6 +201,10 @@ void verbs_do(const char *line, long now) {
 		network_join();
 		return;
 	}
+	if (!strcmp(verb, "SCAN")) {
+		network_scan();
+		return;
+	}
 	if (!strcmp(verb, "CALL")) {
 		capitals(first);
 		snprintf(settings.callsign, sizeof(settings.callsign), "%s", first);
@@ -284,7 +289,7 @@ void verbs_do(const char *line, long now) {
 		esp_restart();
 		return;
 	}
-	console_say("? %s: WIFI CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS STATUS RESTART", verb);
+	console_say("? %s: WIFI SCAN CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS STATUS RESTART", verb);
 }
 
 void verbs_poll(long now) {

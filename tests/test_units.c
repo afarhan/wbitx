@@ -2,7 +2,8 @@
 // Copyright (C) 2026 Ashhar Farhan
 //
 // test_units.c — the talkie's code that knows nothing of the ESP32, tried on
-// this computer: mu-law, the filters, the duty, the cookie and the stretch.
+// this computer: mu-law, the filters, the duty, the keys, the cookie and the
+// stretch.
 //
 //     make check
 //
@@ -17,6 +18,7 @@
 #include <string.h>
 
 #include "../wifitalkie/auth.h"
+#include "../wifitalkie/button.h"
 #include "../wifitalkie/playback.h"
 #include "../wifitalkie/telephone.h"
 
@@ -35,6 +37,9 @@
 #define SPEECH_TAPS 255
 #define QUIET_LEVEL (12.0 * 256.0)
 #define SHAPING_LEAST_DB 20.0
+#define BOUNCE_MS 16
+#define KEY_HELD_TRY_MS 3000
+#define KEY_SHORT_MS 200
 
 static int failures;
 
@@ -206,6 +211,56 @@ static void test_duty(void) {
 	expect(gain > SHAPING_LEAST_DB, "the duty's rounding error is pushed above the speech");
 }
 
+// a key's level held from one millisecond to another: how many things it
+// said, and the last
+static int button_run(struct button *b, int is_pressed, long from, long to, int *last) {
+	int count = 0;
+	int what;
+	long now;
+
+	*last = BUTTON_NOTHING;
+	for (now = from; now < to; now++) {
+		what = button_step(b, is_pressed, now);
+		if (what == BUTTON_NOTHING)
+			continue;
+		*last = what;
+		count++;
+	}
+	return count;
+}
+
+static void test_buttons(void) {
+	struct button b;
+	int last;
+	int count;
+	long at;
+
+	button_begin(&b, BUTTON_PLAIN);
+	count = 0;
+	for (at = 0; at < BOUNCE_MS; at += 2)
+		count += button_run(&b, (int)(at / 2 % 2), at, at + 2, &last);
+	expect(count == 0, "a key bouncing says nothing");
+	count = button_run(&b, 1, BOUNCE_MS, BOUNCE_MS + KEY_HELD_TRY_MS, &last);
+	expect(count == 1 && last == BUTTON_PRESSED, "a plain key held says pressed once");
+	count = button_run(&b, 0, BOUNCE_MS + KEY_HELD_TRY_MS, BOUNCE_MS + 2 * KEY_HELD_TRY_MS, &last);
+	expect(count == 0, "a plain key let go says nothing");
+
+	button_begin(&b, BUTTON_REPEATING);
+	count = button_run(&b, 1, 0, BUTTON_DEBOUNCE_MS + BUTTON_REPEAT_AFTER_MS + 2 * BUTTON_REPEAT_EVERY_MS + 1, &last);
+	expect(count == 4 && last == BUTTON_REPEATED, "a repeating key held says pressed, then repeats");
+
+	button_begin(&b, BUTTON_HOLDING);
+	count = button_run(&b, 1, 0, KEY_SHORT_MS, &last);
+	expect(count == 0, "a holding key says nothing going down");
+	count = button_run(&b, 0, KEY_SHORT_MS, 2 * KEY_SHORT_MS, &last);
+	expect(count == 1 && last == BUTTON_PRESSED, "a holding key let go soon says pressed");
+	count = button_run(&b, 1, 2 * KEY_SHORT_MS, 2 * KEY_SHORT_MS + KEY_HELD_TRY_MS, &last);
+	expect(count == 1 && last == BUTTON_HELD, "a holding key held says held once");
+	count = button_run(&b, 0, 2 * KEY_SHORT_MS + KEY_HELD_TRY_MS, 3 * KEY_SHORT_MS + KEY_HELD_TRY_MS, &last);
+	expect(count == 0, "a holding key let go after held says nothing");
+	printf("buttons: debounce, repeat, press and hold as they should\n");
+}
+
 static uint8_t counted_byte(void) {
 	static uint8_t next;
 
@@ -245,6 +300,7 @@ int main(void) {
 	test_down();
 	test_playback();
 	test_duty();
+	test_buttons();
 	test_cookie();
 	test_stretch();
 	if (failures == 0)

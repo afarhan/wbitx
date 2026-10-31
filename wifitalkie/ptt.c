@@ -13,7 +13,9 @@
 // packets a second to nobody would only be using the owner's WiFi and the
 // service. PTT ON typed and forgotten is the case this is for.
 //
-// The lamp is lit while the talkie speaks or hears; voip.c says which.
+// The lamp is lit while the talkie speaks or hears; voip.c says which. It
+// was the board's LED; that pin is now the UP key, and the lamp is shown on
+// the display.
 
 #include "driver/gpio.h"
 
@@ -31,6 +33,7 @@ static long button_changed_ms;
 static int is_down;
 static long down_since_ms;
 static int is_cut;
+static int is_lit;
 
 void ptt_open(void) {
 	gpio_config_t button = {
@@ -40,17 +43,8 @@ void ptt_open(void) {
 		.pull_down_en = GPIO_PULLDOWN_DISABLE,
 		.intr_type = GPIO_INTR_DISABLE,
 	};
-	gpio_config_t lamp = {
-		.pin_bit_mask = 1ULL << PIN_LAMP,
-		.mode = GPIO_MODE_OUTPUT,
-		.pull_up_en = GPIO_PULLUP_DISABLE,
-		.pull_down_en = GPIO_PULLDOWN_DISABLE,
-		.intr_type = GPIO_INTR_DISABLE,
-	};
 
 	gpio_config(&button);
-	gpio_config(&lamp);
-	ptt_lamp(0);
 }
 
 void ptt_set(int is_verb) {
@@ -91,9 +85,10 @@ int ptt_is_down(void) {
 	return is_down;
 }
 
-void ptt_lamp(int is_lit) {
-	if (is_lit)
-		gpio_set_level(PIN_LAMP, LAMP_LIT_LEVEL);
-	else
-		gpio_set_level(PIN_LAMP, !LAMP_LIT_LEVEL);
+void ptt_lamp(int is_lighting) {
+	is_lit = is_lighting;
+}
+
+int ptt_is_lit(void) {
+	return is_lit;
 }

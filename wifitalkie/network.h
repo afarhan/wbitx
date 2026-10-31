@@ -12,6 +12,7 @@ extern "C" {
 void network_open(void);
 void network_join(void);
 void network_poll(long now);
+void network_scan(void);
 int network_is_up(void);
 void network_describe(char *text, int room);
 

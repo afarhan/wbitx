@@ -20,6 +20,7 @@ void voip_busy_heard(const char *why, long now);
 void voip_tone(int is_on);
 void voip_describe(char *text, int room);
 void voip_counts(char *text, int room);
+int voip_hearing(char *callsign, int room);
 
 #ifdef __cplusplus
 }
