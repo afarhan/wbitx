@@ -122,6 +122,17 @@ static void dot(int x, int y) {
 	frame[y / DISPLAY_ROW_HIGH][x] |= (uint8_t)(1 << (y % DISPLAY_ROW_HIGH));
 }
 
+// a box wide by high dots, its top left at x, y, filled
+void display_fill(int x, int y, int wide, int high) {
+	int i;
+	int j;
+
+	for (i = 0; i < wide; i++) {
+		for (j = 0; j < high; j++)
+			dot(x + i, y + j);
+	}
+}
+
 // text with its top at the row's, each dot of the font scale by scale
 void display_text(int x, int row, int scale, const char *text) {
 	const uint8_t *letter;

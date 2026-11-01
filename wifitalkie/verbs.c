@@ -24,6 +24,7 @@
 //     VOL <0-100>  MIC <0-100>  the speaker's level and the microphone's
 //     LEVELS ON|OFF             the microphone's levels each second
 //     VOX ON|OFF                the gaps between words as comfort noise
+//     KEYS                      each key's pin as it is now, DOWN or up
 //     RECORD                    3 s of the microphone, in hex, after
 //     MICPIN <0-4>              read the microphone on another ADC1 pin
 //     DISPLAY ON|OFF            the OLED, and its I2C, on or off
@@ -44,6 +45,7 @@
 #include "auth.h"
 #include "console.h"
 #include "display.h"
+#include "keys.h"
 #include "microphone.h"
 #include "network.h"
 #include "ptt.h"
@@ -317,6 +319,11 @@ void verbs_do(const char *line, long now) {
 			console_say("VOX OFF");
 		return;
 	}
+	if (!strcmp(verb, "KEYS")) {
+		keys_describe(first, sizeof(first));
+		console_say("KEYS %s", first);
+		return;
+	}
 	if (!strcmp(verb, "RECORD")) {
 		microphone_record();
 		return;
@@ -330,7 +337,7 @@ void verbs_do(const char *line, long now) {
 		esp_restart();
 		return;
 	}
-	console_say("? %s: WIFI SCAN RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX RECORD MICPIN DISPLAY STATUS RESTART", verb);
+	console_say("? %s: WIFI SCAN RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX KEYS RECORD MICPIN DISPLAY STATUS RESTART", verb);
 }
 
 void verbs_poll(long now) {

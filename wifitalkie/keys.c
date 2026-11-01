@@ -5,9 +5,13 @@
 //
 // Each is a key to ground, with the C3's pull-up; button.c says what its
 // presses mean. UP and DOWN repeat while held; MENU is BACK when pressed and
-// HOME when held; ENTER is a press. keys_poll() gives at most one press a
+// HOME when held; ENTER is a press, given as it comes up, and held, which
+// takes a character off while text is entered, and goes on taking them off
+// while it is held. keys_poll() gives at most one press a
 // turn of the loop; two keys' presses in the same millisecond give the
 // first's, with how long its key has been held.
+
+#include <stdio.h>
 
 #include "driver/gpio.h"
 
@@ -15,7 +19,7 @@
 #include "pins.h"
 
 static const int pins[KEYS] = {PIN_KEY_UP, PIN_KEY_DOWN, PIN_KEY_MENU, PIN_KEY_ENTER};
-static const int kinds[KEYS] = {BUTTON_REPEATING, BUTTON_REPEATING, BUTTON_HOLDING, BUTTON_PLAIN};
+static const int kinds[KEYS] = {BUTTON_REPEATING, BUTTON_REPEATING, BUTTON_HOLDING, BUTTON_HOLDING_REPEATING};
 static const char *names[KEYS] = {"UP", "DOWN", "MENU", "ENTER"};
 static struct button buttons[KEYS];
 
@@ -55,4 +59,22 @@ int keys_poll(long now, struct key_press *press) {
 
 const char *keys_name(int key) {
 	return names[key];
+}
+
+// each key's pin as it is now, and the PTT's, DOWN or up, for the verb KEYS:
+// a key that says DOWN while nobody presses it is stuck or shorted
+void keys_describe(char *text, int room) {
+	int used = 0;
+	int key;
+
+	for (key = 0; key < KEYS; key++) {
+		if (gpio_get_level(pins[key]) == 0)
+			used += snprintf(text + used, room - used, "%s DOWN, ", names[key]);
+		else
+			used += snprintf(text + used, room - used, "%s up, ", names[key]);
+	}
+	if (gpio_get_level(PIN_PTT) == 0)
+		snprintf(text + used, room - used, "PTT DOWN");
+	else
+		snprintf(text + used, room - used, "PTT up");
 }

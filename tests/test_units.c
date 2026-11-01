@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Ashhar Farhan
 //
 // test_units.c — the talkie's code that knows nothing of the ESP32, tried on
-// this computer: mu-law, the filters, the duty, the keys, the dial, the speech's
+// this computer: mu-law, the filters, the duty, the keys, the dial, the text entry, the speech's
 // high-pass and gate, the cookie and the stretch.
 //
 //     make check
@@ -21,7 +21,9 @@
 #include "../wifitalkie/auth.h"
 #include "../wifitalkie/button.h"
 #include "../wifitalkie/dial.h"
+#include "../wifitalkie/entry.h"
 #include "../wifitalkie/playback.h"
+#include "../wifitalkie/settings.h"
 #include "../wifitalkie/speech.h"
 #include "../wifitalkie/telephone.h"
 
@@ -269,6 +271,13 @@ static void test_buttons(void) {
 	expect(count == 1 && last == BUTTON_HELD, "a holding key held says held once");
 	count = button_run(&b, 0, 2 * KEY_SHORT_MS + KEY_HELD_TRY_MS, 3 * KEY_SHORT_MS + KEY_HELD_TRY_MS, &last);
 	expect(count == 0, "a holding key let go after held says nothing");
+	button_begin(&b, BUTTON_HOLDING_REPEATING);
+	count = button_run(&b, 1, 0, BUTTON_DEBOUNCE_MS + BUTTON_HELD_MS + 2 * BUTTON_REPEAT_EVERY_MS + 1, &last);
+	expect(count == 3 && last == BUTTON_REPEATED, "a holding, repeating key held says held, then repeats");
+	count = button_run(&b, 0, BUTTON_DEBOUNCE_MS + BUTTON_HELD_MS + 2 * BUTTON_REPEAT_EVERY_MS + 1,
+		2 * BUTTON_HELD_MS, &last);
+	expect(count == 0, "a holding, repeating key let go after held says nothing");
+
 	button_begin(&b, BUTTON_REPEATING);
 	button_run(&b, 1, 0, BUTTON_FAST_AFTER_MS, &last);
 	count = button_run(&b, 1, BUTTON_FAST_AFTER_MS, BUTTON_FAST_AFTER_MS + BUTTON_REPEAT_EVERY_MS, &last);
@@ -346,6 +355,34 @@ static void test_dial(void) {
 	printf("dial: kilohertz steps, faster held, and its ends\n");
 }
 
+static void test_entry(void) {
+	struct entry e;
+	int i;
+
+	entry_begin(&e, ENTRY_CALLSIGN, "", SETTINGS_CALLSIGN_ROOM - 1);
+	expect(entry_around(&e, 0) == 'A' && entry_around(&e, -1) == '/' && entry_around(&e, 1) == 'B',
+		"the entry starts at the set's first, its neighbours round it");
+	entry_scroll(&e, 0);
+	expect(entry_around(&e, 0) == '/', "scrolling down from the first goes round to the last");
+	entry_scroll(&e, 1);
+	entry_scroll(&e, 1);
+	entry_add(&e);
+	for (i = 0; i < 21; i++)
+		entry_scroll(&e, 1);
+	entry_add(&e);
+	expect(!strcmp(e.text, "BW"), "characters are added as chosen");
+	entry_delete(&e);
+	expect(!strcmp(e.text, "B"), "the last is taken off");
+	expect(entry_delete(&e) && !entry_delete(&e) && e.text[0] == 0, "an empty text stays empty");
+	entry_begin(&e, ENTRY_ANY, "VU2ESE", 8);
+	expect(e.length == 6 && entry_around(&e, 0) == 'a', "an entry begins with the text it is given");
+	entry_add(&e);
+	entry_add(&e);
+	expect(!entry_add(&e) && !strcmp(e.text, "VU2ESEaa"), "the text stops at its most");
+	expect((int)strlen(ENTRY_ANY) == '~' - ' ' + 1, "the whole set is all of printable ASCII");
+	printf("entry: scrolled round, added, taken off, kept to its length\n");
+}
+
 static void test_speech(void) {
 	struct speech s;
 	double noise_size = NOISE_SIZE / 2.0;
@@ -415,6 +452,7 @@ int main(void) {
 	test_duty();
 	test_buttons();
 	test_dial();
+	test_entry();
 	test_speech();
 	test_cookie();
 	test_stretch();

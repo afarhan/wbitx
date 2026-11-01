@@ -18,6 +18,10 @@
 // minute, with ALWAYS_GAP_MS let go between, so that my.sbitx.net hears it
 // as overs. It is 0 in a talkie for use.
 //
+// While the screen has borrowed the button, ptt_lend(), the button does
+// not speak: each press of it is kept for ptt_take_press(), the screen's
+// "accept" while text is being entered. The verb still speaks.
+//
 // The lamp is lit while the talkie speaks or hears; voip.c says which. It
 // was the board's LED; that pin is now the UP key, and the lamp is shown on
 // the display.
@@ -43,6 +47,9 @@ static long down_since_ms;
 static int is_cut;
 static int is_lit;
 static long cut_ms;
+static int is_lent;
+static int is_press_kept;
+static int was_button_down;
 
 void ptt_open(void) {
 	gpio_config_t button = {
@@ -70,7 +77,10 @@ void ptt_poll(long now) {
 	}
 	if (now - button_changed_ms >= DEBOUNCE_MS)
 		is_button_down = level == 0;
-	is_wanted = is_verb_down || is_button_down;
+	if (is_button_down && !was_button_down && is_lent)
+		is_press_kept = 1;
+	was_button_down = is_button_down;
+	is_wanted = is_verb_down || (is_button_down && !is_lent);
 	if (ALWAYS_SPEAKING && network_is_up()) {
 		is_wanted = 1;
 		if (is_cut && now - cut_ms >= ALWAYS_GAP_MS)
@@ -106,4 +116,20 @@ void ptt_lamp(int is_lighting) {
 
 int ptt_is_lit(void) {
 	return is_lit;
+}
+
+// lent back still held, the button has to be let go before it speaks
+void ptt_lend(int is_lending) {
+	if (is_lent && !is_lending && is_button_down)
+		is_cut = 1;
+	is_lent = is_lending;
+	is_press_kept = 0;
+}
+
+// 1 once for each press of the button while it is lent
+int ptt_take_press(void) {
+	int was = is_press_kept;
+
+	is_press_kept = 0;
+	return was;
 }

@@ -17,6 +17,10 @@
 //                        BUTTON_HELD_MS; held, once, when it has been down
 //                        that long, and then nothing as it comes up (MENU,
 //                        which is BACK pressed and HOME held)
+//     BUTTON_HOLDING_REPEATING   as BUTTON_HOLDING, but after held it is
+//                        repeated every BUTTON_REPEAT_EVERY_MS while it
+//                        stays down (ENTER, which held takes characters
+//                        off one after another)
 //
 // It knows nothing of the ESP32, so tests/test_units.c tries it.
 
@@ -32,19 +36,23 @@ void button_begin(struct button *b, int kind) {
 	b->is_held_given = 0;
 }
 
+static int is_holding(const struct button *b) {
+	return b->kind == BUTTON_HOLDING || b->kind == BUTTON_HOLDING_REPEATING;
+}
+
 static int going_down(struct button *b, long now) {
 	b->is_down = 1;
 	b->down_ms = now;
 	b->repeat_ms = now + BUTTON_REPEAT_AFTER_MS;
 	b->is_held_given = 0;
-	if (b->kind == BUTTON_HOLDING)
+	if (is_holding(b))
 		return BUTTON_NOTHING;
 	return BUTTON_PRESSED;
 }
 
 static int coming_up(struct button *b) {
 	b->is_down = 0;
-	if (b->kind == BUTTON_HOLDING && !b->is_held_given)
+	if (is_holding(b) && !b->is_held_given)
 		return BUTTON_PRESSED;
 	return BUTTON_NOTHING;
 }
@@ -57,9 +65,14 @@ static int staying_down(struct button *b, long now) {
 			b->repeat_ms += BUTTON_REPEAT_EVERY_MS;
 		return BUTTON_REPEATED;
 	}
-	if (b->kind == BUTTON_HOLDING && !b->is_held_given && now - b->down_ms >= BUTTON_HELD_MS) {
+	if (is_holding(b) && !b->is_held_given && now - b->down_ms >= BUTTON_HELD_MS) {
 		b->is_held_given = 1;
+		b->repeat_ms = now + BUTTON_REPEAT_EVERY_MS;
 		return BUTTON_HELD;
+	}
+	if (b->kind == BUTTON_HOLDING_REPEATING && b->is_held_given && now >= b->repeat_ms) {
+		b->repeat_ms += BUTTON_REPEAT_EVERY_MS;
+		return BUTTON_REPEATED;
 	}
 	return BUTTON_NOTHING;
 }

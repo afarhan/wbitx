@@ -14,6 +14,7 @@ void service_poll(long now);
 void service_restart(void);
 void service_new_key(void);
 void service_describe(char *text, int room);
+int service_is_online(void);
 
 #ifdef __cplusplus
 }

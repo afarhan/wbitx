@@ -472,6 +472,10 @@ void service_poll(long now) {
 		line_poll(now);
 }
 
+int service_is_online(void) {
+	return state == STATE_ONLINE;
+}
+
 void service_describe(char *text, int room) {
 	snprintf(text, room, "%s", status);
 }

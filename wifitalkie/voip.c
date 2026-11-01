@@ -77,6 +77,7 @@ static long tuned_ms;
 static long channel_told = -1;
 static int is_tuned_begun;
 static char room[TEXT_ROOM];
+static int here = -1;
 static char busy[TEXT_ROOM];
 static long busy_ms;
 static long polled_ms;
@@ -119,12 +120,14 @@ void voip_close(void) {
 		close(fd);
 	fd = NOT_OPEN;
 	room[0] = 0;
+	here = -1;
 	busy[0] = 0;
 }
 
 void voip_room_heard(long channel, int count) {
 	char said[TEXT_ROOM];
 
+	here = count;
 	snprintf(said, sizeof(said), "%ld KHZ, %d HERE", channel, count);
 	if (!strcmp(said, room))
 		return;
@@ -256,6 +259,17 @@ void voip_describe(char *text, int room_size) {
 		return;
 	}
 	snprintf(text, room_size, "ONLINE");
+}
+
+// how many are in the room, as the service last said, or -1 not knowing
+int voip_here(void) {
+	return here;
+}
+
+// whether my.sbitx.net said the room was busy, a moment ago, and why
+int voip_busy(char *why, int room_size) {
+	snprintf(why, room_size, "%s", busy);
+	return busy[0] != 0 && polled_ms - busy_ms < BUSY_SHOWN_MS;
 }
 
 // whether an over is being heard, and whose
