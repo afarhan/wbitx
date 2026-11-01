@@ -25,6 +25,23 @@
 // after MIC and how many came, which says whether the ADC keeps the rate
 // it was asked for: the packets go at the rate the microphone makes them.
 //
+// What comes out of the 8000 a second is put through speech.c's high-pass,
+// the hum taken off. Its gate, the VOX, sends the gaps between words as
+// comfort noise; it is off unless microphone_vox() turns it on, the verb
+// VOX ON. It was made for a mic element whose voice stood little above the
+// noise; with a better element, on 1 November 2026, it was not needed.
+// LEVELS measures after the high-pass and before the gate, and RECORD keeps
+// what is sent.
+//
+// microphone_pin() reads another pin from now on, until the next power-up:
+// GPIO0 to GPIO4 are ADC1's, for trying which is quietest.
+//
+// microphone_record() keeps the next RECORD_SECONDS of what goes out, at
+// 8000 a second, and then says it on the console a line of RECORD_LINE
+// samples at a time, one line a turn of the loop: RECORDING, lines of
+// "R" and four hex digits a sample, then RECORDED. It is for looking at
+// the microphone's noise from the laptop.
+//
 // On 30 October 2026 the ADC was twice found giving nothing from the start;
 // at other starts it ran. When it was next caught, it had stopped just as
 // the WiFi came up, whose radio's calibration uses the same SAR ADC: that
@@ -34,12 +51,15 @@
 
 #include <string.h>
 
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 #include "esp_adc/adc_continuous.h"
 
 #include "console.h"
 #include "microphone.h"
 #include "pins.h"
 #include "settings.h"
+#include "speech.h"
 
 #define SAMPLE_HZ DOUBLE_RATE_HZ
 #define STORE_BYTES 4096
@@ -53,12 +73,18 @@
 #define INT16_MOST 32767
 #define MS_A_SECOND 1000
 #define STALL_MS 500
+#define RECORD_SECONDS 3
+#define RECORD_SAMPLES (RECORD_SECONDS * TELEPHONE_RATE_HZ)
+#define RECORD_LINE 32
+#define ADC_CODES 4096
 
 static adc_continuous_handle_t handle;
 static adc_channel_t channel;
 static int is_open;
 static int32_t mean;
 static struct telephone_down down;
+static struct speech speech;
+static int is_vox;
 static int16_t frames[FRAMES_KEPT][TELEPHONE_FRAME_SAMPLES];
 static int frame_in;
 static int frame_out;
@@ -73,8 +99,12 @@ static long last_result_ms;
 static unsigned restarts;
 static long second_began_ms;
 static struct microphone_levels last_second;
+static int16_t recorded[RECORD_SAMPLES];
+static int is_recording;
+static int record_filled;
+static int record_said;
 
-void microphone_open(void) {
+static void open_on(int pin) {
 	adc_continuous_handle_cfg_t store = {
 		.max_store_buf_size = STORE_BYTES,
 		.conv_frame_size = FRAME_BYTES,
@@ -85,9 +115,10 @@ void microphone_open(void) {
 	adc_unit_t unit;
 
 	telephone_down_begin(&down);
+	speech_begin(&speech, TELEPHONE_RATE_HZ);
 	mean = ADC_MIDDLE << MEAN_FRACTION_SHIFT;
-	if (adc_continuous_io_to_channel(PIN_MICROPHONE, &unit, &channel) != ESP_OK || unit != ADC_UNIT_1) {
-		console_say("MIC: PIN %d IS NOT ON ADC1", PIN_MICROPHONE);
+	if (adc_continuous_io_to_channel(pin, &unit, &channel) != ESP_OK || unit != ADC_UNIT_1) {
+		console_say("MIC: PIN %d IS NOT ON ADC1", pin);
 		return;
 	}
 	memset(&pattern, 0, sizeof(pattern));
@@ -108,6 +139,21 @@ void microphone_open(void) {
 		return;
 	}
 	is_open = 1;
+}
+
+void microphone_open(void) {
+	open_on(PIN_MICROPHONE);
+}
+
+void microphone_pin(int pin) {
+	if (is_open) {
+		adc_continuous_stop(handle);
+		adc_continuous_deinit(handle);
+		is_open = 0;
+	}
+	open_on(pin);
+	if (is_open)
+		console_say("MIC ON GPIO%d", pin);
 }
 
 static void frame_full(void) {
@@ -141,7 +187,12 @@ static void take(int raw) {
 		sample = -INT16_MOST;
 	if (!telephone_down_take(&down, (int16_t)sample, &kept))
 		return;
+	kept = speech_high_pass(&speech, kept);
 	measure(kept);
+	if (is_vox)
+		kept = speech_gate(&speech, kept, TELEPHONE_RATE_HZ);
+	if (is_recording && record_filled < RECORD_SAMPLES)
+		recorded[record_filled++] = kept;
 	frames[frame_in][filled++] = kept;
 	if (filled == TELEPHONE_FRAME_SAMPLES)
 		frame_full();
@@ -163,6 +214,53 @@ static int square_root(int64_t value) {
 		bit >>= 2;
 	}
 	return (int)root;
+}
+
+// what the ADC's level is, by its own calibration, or 0 without one
+static int adc_millivolts(void) {
+	adc_cali_curve_fitting_config_t config = {
+		.unit_id = ADC_UNIT_1,
+		.chan = channel,
+		.atten = ADC_ATTEN_DB_12,
+		.bitwidth = ADC_BITWIDTH_12,
+	};
+	adc_cali_handle_t cali;
+	int millivolts = 0;
+
+	if (adc_cali_create_scheme_curve_fitting(&config, &cali) != ESP_OK)
+		return 0;
+	adc_cali_raw_to_voltage(cali, (int)(mean >> MEAN_FRACTION_SHIFT), &millivolts);
+	adc_cali_delete_scheme_curve_fitting(cali);
+	return millivolts;
+}
+
+static void record_say(void) {
+	char line[2 + RECORD_LINE * 4];
+	int n = 0;
+	int i;
+
+	if (!is_recording || record_filled < RECORD_SAMPLES)
+		return;
+	line[n++] = 'R';
+	for (i = 0; i < RECORD_LINE && record_said < RECORD_SAMPLES; i++, record_said++)
+		n += snprintf(&line[n], sizeof(line) - n, "%04x", (uint16_t)recorded[record_said]);
+	console_say("%s", line);
+	if (record_said < RECORD_SAMPLES)
+		return;
+	console_say("RECORDED %d SAMPLES AT %d A SECOND, THE ADC AT %d OF %d, ABOUT %d MV", RECORD_SAMPLES,
+		TELEPHONE_RATE_HZ, (int)(mean >> MEAN_FRACTION_SHIFT), ADC_CODES, adc_millivolts());
+	is_recording = 0;
+}
+
+void microphone_vox(int is_on) {
+	is_vox = is_on;
+}
+
+void microphone_record(void) {
+	record_filled = 0;
+	record_said = 0;
+	is_recording = 1;
+	console_say("RECORDING %d SECONDS", RECORD_SECONDS);
 }
 
 void microphone_poll(long now) {
@@ -191,6 +289,7 @@ void microphone_poll(long now) {
 		adc_continuous_start(handle);
 		last_result_ms = now;
 	}
+	record_say();
 	if (now - second_began_ms < MS_A_SECOND)
 		return;
 	last_second.results = results_a_second;

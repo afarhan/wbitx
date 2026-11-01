@@ -11,6 +11,7 @@
 //
 //     WIFI <ssid> <password>    join this access point, and keep it
 //     SCAN                      the access points in hearing
+//     RADIO ON|OFF              the WiFi radio itself, on or off
 //     CALL <callsign>           the owner's callsign at my.sbitx.net
 //     GRID <locator>            the grid said to my.sbitx.net
 //     FREQ <hz>                 the dial: its kilohertz is the room
@@ -22,12 +23,16 @@
 //     TONE ON|OFF               1 kHz in place of the microphone
 //     VOL <0-100>  MIC <0-100>  the speaker's level and the microphone's
 //     LEVELS ON|OFF             the microphone's levels each second
+//     VOX ON|OFF                the gaps between words as comfort noise
+//     RECORD                    3 s of the microphone, in hex, after
+//     MICPIN <0-4>              read the microphone on another ADC1 pin
+//     DISPLAY ON|OFF            the OLED, and its I2C, on or off
 //     STATUS                    all of it
 //     RESTART                   start the talkie again
 //
 // A verb that changes what the line to my.sbitx.net is made with, CALL,
 // SERVER, NEW_KEY and VOIP, has it made again. Whatever is set is kept
-// across power-ups, but PTT, TONE and LEVELS, which are for now.
+// across power-ups, but PTT, TONE, LEVELS, VOX, RECORD, MICPIN, DISPLAY and RADIO, which are for now.
 
 #include <ctype.h>
 #include <stdio.h>
@@ -38,6 +43,7 @@
 
 #include "auth.h"
 #include "console.h"
+#include "display.h"
 #include "microphone.h"
 #include "network.h"
 #include "ptt.h"
@@ -201,6 +207,13 @@ void verbs_do(const char *line, long now) {
 		network_join();
 		return;
 	}
+	if (!strcmp(verb, "RADIO") && is_on_off(first, &is_on)) {
+		if (is_on)
+			network_on();
+		else
+			network_off();
+		return;
+	}
 	if (!strcmp(verb, "SCAN")) {
 		network_scan();
 		return;
@@ -280,6 +293,32 @@ void verbs_do(const char *line, long now) {
 		is_levels_shown = is_on;
 		return;
 	}
+	if (!strcmp(verb, "DISPLAY") && is_on_off(first, &is_on)) {
+		if (is_on) {
+			display_on();
+			console_say("DISPLAY ON");
+		} else {
+			display_off();
+			console_say("DISPLAY OFF");
+		}
+		return;
+	}
+	if (!strcmp(verb, "MICPIN") && first[0] != 0) {
+		microphone_pin(atoi(first));
+		return;
+	}
+	if (!strcmp(verb, "VOX") && is_on_off(first, &is_on)) {
+		microphone_vox(is_on);
+		if (is_on)
+			console_say("VOX ON");
+		else
+			console_say("VOX OFF");
+		return;
+	}
+	if (!strcmp(verb, "RECORD")) {
+		microphone_record();
+		return;
+	}
 	if (!strcmp(verb, "STATUS")) {
 		say_status();
 		return;
@@ -289,7 +328,7 @@ void verbs_do(const char *line, long now) {
 		esp_restart();
 		return;
 	}
-	console_say("? %s: WIFI SCAN CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS STATUS RESTART", verb);
+	console_say("? %s: WIFI SCAN RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX RECORD MICPIN DISPLAY STATUS RESTART", verb);
 }
 
 void verbs_poll(long now) {

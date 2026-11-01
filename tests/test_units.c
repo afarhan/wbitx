@@ -2,8 +2,8 @@
 // Copyright (C) 2026 Ashhar Farhan
 //
 // test_units.c — the talkie's code that knows nothing of the ESP32, tried on
-// this computer: mu-law, the filters, the duty, the keys, the cookie and the
-// stretch.
+// this computer: mu-law, the filters, the duty, the keys, the speech's
+// high-pass and gate, the cookie and the stretch.
 //
 //     make check
 //
@@ -15,11 +15,13 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "../wifitalkie/auth.h"
 #include "../wifitalkie/button.h"
 #include "../wifitalkie/playback.h"
+#include "../wifitalkie/speech.h"
 #include "../wifitalkie/telephone.h"
 
 #define SETTLE_SAMPLES 200
@@ -37,6 +39,14 @@
 #define SPEECH_TAPS 255
 #define QUIET_LEVEL (12.0 * 256.0)
 #define SHAPING_LEAST_DB 20.0
+#define HUM_HZ 50.0
+#define HUM_LEAST_DB 25.0
+#define SPEECH_RATE 8000
+#define NOISE_SIZE 30
+#define VOICE_SIZE 3000.0
+#define QUIET_VOICE_SIZE 120.0
+#define GATE_SETTLE_MS 20
+#define GATE_LEARN_MS 1000
 #define BOUNCE_MS 16
 #define KEY_HELD_TRY_MS 3000
 #define KEY_SHORT_MS 200
@@ -261,6 +271,92 @@ static void test_buttons(void) {
 	printf("buttons: debounce, repeat, press and hold as they should\n");
 }
 
+// a tone's level through the high-pass, in dB
+static double high_pass_db(double hz) {
+	struct speech s;
+	double sum = 0;
+	int16_t out;
+	int i;
+
+	speech_begin(&s, SPEECH_RATE);
+	for (i = 0; i < SETTLE_SAMPLES + MEASURE_SAMPLES; i++) {
+		out = speech_high_pass(&s, (int16_t)lrint(TEST_AMPLITUDE * sin(2 * M_PI * hz * i / SPEECH_RATE)));
+		if (i >= SETTLE_SAMPLES)
+			sum += (double)out * out;
+	}
+	return 20 * log10(sqrt(sum / MEASURE_SAMPLES) / (TEST_AMPLITUDE / sqrt(2)));
+}
+
+static int16_t noise_sample(void) {
+	static uint32_t next = 1;
+
+	next = next * 1103515245 + 12345;
+	return (int16_t)((int)(next >> 16) % (2 * NOISE_SIZE + 1) - NOISE_SIZE);
+}
+
+// the largest sample out of the gate over ms milliseconds of noise, with a
+// tone of voice_size on it, and the mean size of what came out
+static int gate_run(struct speech *s, double voice_size, int ms, double *mean_size) {
+	int largest = 0;
+	double sum = 0;
+	int16_t out;
+	int count = ms * SPEECH_RATE / 1000;
+	int i;
+
+	for (i = 0; i < count; i++) {
+		out = speech_gate(s, (int16_t)(noise_sample() + lrint(voice_size * sin(2 * M_PI * PASS_HZ * i / SPEECH_RATE))), SPEECH_RATE);
+		if (abs(out) > largest)
+			largest = abs(out);
+		sum += abs(out);
+	}
+	if (mean_size)
+		*mean_size = sum / count;
+	return largest;
+}
+
+// the largest of a voice's first cycle out of the gate, the gate shut when
+// it began
+static int gate_onset(struct speech *s) {
+	int largest = 0;
+	int16_t out;
+	int i;
+
+	for (i = 0; i < SPEECH_AHEAD_SAMPLES + SPEECH_RATE / (int)PASS_HZ; i++) {
+		out = speech_gate(s, (int16_t)(noise_sample() + lrint(VOICE_SIZE * sin(2 * M_PI * PASS_HZ * i / SPEECH_RATE))), SPEECH_RATE);
+		if (i >= SPEECH_AHEAD_SAMPLES && abs(out) > largest)
+			largest = abs(out);
+	}
+	return largest;
+}
+
+static void test_speech(void) {
+	struct speech s;
+	double noise_size = NOISE_SIZE / 2.0;
+	double size;
+
+	expect(high_pass_db(HUM_HZ) < -HUM_LEAST_DB, "the high-pass takes the mains' hum off");
+	expect(fabs(high_pass_db(PASS_HZ)) < PASS_TOLERANCE_DB, "the high-pass passes speech at 1 kHz");
+	speech_begin(&s, SPEECH_RATE);
+	gate_run(&s, 0, GATE_LEARN_MS, NULL);
+	gate_run(&s, 0, GATE_SETTLE_MS * 10, &size);
+	expect(size > noise_size / SPEECH_COMFORT_PART / 2 && size < noise_size * 0.75,
+		"the gate sends noise alone as comfort noise, quieter than it");
+	gate_run(&s, VOICE_SIZE, GATE_SETTLE_MS, NULL);
+	expect(gate_run(&s, VOICE_SIZE, GATE_SETTLE_MS, NULL) > VOICE_SIZE * 0.95, "the gate passes a voice whole");
+	gate_run(&s, 0, SPEECH_HOLD_MS / 2, &size);
+	expect(size > noise_size * 0.75, "the gate holds open a while after the voice");
+	gate_run(&s, 0, SPEECH_HOLD_MS + SPEECH_CLOSING_MS, NULL);
+	gate_run(&s, 0, GATE_SETTLE_MS * 10, &size);
+	expect(size < noise_size * 0.75, "the gate shuts after its hold");
+	expect(gate_onset(&s) > VOICE_SIZE * 0.9, "the gate is open by a word's first sound");
+	speech_begin(&s, SPEECH_RATE);
+	gate_run(&s, 0, GATE_LEARN_MS, NULL);
+	gate_run(&s, QUIET_VOICE_SIZE, GATE_SETTLE_MS, NULL);
+	expect(gate_run(&s, QUIET_VOICE_SIZE, GATE_SETTLE_MS, NULL) > QUIET_VOICE_SIZE * 0.9,
+		"a voice a few times the noise opens the gate");
+	printf("speech: hum off, speech through, comfort noise %.1f in the gaps for noise of %.1f\n", size, noise_size);
+}
+
 static uint8_t counted_byte(void) {
 	static uint8_t next;
 
@@ -301,6 +397,7 @@ int main(void) {
 	test_playback();
 	test_duty();
 	test_buttons();
+	test_speech();
 	test_cookie();
 	test_stretch();
 	if (failures == 0)

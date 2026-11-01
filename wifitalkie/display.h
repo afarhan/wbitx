@@ -21,6 +21,8 @@ void display_clear(void);
 void display_text(int x, int row, int scale, const char *text);
 void display_bar(int x, int row, int wide, int filled);
 void display_poll(void);
+void display_off(void);
+void display_on(void);
 
 #ifdef __cplusplus
 }

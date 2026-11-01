@@ -27,6 +27,9 @@ void microphone_open(void);
 void microphone_poll(long now);
 int microphone_frame(int16_t samples[TELEPHONE_FRAME_SAMPLES]);
 void microphone_levels(struct microphone_levels *levels);
+void microphone_record(void);
+void microphone_vox(int is_on);
+void microphone_pin(int pin);
 
 #ifdef __cplusplus
 }

@@ -15,6 +15,10 @@
 // once would hold the loop up some 25 ms, near what the speaker's ring
 // holds. So a screen redrawn reaches the display over eight turns of the
 // loop, and a page not changed is not sent at all.
+//
+// display_off() turns the panel off and sends it nothing more, so that no
+// I2C runs near the microphone; display_on() turns it on and sends it all
+// again.
 
 #include <string.h>
 
@@ -39,6 +43,8 @@
 #define COLUMN_HIGH_SET 0x10
 #define NIBBLE 0x0f
 #define NIBBLE_BITS 4
+#define PANEL_OFF 0xae
+#define PANEL_ON 0xaf
 
 static const uint8_t start[] = {
 	COMMANDS,
@@ -63,6 +69,7 @@ static const uint8_t start[] = {
 static i2c_master_bus_handle_t bus;
 static i2c_master_dev_handle_t device;
 static int is_open;
+static int is_off;
 static uint8_t frame[DISPLAY_ROWS][DISPLAY_WIDE];
 static uint8_t sent[DISPLAY_ROWS][DISPLAY_WIDE];
 static int is_sent[DISPLAY_ROWS];
@@ -180,7 +187,7 @@ void display_poll(void) {
 	int tried;
 	int page;
 
-	if (!is_open)
+	if (!is_open || is_off)
 		return;
 	for (tried = 0; tried < DISPLAY_ROWS; tried++) {
 		page = next_page;
@@ -190,4 +197,25 @@ void display_poll(void) {
 		send_page(page);
 		return;
 	}
+}
+
+static void panel(uint8_t command) {
+	uint8_t sent_now[] = {COMMANDS, command};
+
+	i2c_master_transmit(device, sent_now, sizeof(sent_now), WAIT_MS);
+}
+
+void display_off(void) {
+	if (!is_open || is_off)
+		return;
+	panel(PANEL_OFF);
+	is_off = 1;
+}
+
+void display_on(void) {
+	if (!is_open || !is_off)
+		return;
+	memset(is_sent, 0, sizeof(is_sent));
+	panel(PANEL_ON);
+	is_off = 0;
 }

@@ -21,6 +21,9 @@
 // and only now and then with the house's, heard at -75. A talkie is used
 // near its access point.
 //
+// network_off() stops the radio altogether, until network_on(); it is for
+// measuring what the radio puts into the microphone.
+//
 // This is C++ for the WiFi library; the rest of the talkie asks it in C.
 
 #include <Arduino.h>
@@ -69,6 +72,18 @@ void network_join(void) {
 	WiFi.begin(settings.ssid, settings.password);
 	WiFi.setTxPower(TX_POWER);
 	console_say("WIFI JOINING %s", settings.ssid);
+}
+
+void network_off(void) {
+	WiFi.mode(WIFI_OFF);
+	console_say("RADIO OFF");
+}
+
+void network_on(void) {
+	WiFi.mode(WIFI_STA);
+	WiFi.setSleep(false);
+	console_say("RADIO ON");
+	network_join();
 }
 
 void network_poll(long now) {

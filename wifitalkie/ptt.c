@@ -13,6 +13,11 @@
 // packets a second to nobody would only be using the owner's WiFi and the
 // service. PTT ON typed and forgotten is the case this is for.
 //
+// ALWAYS_SPEAKING, for measuring the noise with the talkie off its USB:
+// while the WiFi is up the PTT is held down as if by the verb, minute after
+// minute, with ALWAYS_GAP_MS let go between, so that my.sbitx.net hears it
+// as overs. It is 0 in a talkie for use.
+//
 // The lamp is lit while the talkie speaks or hears; voip.c says which. It
 // was the board's LED; that pin is now the UP key, and the lamp is shown on
 // the display.
@@ -20,11 +25,14 @@
 #include "driver/gpio.h"
 
 #include "console.h"
+#include "network.h"
 #include "pins.h"
 #include "ptt.h"
 
 #define DEBOUNCE_MS 20
 #define ONE_OVER_MS 60000
+#define ALWAYS_SPEAKING 0
+#define ALWAYS_GAP_MS 2000
 
 static int is_verb_down;
 static int is_button_down;
@@ -34,6 +42,7 @@ static int is_down;
 static long down_since_ms;
 static int is_cut;
 static int is_lit;
+static long cut_ms;
 
 void ptt_open(void) {
 	gpio_config_t button = {
@@ -62,6 +71,11 @@ void ptt_poll(long now) {
 	if (now - button_changed_ms >= DEBOUNCE_MS)
 		is_button_down = level == 0;
 	is_wanted = is_verb_down || is_button_down;
+	if (ALWAYS_SPEAKING && network_is_up()) {
+		is_wanted = 1;
+		if (is_cut && now - cut_ms >= ALWAYS_GAP_MS)
+			is_cut = 0;
+	}
 	if (!is_wanted)
 		is_cut = 0;
 	if (is_cut)
@@ -70,6 +84,7 @@ void ptt_poll(long now) {
 		down_since_ms = now;
 	if (is_wanted && now - down_since_ms >= ONE_OVER_MS) {
 		is_cut = 1;
+		cut_ms = now;
 		is_wanted = 0;
 		is_verb_down = 0;
 		console_say("PTT OFF: ONE MINUTE");
