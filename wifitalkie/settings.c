@@ -50,6 +50,7 @@ void settings_load(void) {
 	settings.port = SETTINGS_DEFAULT_PORT;
 	settings.volume = SETTINGS_DEFAULT_VOLUME;
 	settings.mic = SETTINGS_DEFAULT_MIC;
+	settings.is_vox = SETTINGS_DEFAULT_VOX;
 	settings.is_voip_online = 1;
 	if (nvs_open(NAMESPACE, NVS_READONLY, &handle) != ESP_OK)
 		return;
@@ -66,6 +67,7 @@ void settings_load(void) {
 	number_get(handle, "voip", &settings.is_voip_online);
 	number_get(handle, "volume", &settings.volume);
 	number_get(handle, "mic", &settings.mic);
+	number_get(handle, "vox", &settings.is_vox);
 	nvs_close(handle);
 }
 
@@ -87,6 +89,7 @@ void settings_save(void) {
 	nvs_set_u32(handle, "voip", settings.is_voip_online);
 	nvs_set_u32(handle, "volume", settings.volume);
 	nvs_set_u32(handle, "mic", settings.mic);
+	nvs_set_u32(handle, "vox", settings.is_vox);
 	nvs_commit(handle);
 	nvs_close(handle);
 }

@@ -32,7 +32,7 @@
 //
 // A verb that changes what the line to my.sbitx.net is made with, CALL,
 // SERVER, NEW_KEY and VOIP, has it made again. Whatever is set is kept
-// across power-ups, but PTT, TONE, LEVELS, VOX, RECORD, MICPIN, DISPLAY and RADIO, which are for now.
+// across power-ups, but PTT, TONE, LEVELS, RECORD, MICPIN, DISPLAY and RADIO, which are for now.
 
 #include <ctype.h>
 #include <stdio.h>
@@ -136,6 +136,10 @@ static void say_status(void) {
 	speaker_describe(text, sizeof(text));
 	console_say("SPEAKER %s", text);
 	microphone_levels(&levels);
+	if (settings.is_vox)
+		console_say("VOX ON");
+	else
+		console_say("VOX OFF");
 	console_say("MIC %u, PEAK %d RMS %d, ADC %d A SECOND (%d READ, %d STRANGE, %u RESTARTS)",
 		(unsigned)settings.mic, levels.peak, levels.rms, levels.samples_a_second,
 		levels.results, levels.strangers, levels.restarts);
@@ -308,7 +312,8 @@ void verbs_do(const char *line, long now) {
 		return;
 	}
 	if (!strcmp(verb, "VOX") && is_on_off(first, &is_on)) {
-		microphone_vox(is_on);
+		settings.is_vox = (uint32_t)is_on;
+		settings_save();
 		if (is_on)
 			console_say("VOX ON");
 		else

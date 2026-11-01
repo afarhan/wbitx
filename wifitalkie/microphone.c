@@ -27,9 +27,9 @@
 //
 // What comes out of the 8000 a second is put through speech.c's high-pass,
 // the hum taken off. Its gate, the VOX, sends the gaps between words as
-// comfort noise; it is off unless microphone_vox() turns it on, the verb
-// VOX ON. It was made for a mic element whose voice stood little above the
-// noise; with a better element, on 1 November 2026, it was not needed.
+// comfort noise, while settings.is_vox, the verb VOX, has it on; it is on
+// unless turned off. It was made for a mic element whose voice stood little
+// above the noise, and keeps the gaps quiet with any.
 // LEVELS measures after the high-pass and before the gate, and RECORD keeps
 // what is sent.
 //
@@ -84,7 +84,6 @@ static int is_open;
 static int32_t mean;
 static struct telephone_down down;
 static struct speech speech;
-static int is_vox;
 static int16_t frames[FRAMES_KEPT][TELEPHONE_FRAME_SAMPLES];
 static int frame_in;
 static int frame_out;
@@ -189,7 +188,7 @@ static void take(int raw) {
 		return;
 	kept = speech_high_pass(&speech, kept);
 	measure(kept);
-	if (is_vox)
+	if (settings.is_vox)
 		kept = speech_gate(&speech, kept, TELEPHONE_RATE_HZ);
 	if (is_recording && record_filled < RECORD_SAMPLES)
 		recorded[record_filled++] = kept;
@@ -250,10 +249,6 @@ static void record_say(void) {
 	console_say("RECORDED %d SAMPLES AT %d A SECOND, THE ADC AT %d OF %d, ABOUT %d MV", RECORD_SAMPLES,
 		TELEPHONE_RATE_HZ, (int)(mean >> MEAN_FRACTION_SHIFT), ADC_CODES, adc_millivolts());
 	is_recording = 0;
-}
-
-void microphone_vox(int is_on) {
-	is_vox = is_on;
 }
 
 void microphone_record(void) {

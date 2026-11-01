@@ -23,6 +23,7 @@ extern "C" {
 #define SETTINGS_DEFAULT_PORT 8081
 #define SETTINGS_DEFAULT_VOLUME 50
 #define SETTINGS_DEFAULT_MIC 50
+#define SETTINGS_DEFAULT_VOX 1
 #define SETTINGS_LEVEL_MOST 100
 
 struct settings {
@@ -39,6 +40,7 @@ struct settings {
 	uint32_t is_voip_online;
 	uint32_t volume;
 	uint32_t mic;
+	uint32_t is_vox;
 };
 
 extern struct settings settings;
