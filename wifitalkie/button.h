@@ -22,6 +22,8 @@ extern "C" {
 #define BUTTON_DEBOUNCE_MS 20
 #define BUTTON_REPEAT_AFTER_MS 500
 #define BUTTON_REPEAT_EVERY_MS 250
+#define BUTTON_FAST_AFTER_MS 2000
+#define BUTTON_FAST_EVERY_MS 50
 #define BUTTON_HELD_MS 1000
 
 struct button {
@@ -36,6 +38,7 @@ struct button {
 
 void button_begin(struct button *b, int kind);
 int button_step(struct button *b, int is_pressed, long now);
+long button_held_ms(const struct button *b, long now);
 
 #ifdef __cplusplus
 }

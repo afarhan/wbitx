@@ -10,7 +10,9 @@
 //     BUTTON_PLAIN       pressed, as it goes down (ENTER)
 //     BUTTON_REPEATING   pressed as it goes down, and repeated while it is
 //                        held, after BUTTON_REPEAT_AFTER_MS, every
-//                        BUTTON_REPEAT_EVERY_MS (UP and DOWN)
+//                        BUTTON_REPEAT_EVERY_MS, and every
+//                        BUTTON_FAST_EVERY_MS once it has been held
+//                        BUTTON_FAST_AFTER_MS (UP and DOWN)
 //     BUTTON_HOLDING     pressed as it comes up, if it was down less than
 //                        BUTTON_HELD_MS; held, once, when it has been down
 //                        that long, and then nothing as it comes up (MENU,
@@ -49,7 +51,10 @@ static int coming_up(struct button *b) {
 
 static int staying_down(struct button *b, long now) {
 	if (b->kind == BUTTON_REPEATING && now >= b->repeat_ms) {
-		b->repeat_ms += BUTTON_REPEAT_EVERY_MS;
+		if (now - b->down_ms >= BUTTON_FAST_AFTER_MS)
+			b->repeat_ms += BUTTON_FAST_EVERY_MS;
+		else
+			b->repeat_ms += BUTTON_REPEAT_EVERY_MS;
 		return BUTTON_REPEATED;
 	}
 	if (b->kind == BUTTON_HOLDING && !b->is_held_given && now - b->down_ms >= BUTTON_HELD_MS) {
@@ -73,4 +78,11 @@ int button_step(struct button *b, int is_pressed, long now) {
 	if (is_pressed)
 		return staying_down(b, now);
 	return BUTTON_NOTHING;
+}
+
+// how long the key has been down, 0 if it is up
+long button_held_ms(const struct button *b, long now) {
+	if (!b->is_down)
+		return 0;
+	return now - b->down_ms;
 }

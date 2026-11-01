@@ -122,6 +122,19 @@ void network_scan(void) {
 	network_join();
 }
 
+// the address and the signal, for the screen; nothing while not up
+void network_address(char *text, int room) {
+	text[0] = 0;
+	if (network_is_up())
+		snprintf(text, room, "%s", WiFi.localIP().toString().c_str());
+}
+
+int network_rssi(void) {
+	if (!network_is_up())
+		return 0;
+	return (int)WiFi.RSSI();
+}
+
 int network_is_up(void) {
 	return WiFi.status() == WL_CONNECTED;
 }

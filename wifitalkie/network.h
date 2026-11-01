@@ -16,6 +16,8 @@ void network_scan(void);
 void network_off(void);
 void network_on(void);
 int network_is_up(void);
+void network_address(char *text, int room);
+int network_rssi(void);
 void network_describe(char *text, int room);
 
 #ifdef __cplusplus

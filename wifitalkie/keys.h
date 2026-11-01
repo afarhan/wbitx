@@ -20,6 +20,7 @@ extern "C" {
 struct key_press {
 	int key;
 	int what;
+	long held_ms;
 };
 
 void keys_open(void);

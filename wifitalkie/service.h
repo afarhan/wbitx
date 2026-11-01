@@ -12,6 +12,7 @@ extern "C" {
 void service_open(void);
 void service_poll(long now);
 void service_restart(void);
+void service_new_key(void);
 void service_describe(char *text, int room);
 
 #ifdef __cplusplus

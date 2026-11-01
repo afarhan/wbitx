@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Ashhar Farhan
 //
 // test_units.c — the talkie's code that knows nothing of the ESP32, tried on
-// this computer: mu-law, the filters, the duty, the keys, the speech's
+// this computer: mu-law, the filters, the duty, the keys, the dial, the speech's
 // high-pass and gate, the cookie and the stretch.
 //
 //     make check
@@ -20,6 +20,7 @@
 
 #include "../wifitalkie/auth.h"
 #include "../wifitalkie/button.h"
+#include "../wifitalkie/dial.h"
 #include "../wifitalkie/playback.h"
 #include "../wifitalkie/speech.h"
 #include "../wifitalkie/telephone.h"
@@ -268,6 +269,10 @@ static void test_buttons(void) {
 	expect(count == 1 && last == BUTTON_HELD, "a holding key held says held once");
 	count = button_run(&b, 0, 2 * KEY_SHORT_MS + KEY_HELD_TRY_MS, 3 * KEY_SHORT_MS + KEY_HELD_TRY_MS, &last);
 	expect(count == 0, "a holding key let go after held says nothing");
+	button_begin(&b, BUTTON_REPEATING);
+	button_run(&b, 1, 0, BUTTON_FAST_AFTER_MS, &last);
+	count = button_run(&b, 1, BUTTON_FAST_AFTER_MS, BUTTON_FAST_AFTER_MS + BUTTON_REPEAT_EVERY_MS, &last);
+	expect(count >= BUTTON_REPEAT_EVERY_MS / BUTTON_FAST_EVERY_MS - 1, "a repeating key held long repeats faster");
 	printf("buttons: debounce, repeat, press and hold as they should\n");
 }
 
@@ -327,6 +332,18 @@ static int gate_onset(struct speech *s) {
 			largest = abs(out);
 	}
 	return largest;
+}
+
+static void test_dial(void) {
+	expect(dial_step(21080000, 1, 0) == 21081000, "the dial steps up a kilohertz");
+	expect(dial_step(21080000, 0, 0) == 21079000, "the dial steps down a kilohertz");
+	expect(dial_step(7074500, 1, 0) == 7075000 && dial_step(7074500, 0, 0) == 7074000,
+		"a frequency off the kilohertz comes onto it");
+	expect(dial_step(21083000, 1, DIAL_TENS_AFTER_MS) == 21090000, "held, the dial steps ten kilohertz, on round ones");
+	expect(dial_step(21083000, 0, DIAL_HUNDREDS_AFTER_MS) == 21000000, "held longer, a hundred");
+	expect(dial_step(DIAL_LEAST_HZ, 0, 0) == DIAL_LEAST_HZ, "the dial stops at its bottom");
+	expect(dial_step(DIAL_MOST_HZ, 1, DIAL_HUNDREDS_AFTER_MS) == DIAL_MOST_HZ, "the dial stops at its top");
+	printf("dial: kilohertz steps, faster held, and its ends\n");
 }
 
 static void test_speech(void) {
@@ -397,6 +414,7 @@ int main(void) {
 	test_playback();
 	test_duty();
 	test_buttons();
+	test_dial();
 	test_speech();
 	test_cookie();
 	test_stretch();

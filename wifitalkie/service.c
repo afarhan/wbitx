@@ -426,6 +426,15 @@ void service_open(void) {
 	say_status("OFF");
 }
 
+// a new cookie, for NEW_KEY and the screen's NEW CODE: the old one is
+// forgotten, a new one made at the next turn, and the line made again
+void service_new_key(void) {
+	settings.cookie[0] = 0;
+	settings.stretched_for[0] = 0;
+	settings_save();
+	service_restart();
+}
+
 // after a change to what the line is made with: it is made again
 void service_restart(void) {
 	is_restart_asked = 1;

@@ -165,10 +165,7 @@ static void new_key(long now) {
 		return;
 	}
 	new_key_asked_ms = -NEW_KEY_AGAIN_MS;
-	settings.cookie[0] = 0;
-	settings.stretched_for[0] = 0;
-	settings_save();
-	service_restart();
+	service_new_key();
 	console_say("NEW_KEY MAKING; ADD IT AT MY.SBITX.NET IN PLACE OF THE OLD");
 }
 

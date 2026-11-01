@@ -7,7 +7,7 @@
 // presses mean. UP and DOWN repeat while held; MENU is BACK when pressed and
 // HOME when held; ENTER is a press. keys_poll() gives at most one press a
 // turn of the loop; two keys' presses in the same millisecond give the
-// first's.
+// first's, with how long its key has been held.
 
 #include "driver/gpio.h"
 
@@ -47,6 +47,7 @@ int keys_poll(long now, struct key_press *press) {
 			continue;
 		press->key = key;
 		press->what = what;
+		press->held_ms = button_held_ms(&buttons[key], now);
 		found = 1;
 	}
 	return found;
