@@ -9,8 +9,9 @@
 // a row on one edge, for one connector; the keys, top to bottom, MENU, UP,
 // DOWN, ENTER. GPIO9 is also the board's BOOT button, so BOOT is UP once
 // the board has started; GPIO8 is also its blue lamp, which lights while
-// MENU is held, and the talkie's lamp is now on the display. The PTT is GPIO21, UART0's TX, which the ROM drives at reset:
-// it has 1k in series. GPIO4 and GPIO5 are the headset's left and right.
+// MENU is held, and the talkie's lamp is now on the display. There is no
+// PTT key of its own: ENTER is the PTT on the home page. GPIO21 is spare;
+// it is UART0's TX, which the ROM drives at reset. GPIO4 and GPIO5 are the headset's left and right.
 // GPIO2 (MUTE) and GPIO0 (the headset's microphone) are for what is still
 // to be built.
 
@@ -25,4 +26,3 @@
 #define PIN_KEY_UP 9
 #define PIN_KEY_DOWN 10
 #define PIN_KEY_ENTER 20
-#define PIN_PTT 21

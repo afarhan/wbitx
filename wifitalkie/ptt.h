@@ -9,14 +9,12 @@
 extern "C" {
 #endif
 
-void ptt_open(void);
 void ptt_poll(long now);
 void ptt_set(int is_down);
 int ptt_is_down(void);
 void ptt_lamp(int is_lit);
 int ptt_is_lit(void);
 void ptt_lend(int is_lending);
-int ptt_take_press(void);
 
 #ifdef __cplusplus
 }

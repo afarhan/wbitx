@@ -9,6 +9,10 @@
 // "talkie", so that a field added later finds the others where they were.
 // A field never written keeps its default.
 //
+// The WiFi networks joined, up to SETTINGS_KNOWN with their keys (known.c),
+// are kept under "kssid0", "kpass0" and so on, NVS's keys being fifteen
+// characters at most.
+//
 // The cookie is kept here, and its stretch beside it with what it was made
 // for, "<callsign> <cookie>", so that the stretch is not done again at
 // every power-up; service.c does it again when the two no longer match.
@@ -24,6 +28,7 @@
 #include "settings.h"
 
 #define NAMESPACE "talkie"
+#define KEY_ROOM 16
 
 struct settings settings;
 
@@ -44,6 +49,8 @@ static void number_get(nvs_handle_t handle, const char *key, uint32_t *value) {
 
 void settings_load(void) {
 	nvs_handle_t handle;
+	char key[KEY_ROOM];
+	int i;
 
 	memset(&settings, 0, sizeof(settings));
 	snprintf(settings.host, sizeof(settings.host), "%s", SETTINGS_DEFAULT_HOST);
@@ -68,11 +75,19 @@ void settings_load(void) {
 	number_get(handle, "volume", &settings.volume);
 	number_get(handle, "mic", &settings.mic);
 	number_get(handle, "vox", &settings.is_vox);
+	for (i = 0; i < SETTINGS_KNOWN; i++) {
+		snprintf(key, sizeof(key), "kssid%d", i);
+		text_get(handle, key, settings.known_ssid[i], sizeof(settings.known_ssid[i]));
+		snprintf(key, sizeof(key), "kpass%d", i);
+		text_get(handle, key, settings.known_password[i], sizeof(settings.known_password[i]));
+	}
 	nvs_close(handle);
 }
 
 void settings_save(void) {
 	nvs_handle_t handle;
+	char key[KEY_ROOM];
+	int i;
 
 	if (nvs_open(NAMESPACE, NVS_READWRITE, &handle) != ESP_OK)
 		return;
@@ -90,6 +105,12 @@ void settings_save(void) {
 	nvs_set_u32(handle, "volume", settings.volume);
 	nvs_set_u32(handle, "mic", settings.mic);
 	nvs_set_u32(handle, "vox", settings.is_vox);
+	for (i = 0; i < SETTINGS_KNOWN; i++) {
+		snprintf(key, sizeof(key), "kssid%d", i);
+		nvs_set_str(handle, key, settings.known_ssid[i]);
+		snprintf(key, sizeof(key), "kpass%d", i);
+		nvs_set_str(handle, key, settings.known_password[i]);
+	}
 	nvs_commit(handle);
 	nvs_close(handle);
 }

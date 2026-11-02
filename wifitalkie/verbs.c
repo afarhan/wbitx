@@ -19,7 +19,7 @@
 //     KEY                       the cookie, to add the talkie on the website
 //     NEW_KEY                   a new cookie; typed twice within 5 s
 //     VOIP ONLINE|OFFLINE       on line to the repeater, or not
-//     PTT ON|OFF                speak, as the BOOT button held does
+//     PTT ON|OFF                speak, as ENTER held on the home page does
 //     TONE ON|OFF               1 kHz in place of the microphone
 //     VOL <0-100>  MIC <0-100>  the speaker's level and the microphone's
 //     LEVELS ON|OFF             the microphone's levels each second

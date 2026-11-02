@@ -15,6 +15,7 @@ extern "C" {
 
 #define SETTINGS_SSID_ROOM 33
 #define SETTINGS_PASSWORD_ROOM 65
+#define SETTINGS_KNOWN 4
 #define SETTINGS_CALLSIGN_ROOM 16
 #define SETTINGS_GRID_ROOM 12
 #define SETTINGS_HOST_ROOM 64
@@ -41,6 +42,8 @@ struct settings {
 	uint32_t volume;
 	uint32_t mic;
 	uint32_t is_vox;
+	char known_ssid[SETTINGS_KNOWN][SETTINGS_SSID_ROOM];
+	char known_password[SETTINGS_KNOWN][SETTINGS_PASSWORD_ROOM];
 };
 
 extern struct settings settings;

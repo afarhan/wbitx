@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Ashhar Farhan
 //
 // test_units.c — the talkie's code that knows nothing of the ESP32, tried on
-// this computer: mu-law, the filters, the duty, the keys, the dial, the text entry, the speech's
+// this computer: mu-law, the filters, the duty, the keys, the dial, the text entry, the networks remembered, the speech's
 // high-pass and gate, the cookie and the stretch.
 //
 //     make check
@@ -22,6 +22,7 @@
 #include "../wifitalkie/button.h"
 #include "../wifitalkie/dial.h"
 #include "../wifitalkie/entry.h"
+#include "../wifitalkie/known.h"
 #include "../wifitalkie/playback.h"
 #include "../wifitalkie/settings.h"
 #include "../wifitalkie/speech.h"
@@ -383,6 +384,30 @@ static void test_entry(void) {
 	printf("entry: scrolled round, added, taken off, kept to its length\n");
 }
 
+static void test_known(void) {
+	struct settings s;
+	char ssid[SETTINGS_SSID_ROOM];
+	int i;
+
+	memset(&s, 0, sizeof(s));
+	expect(known_find(&s, "home") < 0 && known_find(&s, "") < 0, "nothing is known at first");
+	expect(known_remember(&s, "home", "one") && known_find(&s, "home") == 0, "a network joined is remembered");
+	expect(!known_remember(&s, "home", "one"), "the same again changes nothing");
+	known_remember(&s, "hotspot", "two");
+	expect(known_find(&s, "hotspot") == 0 && known_find(&s, "home") == 1, "the last joined is first");
+	known_remember(&s, "home", "three");
+	expect(known_find(&s, "home") == 0 && !strcmp(s.known_password[0], "three")
+		&& known_find(&s, "hotspot") == 1, "joined again, it comes to the front with its new key");
+	for (i = 0; i < SETTINGS_KNOWN; i++) {
+		snprintf(ssid, sizeof(ssid), "club%d", i);
+		known_remember(&s, ssid, "x");
+	}
+	expect(known_find(&s, "home") < 0 && known_find(&s, "club0") == SETTINGS_KNOWN - 1,
+		"the one joined longest ago is forgotten for a new one");
+	expect(!known_remember(&s, "", "x"), "a network without a name is not remembered");
+	printf("known: remembered, last first, the oldest forgotten\n");
+}
+
 static void test_speech(void) {
 	struct speech s;
 	double noise_size = NOISE_SIZE / 2.0;
@@ -453,6 +478,7 @@ int main(void) {
 	test_buttons();
 	test_dial();
 	test_entry();
+	test_known();
 	test_speech();
 	test_cookie();
 	test_stretch();

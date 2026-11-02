@@ -29,7 +29,7 @@
 //     microphone.c     the ADC, down to 8000 a second
 //     speaker.c        the queue and the PWM, playback.c the 62500 a second
 //     telephone.c      mu-law and the filter
-//     ptt.c            the PTT and the lamp
+//     ptt.c            the PTT, the ENTER key on the home page, and the lamp
 //     screen.c         the display and the keys: display.c, font.c, keys.c,
 //                      button.c
 //     pins.h           where the parts go
@@ -54,7 +54,6 @@ void setup() {
 	console_begin();
 	settings_load();
 	telephone_open();
-	ptt_open();
 	screen_open();
 	speaker_open();
 	microphone_open();
