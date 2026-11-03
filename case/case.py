@@ -9,13 +9,13 @@ full rectangle of large holes (the Teenage Engineering grille, turned on its
 side), the perfboard on the right with the 10 mm microphone poking out at its
 top, the display, and four 6x6 keys under it. The headset jack comes out of
 the top, the ESP32's USB-C out of the right side. The keys' 3.5 mm plungers
-come through the front, flush, each in a shallow dish for the finger. Behind
-all of it, in a tray of its own, an 18650 lies across the width along the top,
-tucked forward behind the board and over the speaker's magnet, and its charger
-module sits at the bottom with its USB-C out of the bottom.
+come through the front, each in a countersink for the finger. Behind it all,
+in a shallow tray of its own, a KP523450 pouch cell lies flat on the back wall
+behind the board, and its charger module lies behind the speaker's magnet with
+its USB-C out of the bottom.
 
 Two parts to print in black PLA: the front shell (face down) and the back
-tray (back down). Three M2 screws go in from the back.
+tray (back down). Four M3 screws go in from the back.
 
     python case.py front    only exports/front.stl, to try on the prototype
 
@@ -31,7 +31,7 @@ scaled from talkie_front.jpeg at 11.45 px/mm. Measure, and change them here.
 import os
 import sys
 
-from build123d import (Align, Axis, Box, Color, Compound, Cylinder, Pos, Rot,
+from build123d import (Align, Axis, Box, Color, Compound, Cone, Cylinder, Pos, Rot,
                        Text, export_gltf, export_stl, extrude, fillet)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -59,7 +59,7 @@ KEYS = [(6.5, 42.1), (16.66, 42.1), (26.82, 42.1),   # 4 holes apart,
         (16.66, 49.72)]                              # and 3 holes down
 KEY_HOLE = 4.0      # the 3.5 mm plungers, pressed as they are
 GROOVE_W, GROOVE_D = 0.8, 0.5             # the line between the two plates
-DISH_D, DISH_DEEP = 6.0, 0.8              # round each key, for the finger
+DISH_D, DISH_DEEP = 6.0, 1.0              # round each key, for the finger
 JACK_X, JACK_HOLE = 26.5, 6.5             # on the back, out of the top
 JACK_DEPTH = WALL + FRONT_H + BT + 2.5    # its barrel's centre
 USB_Y, USB_W, USB_H = 24.8, 9.5, 3.8      # SuperMini's USB-C, out the right
@@ -70,12 +70,13 @@ RING_T, RING_H = 1.2, 3.0                 # ring on the front, glue it in
 GRILLE_HOLE, GRILLE_PITCH, GRILLE_N = 3.2, 4.4, 5   # 11 x 11 holes
 DIMPLE = 1.0        # holes off the cone are blind, this deep
 
-CELL_D, CELL_BAY = 18.8, 69.0            # 18650 and its two contacts
+BAT_W, BAT_L, BAT_T = 34.0, 50.0, 5.2     # KP523450 pouch, standing upright
 CHG_L, CHG_W, CHG_T = 28.0, 17.5, 1.2     # TP4056 USB-C module
+CHG_H = CHG_T + 3.2                       # with its USB-C on top
 CHG_X = 13.0        # its left edge, inside x; it lies with its port down
 CHG_USB_W, CHG_USB_H = 9.5, 3.8
 
-BOSS_D, PILOT_D, SCREW_D, HEAD_D = 5.5, 1.6, 2.4, 4.4   # M2 self-tapping
+BOSS_D, PILOT_D, SCREW_D, HEAD_D = 7.0, 2.5, 3.4, 6.2   # M3, cut its own thread
 LIP_H, LIP_T, LIP_GAP = 1.5, 0.8, 0.2
 
 # ---------------------------------------------------------- derived sizes
@@ -89,27 +90,22 @@ SPK_CY = IH / 2
 OW, OH = IW + 2 * WALL, IH + 2 * WALL
 
 SPLIT = WALL + max(SPK_DEEP, FRONT_H + BT + BACK_H) + 0.5   # the seam
-# three screws at the corners of the speaker's square; the fourth, top right
-# by the microphone, is left out so the cell can lie along the top
+# four screws at the corners of the speaker's square
 BOSSES = [(SPK_CX - 22, SPK_CY - 22), (SPK_CX + 22, SPK_CY - 22),
-          (SPK_CX - 22, SPK_CY + 22)]
+          (SPK_CX - 22, SPK_CY + 22), (SPK_CX + 22, SPK_CY + 22)]
 
-# the cell, along the top, from the top-left screw to short of the jack; it
-# comes forward as far as the parts behind the board and the speaker's magnet
-# let it
-CELL_R = CELL_D / 2
-CELL_CY = IH - CLR - CELL_R
-CELL_X0 = BOSSES[2][0] + BOSS_D / 2 + CLR
-_dy = CELL_CY - (SPK_CY + SPK_MAGNET / 2)  # cell's axis above the magnet
-_sag = CELL_R - (CELL_R ** 2 - _dy ** 2) ** 0.5 if _dy < CELL_R else CELL_R
-CELL_FRONT = max(WALL + FRONT_H + BT + BACK_H,
-                 WALL + SPK_DEEP - _sag) + CLR
-D = CELL_FRONT + CELL_D + WALL
+# the cell lies on the back wall behind the board, the charger behind the
+# speaker's magnet; whichever stack is deeper sets the thickness
+POST_H = 2.0        # posts under the board's bottom edge, below the cell
+BAT_X0 = BOARD_X0 + BW / 2 - BAT_W / 2    # inside x, centred on the board
+BAT_Y0 = CLR + POST_H + CLR               # inside y, above the posts
+D = max(WALL + FRONT_H + BT + BACK_H + CLR + BAT_T,
+        WALL + SPK_DEEP + CLR + CHG_H) + WALL
 Z_SPLIT = D - SPLIT
-CELL_ZC = D - (CELL_FRONT + CELL_R)
 
 PROUD = SWITCH_TOP - FRONT_H - WALL       # plungers past the front face
 assert PROUD >= -DISH_DEEP, "the plungers don't reach the front; lower FRONT_H"
+assert BAT_Y0 + BAT_L <= IH, "the cell is taller than the inside"
 assert OLED_TOP - FRONT_H + 0.2 <= WALL - 0.6, "the display pocket leaves too thin a wall"
 
 
@@ -173,6 +169,12 @@ def mouth_x(x0, x1, cy, cz, w, h):
     return (cyl_x(x0, x1, cy - (w / 2 - r), cz, r)
             + cyl_x(x0, x1, cy + (w / 2 - r), cz, r)
             + box(x0, x1, cy - (w / 2 - r), cy + (w / 2 - r), cz - r, cz + r))
+
+
+def chg_mouth():
+    """The charger's USB-C through the bottom wall; it may cross the seam."""
+    return mouth_y(-1, iy(0) + 1, ix(CHG_X + CHG_W / 2),
+                   WALL + CHG_T + CHG_USB_H / 2, CHG_USB_W, CHG_USB_H)
 
 
 def mouth_y(y0, y1, cx, cz, w, h):
@@ -251,11 +253,17 @@ def front_shell():
                  D - WALL - 1, D - WALL + pocket)
     for (kx, ky) in KEYS:
         s -= cyl_z(bx(kx), by(ky), KEY_HOLE / 2, D - WALL - 1, D + 1)
-        s -= cyl_z(bx(kx), by(ky), DISH_D / 2, D - DISH_DEEP, D + 1)
+        # a 45 degree countersink, not a flat-bottomed dish: printed face
+        # down, a flat floor would bridge over air and come out stringy
+        s -= Pos(bx(kx), by(ky), D - DISH_DEEP) * Cone(
+            KEY_HOLE / 2, DISH_D / 2, DISH_DEEP, align=(Align.CENTER, Align.CENTER, Align.MIN))
+        s -= cyl_z(bx(kx), by(ky), DISH_D / 2, D, D + 1)
     s -= cyl_z(bx(MIC_XY[0]), by(MIC_XY[1]), MIC_HOLE / 2, D - WALL - 1, D + 1)
 
     s -= jack_hole(iy(IH) - 1, OH + 1) + jack_notch(0.1)
     s -= usb_hole() + usb_notch(0.1)
+    if WALL + CHG_T + CHG_USB_H > Z_SPLIT - 1:
+        s -= chg_mouth()
     return s
 
 
@@ -271,14 +279,10 @@ def back_tray():
     for (x, y) in BOSSES:
         s += cyl_z(ix(x), iy(y), BOSS_D / 2, WALL - 0.5, Z_SPLIT - LIP_GAP)
 
-    # the cell's bay, along the top: two saddles and two end walls
-    cy, r = iy(CELL_CY), CELL_R
-    x0, x1 = ix(CELL_X0), ix(CELL_X0 + CELL_BAY)
-    for xc in (x0 + 12, x1 - 12):
-        s += box(xc - 4, xc + 4, cy - r - 1.5, iy(IH) + 0.5,
-                 WALL - 0.5, CELL_ZC + 2)
-    for (xa, xb) in ((x0 - 1.5, x0), (x1, x1 + 1.5)):
-        s += box(xa, xb, cy - r - 1.5, iy(IH) + 0.5, WALL - 0.5, CELL_ZC + 5)
+    # a rail along the cell's left edge; the right wall and the posts do
+    # the rest
+    bx0 = ix(BAT_X0) - CLR
+    s += box(bx0 - 1.2, bx0, iy(BAT_Y0), iy(IH) + 0.5, WALL - 0.5, WALL + 2.5)
 
     # the charger, port down: a low fence on its three inside sides
     cx0, cx1, cy1 = ix(CHG_X), ix(CHG_X + CHG_W), iy(CLR + CHG_L)
@@ -288,21 +292,17 @@ def back_tray():
 
     # two posts under the board's bottom edge, holding it to the front pads
     zb = z(WALL + FRONT_H + BT)
-    for xb in (10.0, 30.0):
-        s += box(bx(xb) - 2, bx(xb) + 2, by(BH - 0.5), by(BH - 4.5),
+    for xb in (6.0, BW - 6.0):
+        s += box(bx(xb) - 2.5, bx(xb) + 2.5, by(BH - 0.5), by(BH - POST_H),
                  WALL - 0.5, zb)
 
     # ---- cuts
-    s -= cyl_x(x0, x1, cy, CELL_ZC, r)
-    for xe in (x0, x1):                          # the contacts' wires
-        s -= box(xe - 3, xe + 3, cy - 3, cy + 3, CELL_ZC - 3, CELL_ZC + 6)
     for (x, y) in BOSSES:
         s -= cyl_z(ix(x), iy(y), SCREW_D / 2, -1, Z_SPLIT + 1)
         s -= cyl_z(ix(x), iy(y), HEAD_D / 2, -1, 2.5)
     s -= jack_hole(iy(IH) - 1, OH + 1)
     s -= usb_hole()
-    s -= mouth_y(-1, iy(0) + 1, (cx0 + cx1) / 2,
-                 WALL + CHG_T + CHG_USB_H / 2, CHG_USB_W, CHG_USB_H)
+    s -= chg_mouth()
     return s
 
 
@@ -363,12 +363,12 @@ def parts():
     speaker = (cyl_z(sx, sy, SPK_D / 2, z(WALL + 2.5), z(WALL))
                + cyl_z(sx, sy, SPK_D / 2 - 6, z(WALL + 8), z(WALL + 2.5))
                + cyl_z(sx, sy, SPK_MAGNET / 2, z(WALL + SPK_DEEP), z(WALL + 8)))
-    cell = cyl_x(ix(CELL_X0 + 2), ix(CELL_X0 + 2 + 65), iy(CELL_CY), CELL_ZC,
-                 18.4 / 2)
+    cell = box(ix(BAT_X0), ix(BAT_X0 + BAT_W), iy(BAT_Y0), iy(BAT_Y0 + BAT_L),
+               WALL, WALL + BAT_T)
     cx0, cx1, cm = ix(CHG_X), ix(CHG_X + CHG_W), ix(CHG_X + CHG_W / 2)
     charger = (box(cx0, cx1, iy(CLR), iy(CLR + CHG_L), WALL, WALL + CHG_T)
                + box(cm - 4.45, cm + 4.45, iy(0), iy(7.3),
-                     WALL + CHG_T, WALL + CHG_T + 3.2))
+                     WALL + CHG_T, WALL + CHG_H))
     return [(board, "perfboard", (0.10, 0.40, 0.25)),
             (oled, "oled", (0.10, 0.25, 0.65)),
             (glass, "glass", (0.01, 0.01, 0.01)),
@@ -378,7 +378,7 @@ def parts():
             (jack, "jack", (0.25, 0.25, 0.25)),
             (mini, "supermini", (0.20, 0.20, 0.55)),
             (speaker, "speaker", (0.55, 0.55, 0.55)),
-            (cell, "18650", (0.15, 0.55, 0.85)),
+            (cell, "cell", (0.70, 0.72, 0.75)),
             (charger, "charger", (0.10, 0.30, 0.70))]
 
 
