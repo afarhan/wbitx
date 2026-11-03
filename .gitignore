@@ -2,3 +2,7 @@ build/
 tests/test_units
 tests/voip_tool
 __pycache__/
+*-backups/
+fp-info-cache
+~*.lck
+*.kicad_prl

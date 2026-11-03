@@ -1,0 +1,6 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "wificomms")(type "KiCad")(uri "${KIPRJMOD}/wificomms.pretty")(options "")(descr "ESP32-C3 SuperMini (project)"))
+  (lib (name "phone_cad_2_parts")(type "KiCad")(uri "${KIPRJMOD}/phone_cad_2_parts.pretty")(options "")(descr "Footprints from xyfr (project)"))
+  (lib (name "spdt_slide_switch_ss-12d11_xxx")(type "KiCad")(uri "${KIPRJMOD}/spdt_slide_switch_ss-12d11_xxx.pretty")(options "")(descr "SS-12D11 slide switch (project)"))
+)
