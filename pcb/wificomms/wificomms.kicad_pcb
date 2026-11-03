@@ -2934,6 +2934,446 @@
 			)
 		)
 	)
+	(footprint "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+		(layer "F.Cu")
+		(uuid "499e1afe-90df-4002-a515-f2749ba22256")
+		(at 191.0375 92.09)
+		(descr "Tactile switch 6x6 mm, SMD gull wing, Kinghelm KH-6X6XxH-STM (KH-6X6X7H-STM, C2837533: 7 mm overall, 3.45 mm body, 3.3 mm plunger). Land pattern per the Kinghelm drawing: 1.45 x 1.0 mm pads, 9.4/6.5 mm across, 5.5/3.5 mm along; pads 1-2 one terminal, 3-4 the other.")
+		(tags "switch tactile 6x6 SMD KH-6X6")
+		(property "Reference" "SW1"
+			(at 0 -4.3 0)
+			(layer "F.SilkS")
+			(uuid "98320a08-7660-4c54-9048-aeb7cea9df04")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Value" "SW_SPST_4P_H"
+			(at 0 4.3 0)
+			(layer "F.Fab")
+			(uuid "6ced5252-4c91-4070-8e61-1b9269546667")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "4c393d52-97d2-4d8f-98b3-508f6320ada7")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Description" "SPST momentary switch with 4 pads (2 per terminal). Top terminal = pins 1 (top-left) & 2 (top-right); bottom terminal = pins 3 (bottom-left) & 4 (bottom-right); vertical middle stem = SPST contact. The 4 pins are electrically independent in the symbol - wire the pads you use and mark the rest no-connect."
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "1d31d037-d551-44bb-87a0-1abaf7c9b189")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC Part" "C2800848"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "0b289526-1a63-4763-ae18-56f85058737f")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2837533"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e66a948f-d886-4eec-baba-7bf3664d69a7")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Footprint" "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(uuid "cb186523-3cf3-4ce1-a8b8-27b746c31b7a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(path "/5faf3948-3c9f-415e-be36-10158ad2a505")
+		(sheetname "/")
+		(sheetfile "wificomms.kicad_sch")
+		(attr smd)
+		(fp_line
+			(start -3.1 -3.1)
+			(end 3.1 -3.1)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "9ee13acf-01ba-49a6-96e1-c4c704568b07")
+		)
+		(fp_line
+			(start -3.1 3.1)
+			(end 3.1 3.1)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "848dee99-9a9d-48d7-8c69-d11455bd0451")
+		)
+		(fp_line
+			(start -3 -1.5)
+			(end -3 1.5)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "3f6d8c25-954a-49b9-ab67-a313fb89bf7b")
+		)
+		(fp_line
+			(start 3 -1.5)
+			(end 3 1.5)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "8bf1f0f0-af5c-487b-a41b-629d49f584d7")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 1.75 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "d8e8b231-d497-44cb-995d-6435ee330406")
+		)
+		(fp_rect
+			(start -4.95 -3.35)
+			(end 4.95 3.35)
+			(stroke
+				(width 0.05)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "c8aee259-dfdd-4721-8fbd-51747e1ebac0")
+		)
+		(fp_rect
+			(start -3 -3)
+			(end 3 3)
+			(stroke
+				(width 0.1)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.Fab")
+			(uuid "c7a4ec3e-9f92-4611-8193-7e8a908fa0e7")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 1.65 0)
+			(stroke
+				(width 0.1)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.Fab")
+			(uuid "9f08823a-2ad5-45ec-8bdf-98af3b967c3e")
+		)
+		(fp_text user "${REFERENCE}"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(uuid "896972c2-c2f0-4462-8016-1aba7419ea01")
+			(effects
+				(font
+					(size 0.8 0.8)
+					(thickness 0.12)
+				)
+			)
+		)
+		(pad "1" smd roundrect
+			(at -3.975 -2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 41 "unconnected-(SW1-Pad1)")
+			(uuid "f2cec6cc-5605-4a33-9aad-a85232ef91c3")
+		)
+		(pad "2" smd roundrect
+			(at 3.975 -2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 40 "ENTER_KEY")
+			(uuid "bb8c1e53-1701-491f-aeb1-7089599b9d5b")
+		)
+		(pad "3" smd roundrect
+			(at -3.975 2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 42 "unconnected-(SW1-Pad3)")
+			(uuid "6bb12da6-6dbb-4e2c-b381-3053e209e461")
+		)
+		(pad "4" smd roundrect
+			(at 3.975 2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 1 "GNDPWR")
+			(uuid "14d6fa3c-3612-428d-8bce-cb9a24f20247")
+		)
+		(embedded_fonts no)
+	)
+	(footprint "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+		(layer "F.Cu")
+		(uuid "49b36189-4ef8-4517-b328-0d53936dbd1b")
+		(at 191.0375 105.34)
+		(descr "Tactile switch 6x6 mm, SMD gull wing, Kinghelm KH-6X6XxH-STM (KH-6X6X7H-STM, C2837533: 7 mm overall, 3.45 mm body, 3.3 mm plunger). Land pattern per the Kinghelm drawing: 1.45 x 1.0 mm pads, 9.4/6.5 mm across, 5.5/3.5 mm along; pads 1-2 one terminal, 3-4 the other.")
+		(tags "switch tactile 6x6 SMD KH-6X6")
+		(property "Reference" "SW3"
+			(at 0 -4.3 0)
+			(layer "F.SilkS")
+			(uuid "7c27a959-b663-48ba-82fd-6d81e72a6152")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Value" "SW_SPST_4P_H"
+			(at 0 4.3 0)
+			(layer "F.Fab")
+			(uuid "40d41da1-ad27-4089-9894-3b55e9576f5a")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "3dc89e18-9931-4085-98a1-84525ae86bab")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Description" "SPST momentary switch with 4 pads (2 per terminal). Top terminal = pins 1 (top-left) & 2 (top-right); bottom terminal = pins 3 (bottom-left) & 4 (bottom-right); vertical middle stem = SPST contact. The 4 pins are electrically independent in the symbol - wire the pads you use and mark the rest no-connect."
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "4d584e2f-0f0e-4d77-9b42-dca94a4db0f1")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC Part" "C2800848"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "222394a0-a559-4a5f-bbae-b6cad1823bc0")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2837533"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "d242f092-b107-4d15-983c-b823fddc66c7")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Footprint" "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(uuid "c4eb41d2-111f-4bc7-84b9-5f971c0bf8e3")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(path "/7edd2ab8-78a3-4ab0-99d9-9dc37afa5fd6")
+		(sheetname "/")
+		(sheetfile "wificomms.kicad_sch")
+		(attr smd)
+		(fp_line
+			(start -3.1 -3.1)
+			(end 3.1 -3.1)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "ded7cdba-d6c5-44f7-8be5-dbe70dc571d1")
+		)
+		(fp_line
+			(start -3.1 3.1)
+			(end 3.1 3.1)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "664a7327-e204-496d-bd85-d528b439b3ee")
+		)
+		(fp_line
+			(start -3 -1.5)
+			(end -3 1.5)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "fd66ca69-5cd6-4213-86a8-16ce910eb34b")
+		)
+		(fp_line
+			(start 3 -1.5)
+			(end 3 1.5)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "26f2565d-1f1a-4eb1-a51e-4119db107970")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 1.75 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "e2bb73b0-1844-4bd7-9779-223078fec8a4")
+		)
+		(fp_rect
+			(start -4.95 -3.35)
+			(end 4.95 3.35)
+			(stroke
+				(width 0.05)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "1a0186a1-30ba-42ad-bfe9-78dba5c96425")
+		)
+		(fp_rect
+			(start -3 -3)
+			(end 3 3)
+			(stroke
+				(width 0.1)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.Fab")
+			(uuid "985ca0f8-7bbf-4a66-8f8c-00783ae479ef")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 1.65 0)
+			(stroke
+				(width 0.1)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.Fab")
+			(uuid "3af1a963-d28d-4e7b-9de3-b985ac10eaea")
+		)
+		(fp_text user "${REFERENCE}"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(uuid "220e79de-06e7-4c1f-9d58-6282ffe69cd1")
+			(effects
+				(font
+					(size 0.8 0.8)
+					(thickness 0.12)
+				)
+			)
+		)
+		(pad "1" smd roundrect
+			(at -3.975 -2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 46 "unconnected-(SW3-Pad1)")
+			(uuid "527ee328-a106-4e2e-87b0-5c3c64d7e67e")
+		)
+		(pad "2" smd roundrect
+			(at 3.975 -2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 47 "UP_KEY")
+			(uuid "4849b51f-4c3c-4ad5-838f-5f67757ba836")
+		)
+		(pad "3" smd roundrect
+			(at -3.975 2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 48 "unconnected-(SW3-Pad3)")
+			(uuid "3e2d7fe8-2f70-4636-bcae-23d1de8e3d07")
+		)
+		(pad "4" smd roundrect
+			(at 3.975 2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 1 "GNDPWR")
+			(uuid "fc0e9370-db8d-4e98-a8c7-e0f7748b3b66")
+		)
+		(embedded_fonts no)
+	)
 	(footprint "Resistor_SMD:R_0805_2012Metric"
 		(layer "F.Cu")
 		(uuid "49b4ca3d-3d70-470d-8f0d-40426ffbfdb4")
@@ -5193,6 +5633,226 @@
 				(xyz 0 0 0)
 			)
 		)
+	)
+	(footprint "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+		(layer "F.Cu")
+		(uuid "6c4a2c48-a80b-4bfd-96d6-580b66511588")
+		(at 191.0375 111.965)
+		(descr "Tactile switch 6x6 mm, SMD gull wing, Kinghelm KH-6X6XxH-STM (KH-6X6X7H-STM, C2837533: 7 mm overall, 3.45 mm body, 3.3 mm plunger). Land pattern per the Kinghelm drawing: 1.45 x 1.0 mm pads, 9.4/6.5 mm across, 5.5/3.5 mm along; pads 1-2 one terminal, 3-4 the other.")
+		(tags "switch tactile 6x6 SMD KH-6X6")
+		(property "Reference" "SW4"
+			(at 0 -4.3 0)
+			(layer "F.SilkS")
+			(uuid "301a9494-1d61-4801-b000-a36ac22f6ba7")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Value" "SW_SPST_4P_H"
+			(at 0 4.3 0)
+			(layer "F.Fab")
+			(uuid "3d47826a-8537-4356-9511-92ff3d7e9e6f")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "a5b5418b-84cf-4b79-a08c-5f5c41f1a06d")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Description" "SPST momentary switch with 4 pads (2 per terminal). Top terminal = pins 1 (top-left) & 2 (top-right); bottom terminal = pins 3 (bottom-left) & 4 (bottom-right); vertical middle stem = SPST contact. The 4 pins are electrically independent in the symbol - wire the pads you use and mark the rest no-connect."
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b1a24923-6c0c-4752-9773-a347299c9ce9")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC Part" "C2800848"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "62ba9928-e17f-4726-8590-9d4e4976c2e5")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2837533"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "8d4d54f4-6036-4f0d-aaa6-65db07f3529c")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Footprint" "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(uuid "7ab1868a-559d-44cd-826b-6683737655dd")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(path "/787269ea-a7f6-42b6-904c-6f6904ca3b60")
+		(sheetname "/")
+		(sheetfile "wificomms.kicad_sch")
+		(attr smd)
+		(fp_line
+			(start -3.1 -3.1)
+			(end 3.1 -3.1)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "972b40e5-03b9-4537-9ad8-2f7cb5983f94")
+		)
+		(fp_line
+			(start -3.1 3.1)
+			(end 3.1 3.1)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "544edf54-5707-4664-bc89-04206b1512f8")
+		)
+		(fp_line
+			(start -3 -1.5)
+			(end -3 1.5)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "5dc7f807-14c4-49cd-b9fe-1808b1a3e6df")
+		)
+		(fp_line
+			(start 3 -1.5)
+			(end 3 1.5)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "57c24828-a8c0-4dbb-a506-5e46ab99e577")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 1.75 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "7bd5a06d-5db7-4acf-a10e-ecc9436a20f0")
+		)
+		(fp_rect
+			(start -4.95 -3.35)
+			(end 4.95 3.35)
+			(stroke
+				(width 0.05)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "a71b388b-8566-47d2-8490-7c1e33110670")
+		)
+		(fp_rect
+			(start -3 -3)
+			(end 3 3)
+			(stroke
+				(width 0.1)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.Fab")
+			(uuid "cf2d01ef-3ed5-4470-97ee-0158d33f4e3f")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 1.65 0)
+			(stroke
+				(width 0.1)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.Fab")
+			(uuid "c2fd5f90-8f75-414e-8db5-13fdff68d282")
+		)
+		(fp_text user "${REFERENCE}"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(uuid "689ef588-1b0b-44bb-8b59-395f93e2a18e")
+			(effects
+				(font
+					(size 0.8 0.8)
+					(thickness 0.12)
+				)
+			)
+		)
+		(pad "1" smd roundrect
+			(at -3.975 -2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 49 "unconnected-(SW4-Pad1)")
+			(uuid "edfeb786-72db-40a5-ad2c-8f66dc38d4d7")
+		)
+		(pad "2" smd roundrect
+			(at 3.975 -2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 51 "MENU_KEY")
+			(uuid "59f5c76d-1f91-438b-8a44-1d32dde8fc43")
+		)
+		(pad "3" smd roundrect
+			(at -3.975 2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 50 "unconnected-(SW4-Pad3)")
+			(uuid "8dbae0e5-8faa-4a23-abca-bd2f3d11e593")
+		)
+		(pad "4" smd roundrect
+			(at 3.975 2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 1 "GNDPWR")
+			(uuid "406fb209-cc8d-4b3f-9366-e7f431f8bdcd")
+		)
+		(embedded_fonts no)
 	)
 	(footprint "Capacitor_SMD:C_0805_2012Metric"
 		(layer "F.Cu")
@@ -10374,269 +11034,6 @@
 			)
 		)
 	)
-	(footprint "phone_cad_2_parts:SW_PTS526_5.2x5.2_Gullwing"
-		(layer "F.Cu")
-		(uuid "d0cfdce8-60d0-4b13-9054-ed091a9a2f03")
-		(at 191.0375 98.715)
-		(property "Reference" "SW2"
-			(at 0 -5.85 0)
-			(layer "F.SilkS")
-			(uuid "46cba340-997a-4646-ae9e-234fdc4a7e1c")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Value" "SW_SPST_4P_H"
-			(at 0 5.85 0)
-			(layer "F.Fab")
-			(uuid "51dad437-bfcc-4375-b8d5-81f9d9b31490")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "0492c40d-7239-499f-943d-da7374e3e0eb")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Description" "SPST momentary switch with 4 pads (2 per terminal). Top terminal = pins 1 (top-left) & 2 (top-right); bottom terminal = pins 3 (bottom-left) & 4 (bottom-right); vertical middle stem = SPST contact. The 4 pins are electrically independent in the symbol - wire the pads you use and mark the rest no-connect."
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "045e8e35-65ad-45af-bad1-7a90791c272d")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C2800848"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "ed545e65-9054-45d4-b81a-6a2bd8727a93")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C2689538"
-			(at 0 0 0)
-			(unlocked yes)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "97f07925-45ff-4e0a-948d-fe1c67d125a9")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(path "/6c175eea-e629-4dbf-90b3-8f3a9520bd90")
-		(sheetname "/")
-		(sheetfile "wificomms.kicad_sch")
-		(attr through_hole)
-		(fp_line
-			(start -2.41 -1.07)
-			(end -2.41 1.07)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "056c6b2c-7ada-4080-bfb2-44d0d5f961bf")
-		)
-		(fp_line
-			(start -1.97 2.41)
-			(end 1.97 2.41)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "5927e858-9e89-479c-b811-eb3341847f6e")
-		)
-		(fp_line
-			(start 1.97 -2.41)
-			(end -1.97 -2.41)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "b09f83c5-fe6a-4c30-bb91-039a8bec27bb")
-		)
-		(fp_line
-			(start 2.41 1.07)
-			(end 2.41 -1.07)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "6ab999c2-f36b-4b90-85a8-a41e51453597")
-		)
-		(fp_circle
-			(center -3.56 -2.79)
-			(end -3.41 -2.79)
-			(stroke
-				(width 0.3)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "02513300-36ca-48e8-b79c-9aae340967df")
-		)
-		(fp_circle
-			(center -3.2 -2.4)
-			(end -3.17 -2.4)
-			(stroke
-				(width 0.06)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "ac3a50b1-5ad2-4aaf-a87a-78e950bfe85d")
-		)
-		(fp_circle
-			(center 0 0)
-			(end 1.82 0)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "56c18267-6c17-4708-a35d-93202a582948")
-		)
-		(fp_circle
-			(center -3.56 -2.79)
-			(end -3.41 -2.79)
-			(stroke
-				(width 0.3)
-				(type solid)
-			)
-			(fill no)
-			(layer "Cmts.User")
-			(uuid "69aa9fb6-e9d8-4503-a98f-c8b66ac8223a")
-		)
-		(fp_line
-			(start -2.4 -2.4)
-			(end 2.4 -2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "a29d55d4-f917-48b8-9b46-4c108b855ff3")
-		)
-		(fp_line
-			(start -2.4 2.4)
-			(end -2.4 -2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "458d918c-bcc9-442f-b076-6182f3c4ac6b")
-		)
-		(fp_line
-			(start 2.4 -2.4)
-			(end 2.4 2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "06b924b6-e7dd-4e9e-bf39-8acc91850540")
-		)
-		(fp_line
-			(start 2.4 2.4)
-			(end -2.4 2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "c897d056-f86a-411a-90dc-014a491b64ef")
-		)
-		(fp_text user "${REFERENCE}"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(uuid "3b68a8bb-a323-42a4-86d7-1b12fb3cd6fa")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(pad "1" smd rect
-			(at -3.1 -1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 43 "unconnected-(SW2-Pad1)")
-			(pinfunction "1")
-			(pintype "passive+no_connect")
-			(uuid "0011ebc0-e3dd-4ddd-a513-1d0ff374389b")
-		)
-		(pad "2" smd rect
-			(at 3.1 -1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 45 "DOWN_KEY")
-			(pinfunction "2")
-			(pintype "passive")
-			(uuid "bda449cd-635d-4f12-a40f-e4e071aafd90")
-		)
-		(pad "3" smd rect
-			(at -3.1 1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 44 "unconnected-(SW2-Pad3)")
-			(pinfunction "3")
-			(pintype "passive+no_connect")
-			(uuid "36f351f2-9aef-4ed9-9fa1-d2e9d37e7737")
-		)
-		(pad "4" smd rect
-			(at 3.1 1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 1 "GNDPWR")
-			(pinfunction "4")
-			(pintype "passive")
-			(uuid "e599422a-d288-4d80-8642-9238a049895b")
-		)
-		(embedded_fonts no)
-		(model "phone_cad_2_parts.3dshapes/SW_PTS526_5.2x5.2_Gullwing.wrl"
-			(offset
-				(xyz 0 0 0)
-			)
-			(scale
-				(xyz 1 1 1)
-			)
-			(rotate
-				(xyz 0 0 0)
-			)
-		)
-	)
 	(footprint "Resistor_SMD:R_0805_2012Metric"
 		(layer "F.Cu")
 		(uuid "d3a944d8-1330-43fb-9ce9-e61277c15aa1")
@@ -11809,532 +12206,6 @@
 			)
 		)
 	)
-	(footprint "phone_cad_2_parts:SW_PTS526_5.2x5.2_Gullwing"
-		(layer "F.Cu")
-		(uuid "e6755155-b42e-44e8-97ee-d7d85c690631")
-		(at 191.0375 92.09)
-		(property "Reference" "SW1"
-			(at 0 -5.85 0)
-			(layer "F.SilkS")
-			(uuid "0ace4f22-e888-446b-92fe-b7eca5fde4bc")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Value" "SW_SPST_4P_H"
-			(at 0 5.85 0)
-			(layer "F.Fab")
-			(uuid "c46e05f7-1e22-4871-9686-b7b16d16539c")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "5728fcbe-155a-4597-aa1a-48d87d72c26e")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Description" "SPST momentary switch with 4 pads (2 per terminal). Top terminal = pins 1 (top-left) & 2 (top-right); bottom terminal = pins 3 (bottom-left) & 4 (bottom-right); vertical middle stem = SPST contact. The 4 pins are electrically independent in the symbol - wire the pads you use and mark the rest no-connect."
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "faca72dc-0aa7-4c39-a5fb-e077462cdc64")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C2800848"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "84edf601-6ae7-4017-b0b0-bf94f7377e5c")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C2689538"
-			(at 0 0 0)
-			(unlocked yes)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "9658875a-1096-4e2c-9421-cda1fb57295b")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(path "/5faf3948-3c9f-415e-be36-10158ad2a505")
-		(sheetname "/")
-		(sheetfile "wificomms.kicad_sch")
-		(attr through_hole)
-		(fp_line
-			(start -2.41 -1.07)
-			(end -2.41 1.07)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "698e85c6-e716-4e5a-9e0b-8bbfcfbad848")
-		)
-		(fp_line
-			(start -1.97 2.41)
-			(end 1.97 2.41)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "92dd349a-7007-41d3-8764-6bf42c18b9d9")
-		)
-		(fp_line
-			(start 1.97 -2.41)
-			(end -1.97 -2.41)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "ad4667a4-505a-40bb-a088-b3d958f30a74")
-		)
-		(fp_line
-			(start 2.41 1.07)
-			(end 2.41 -1.07)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "78c35482-f5c4-4b3e-9864-56d881e24362")
-		)
-		(fp_circle
-			(center -3.56 -2.79)
-			(end -3.41 -2.79)
-			(stroke
-				(width 0.3)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "df901c5a-7d92-4bf5-95e6-2d375b50579a")
-		)
-		(fp_circle
-			(center -3.2 -2.4)
-			(end -3.17 -2.4)
-			(stroke
-				(width 0.06)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "583d4d18-1824-4459-8c70-ff031f7fa088")
-		)
-		(fp_circle
-			(center 0 0)
-			(end 1.82 0)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "c003a2fd-06f5-46ac-89d1-481b18d77be0")
-		)
-		(fp_circle
-			(center -3.56 -2.79)
-			(end -3.41 -2.79)
-			(stroke
-				(width 0.3)
-				(type solid)
-			)
-			(fill no)
-			(layer "Cmts.User")
-			(uuid "47f410bc-c4e6-450e-bbd7-caf6a6d5b433")
-		)
-		(fp_line
-			(start -2.4 -2.4)
-			(end 2.4 -2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "16ba2840-1eee-458c-8ab2-3e1b991b51d9")
-		)
-		(fp_line
-			(start -2.4 2.4)
-			(end -2.4 -2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "3247353d-7169-4c7e-90ef-e2cd885b1d61")
-		)
-		(fp_line
-			(start 2.4 -2.4)
-			(end 2.4 2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "e64d8c6b-2f75-4363-abb1-145736785832")
-		)
-		(fp_line
-			(start 2.4 2.4)
-			(end -2.4 2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "5cf58248-96d1-4cc5-8b65-08b0038ef1c9")
-		)
-		(fp_text user "${REFERENCE}"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(uuid "57e86eef-9eb1-4ade-a8a7-964b479ef7d5")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(pad "1" smd rect
-			(at -3.1 -1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 41 "unconnected-(SW1-Pad1)")
-			(pinfunction "1")
-			(pintype "passive+no_connect")
-			(uuid "66c6dc87-aed2-454c-8dd5-62f491fad2e1")
-		)
-		(pad "2" smd rect
-			(at 3.1 -1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 40 "ENTER_KEY")
-			(pinfunction "2")
-			(pintype "passive")
-			(uuid "4758afcf-7532-42ac-84d1-54d05913a956")
-		)
-		(pad "3" smd rect
-			(at -3.1 1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 42 "unconnected-(SW1-Pad3)")
-			(pinfunction "3")
-			(pintype "passive+no_connect")
-			(uuid "e1072a8d-fd49-4c45-9f43-2276b4c2078c")
-		)
-		(pad "4" smd rect
-			(at 3.1 1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 1 "GNDPWR")
-			(pinfunction "4")
-			(pintype "passive")
-			(uuid "aae1bc78-17df-426c-b44e-d55911d0ff65")
-		)
-		(embedded_fonts no)
-		(model "phone_cad_2_parts.3dshapes/SW_PTS526_5.2x5.2_Gullwing.wrl"
-			(offset
-				(xyz 0 0 0)
-			)
-			(scale
-				(xyz 1 1 1)
-			)
-			(rotate
-				(xyz 0 0 0)
-			)
-		)
-	)
-	(footprint "phone_cad_2_parts:SW_PTS526_5.2x5.2_Gullwing"
-		(layer "F.Cu")
-		(uuid "eb5a8c40-8002-43cf-bdb4-ffabe6581c20")
-		(at 191.0375 105.34)
-		(property "Reference" "SW3"
-			(at 0 -5.85 0)
-			(layer "F.SilkS")
-			(uuid "8414bd94-b69c-460d-87e3-93794c28dbad")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Value" "SW_SPST_4P_H"
-			(at 0 5.85 0)
-			(layer "F.Fab")
-			(uuid "9dc7adfb-587c-4f87-897b-023c9d7302a9")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "13b26c0b-e931-432e-bec8-58fb03a085fe")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Description" "SPST momentary switch with 4 pads (2 per terminal). Top terminal = pins 1 (top-left) & 2 (top-right); bottom terminal = pins 3 (bottom-left) & 4 (bottom-right); vertical middle stem = SPST contact. The 4 pins are electrically independent in the symbol - wire the pads you use and mark the rest no-connect."
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "60cc2a15-efc9-4461-9ca5-489a10223836")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C2800848"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "4538b8e0-b423-4f47-b0b8-8e01536755cc")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C2689538"
-			(at 0 0 0)
-			(unlocked yes)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "6d3fa503-91fa-4841-8280-d22160a4785d")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(path "/7edd2ab8-78a3-4ab0-99d9-9dc37afa5fd6")
-		(sheetname "/")
-		(sheetfile "wificomms.kicad_sch")
-		(attr through_hole)
-		(fp_line
-			(start -2.41 -1.07)
-			(end -2.41 1.07)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "09c2a4fd-2dc3-4879-a612-1270bfeb4887")
-		)
-		(fp_line
-			(start -1.97 2.41)
-			(end 1.97 2.41)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "f87ecfe2-acab-4142-81da-b15ad9e355c2")
-		)
-		(fp_line
-			(start 1.97 -2.41)
-			(end -1.97 -2.41)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "9e6b21ac-5f30-4a7a-a8b3-da74d80e9d7d")
-		)
-		(fp_line
-			(start 2.41 1.07)
-			(end 2.41 -1.07)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "1c74dbc8-6f2e-44aa-8e9f-3235f2ddc0b1")
-		)
-		(fp_circle
-			(center -3.56 -2.79)
-			(end -3.41 -2.79)
-			(stroke
-				(width 0.3)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "ded7f088-e311-4222-9752-545520514660")
-		)
-		(fp_circle
-			(center -3.2 -2.4)
-			(end -3.17 -2.4)
-			(stroke
-				(width 0.06)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "ff82ed89-5097-47bd-8f8e-da8ee26c1fb8")
-		)
-		(fp_circle
-			(center 0 0)
-			(end 1.82 0)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "bdc0395c-19c7-4f52-bc9b-7a1e526b042f")
-		)
-		(fp_circle
-			(center -3.56 -2.79)
-			(end -3.41 -2.79)
-			(stroke
-				(width 0.3)
-				(type solid)
-			)
-			(fill no)
-			(layer "Cmts.User")
-			(uuid "fa48a9a2-ece2-48d5-a720-d6ebbbe7cc26")
-		)
-		(fp_line
-			(start -2.4 -2.4)
-			(end 2.4 -2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "e0adeb0d-fda4-4d0e-a158-d72304b34883")
-		)
-		(fp_line
-			(start -2.4 2.4)
-			(end -2.4 -2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "ffaf3ea3-57ea-49ca-8c1c-4b7c3acb4700")
-		)
-		(fp_line
-			(start 2.4 -2.4)
-			(end 2.4 2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "916dd5d8-65a6-4e5d-bd93-f37a7142b0b0")
-		)
-		(fp_line
-			(start 2.4 2.4)
-			(end -2.4 2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "8c3be5f8-9aa6-4c96-b60b-7beec991fb05")
-		)
-		(fp_text user "${REFERENCE}"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(uuid "f5f07f17-6e90-436b-8bd0-6ceee8fab760")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(pad "1" smd rect
-			(at -3.1 -1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 46 "unconnected-(SW3-Pad1)")
-			(pinfunction "1")
-			(pintype "passive+no_connect")
-			(uuid "150d894b-5945-4633-b54f-b17dc07161d6")
-		)
-		(pad "2" smd rect
-			(at 3.1 -1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 47 "UP_KEY")
-			(pinfunction "2")
-			(pintype "passive")
-			(uuid "c79db436-0f04-4346-bed3-808936449787")
-		)
-		(pad "3" smd rect
-			(at -3.1 1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 48 "unconnected-(SW3-Pad3)")
-			(pinfunction "3")
-			(pintype "passive+no_connect")
-			(uuid "f27a9a4d-cbf9-4bce-a2cc-b125b3ab42bd")
-		)
-		(pad "4" smd rect
-			(at 3.1 1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 1 "GNDPWR")
-			(pinfunction "4")
-			(pintype "passive")
-			(uuid "c3165c0f-7970-4ab2-9db6-28bf5abfda95")
-		)
-		(embedded_fonts no)
-		(model "phone_cad_2_parts.3dshapes/SW_PTS526_5.2x5.2_Gullwing.wrl"
-			(offset
-				(xyz 0 0 0)
-			)
-			(scale
-				(xyz 1 1 1)
-			)
-			(rotate
-				(xyz 0 0 0)
-			)
-		)
-	)
 	(footprint "Resistor_SMD:R_0805_2012Metric"
 		(layer "F.Cu")
 		(uuid "f46575ef-b680-4617-aaad-7a6924898b43")
@@ -12478,269 +12349,6 @@
 		)
 		(embedded_fonts no)
 		(model "${KICAD9_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0805_2012Metric.step"
-			(offset
-				(xyz 0 0 0)
-			)
-			(scale
-				(xyz 1 1 1)
-			)
-			(rotate
-				(xyz 0 0 0)
-			)
-		)
-	)
-	(footprint "phone_cad_2_parts:SW_PTS526_5.2x5.2_Gullwing"
-		(layer "F.Cu")
-		(uuid "f7d6e688-c9f1-4025-9298-3f3467748952")
-		(at 191.0375 111.965)
-		(property "Reference" "SW4"
-			(at 0 -5.85 0)
-			(layer "F.SilkS")
-			(uuid "4d3ecefa-8f2f-4545-ac18-64ee8cd59cd8")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Value" "SW_SPST_4P_H"
-			(at 0 5.85 0)
-			(layer "F.Fab")
-			(uuid "5e4cbe54-a87a-44f4-98b5-b8b48a575e68")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "94f05b8b-cd3d-431e-8b52-3cb250fca9ef")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Description" "SPST momentary switch with 4 pads (2 per terminal). Top terminal = pins 1 (top-left) & 2 (top-right); bottom terminal = pins 3 (bottom-left) & 4 (bottom-right); vertical middle stem = SPST contact. The 4 pins are electrically independent in the symbol - wire the pads you use and mark the rest no-connect."
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "05275677-1c1a-42e2-884c-5e01f562afd1")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC Part" "C2800848"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "ebfcc838-ceb6-46a1-809e-2a0ba159239f")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C2689538"
-			(at 0 0 0)
-			(unlocked yes)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "9fcadffa-afd2-40e7-bd3c-4c69218b2951")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(path "/787269ea-a7f6-42b6-904c-6f6904ca3b60")
-		(sheetname "/")
-		(sheetfile "wificomms.kicad_sch")
-		(attr through_hole)
-		(fp_line
-			(start -2.41 -1.07)
-			(end -2.41 1.07)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "a4288472-b4e2-4e6c-a637-363b4bdc8a02")
-		)
-		(fp_line
-			(start -1.97 2.41)
-			(end 1.97 2.41)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "7e312417-47a0-4eb0-a63a-83a4da57fd14")
-		)
-		(fp_line
-			(start 1.97 -2.41)
-			(end -1.97 -2.41)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "965d12ce-6091-4f6f-b44c-44490437b01a")
-		)
-		(fp_line
-			(start 2.41 1.07)
-			(end 2.41 -1.07)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(layer "F.SilkS")
-			(uuid "1de75e92-9280-48bb-835b-d2972779579e")
-		)
-		(fp_circle
-			(center -3.56 -2.79)
-			(end -3.41 -2.79)
-			(stroke
-				(width 0.3)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "1b8c1f70-3a5d-476a-b845-aff7ae7fa671")
-		)
-		(fp_circle
-			(center -3.2 -2.4)
-			(end -3.17 -2.4)
-			(stroke
-				(width 0.06)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "b7c256a0-1632-4eed-8848-509f33734c1b")
-		)
-		(fp_circle
-			(center 0 0)
-			(end 1.82 0)
-			(stroke
-				(width 0.25)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "b16b4de1-7eb7-4ec1-84f1-19641fffd8fe")
-		)
-		(fp_circle
-			(center -3.56 -2.79)
-			(end -3.41 -2.79)
-			(stroke
-				(width 0.3)
-				(type solid)
-			)
-			(fill no)
-			(layer "Cmts.User")
-			(uuid "da5511dd-324e-4527-a027-41b0c336e29d")
-		)
-		(fp_line
-			(start -2.4 -2.4)
-			(end 2.4 -2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "b3770cbc-d8d0-4c8e-8ace-305247e37038")
-		)
-		(fp_line
-			(start -2.4 2.4)
-			(end -2.4 -2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "817e2ea3-84a3-4065-a71c-1b0f8b818d2f")
-		)
-		(fp_line
-			(start 2.4 -2.4)
-			(end 2.4 2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "51bb287b-a64b-4166-8878-f075a6ccfef9")
-		)
-		(fp_line
-			(start 2.4 2.4)
-			(end -2.4 2.4)
-			(stroke
-				(width 0.05)
-				(type solid)
-			)
-			(layer "F.CrtYd")
-			(uuid "af8952e2-2e98-45a1-b8df-7b499612523f")
-		)
-		(fp_text user "${REFERENCE}"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(uuid "d34750dd-ddec-47f8-a45f-c41a23f5670e")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(pad "1" smd rect
-			(at -3.1 -1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 49 "unconnected-(SW4-Pad1)")
-			(pinfunction "1")
-			(pintype "passive+no_connect")
-			(uuid "54023e16-2432-48cd-b2ee-a67132ca322c")
-		)
-		(pad "2" smd rect
-			(at 3.1 -1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 51 "MENU_KEY")
-			(pinfunction "2")
-			(pintype "passive")
-			(uuid "c782a697-8073-48ed-8ae4-b3606e72a327")
-		)
-		(pad "3" smd rect
-			(at -3.1 1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 50 "unconnected-(SW4-Pad3)")
-			(pinfunction "3")
-			(pintype "passive+no_connect")
-			(uuid "bcbd8c34-99f2-4582-be5d-ad98278f5bb2")
-		)
-		(pad "4" smd rect
-			(at 3.1 1.85)
-			(size 1.8 1.1)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 1 "GNDPWR")
-			(pinfunction "4")
-			(pintype "passive")
-			(uuid "bffaa112-d960-43b5-89a0-bc7c9f9312b3")
-		)
-		(embedded_fonts no)
-		(model "phone_cad_2_parts.3dshapes/SW_PTS526_5.2x5.2_Gullwing.wrl"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -13213,6 +12821,226 @@
 				(xyz 0 0 0)
 			)
 		)
+	)
+	(footprint "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+		(layer "F.Cu")
+		(uuid "fee274ae-7537-43e5-b7ff-f01817663f65")
+		(at 191.0375 98.715)
+		(descr "Tactile switch 6x6 mm, SMD gull wing, Kinghelm KH-6X6XxH-STM (KH-6X6X7H-STM, C2837533: 7 mm overall, 3.45 mm body, 3.3 mm plunger). Land pattern per the Kinghelm drawing: 1.45 x 1.0 mm pads, 9.4/6.5 mm across, 5.5/3.5 mm along; pads 1-2 one terminal, 3-4 the other.")
+		(tags "switch tactile 6x6 SMD KH-6X6")
+		(property "Reference" "SW2"
+			(at 0 -4.3 0)
+			(layer "F.SilkS")
+			(uuid "36f8ed13-7e0d-4677-a3b8-6162e027acc1")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Value" "SW_SPST_4P_H"
+			(at 0 4.3 0)
+			(layer "F.Fab")
+			(uuid "749ce582-4f6f-468d-bbfb-6b50d0b41c03")
+			(effects
+				(font
+					(size 1 1)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "e02c910f-5e99-4d65-90fe-b5daa4c86eeb")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Description" "SPST momentary switch with 4 pads (2 per terminal). Top terminal = pins 1 (top-left) & 2 (top-right); bottom terminal = pins 3 (bottom-left) & 4 (bottom-right); vertical middle stem = SPST contact. The 4 pins are electrically independent in the symbol - wire the pads you use and mark the rest no-connect."
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "b86eda24-0936-48f8-a324-52262ed9f342")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC Part" "C2800848"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "dfd61939-bf84-4ef6-a446-d15a249fce2e")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C2837533"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "de14be29-0139-4462-a8bf-9c49f2e1ae90")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Footprint" "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(uuid "dfe1910b-d90a-40ba-b7b6-5388028995ce")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(path "/6c175eea-e629-4dbf-90b3-8f3a9520bd90")
+		(sheetname "/")
+		(sheetfile "wificomms.kicad_sch")
+		(attr smd)
+		(fp_line
+			(start -3.1 -3.1)
+			(end 3.1 -3.1)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "a64d9031-5276-4e46-a558-988e3d33b733")
+		)
+		(fp_line
+			(start -3.1 3.1)
+			(end 3.1 3.1)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "a01b4696-94cd-498d-932c-a2be129ffbb0")
+		)
+		(fp_line
+			(start -3 -1.5)
+			(end -3 1.5)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "b7d5ba3b-5108-4556-ae67-c7bb7aa36518")
+		)
+		(fp_line
+			(start 3 -1.5)
+			(end 3 1.5)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(layer "F.SilkS")
+			(uuid "777dac27-1856-44c8-ba5f-16eb27f7c786")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 1.75 0)
+			(stroke
+				(width 0.12)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "51cd2146-6ec2-4cd6-ba69-d1d5ae75335d")
+		)
+		(fp_rect
+			(start -4.95 -3.35)
+			(end 4.95 3.35)
+			(stroke
+				(width 0.05)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.CrtYd")
+			(uuid "42526044-0a47-4ea3-aed2-2ab5250c6fec")
+		)
+		(fp_rect
+			(start -3 -3)
+			(end 3 3)
+			(stroke
+				(width 0.1)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.Fab")
+			(uuid "800f3d95-6e50-4479-a1de-707ca355cba4")
+		)
+		(fp_circle
+			(center 0 0)
+			(end 1.65 0)
+			(stroke
+				(width 0.1)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.Fab")
+			(uuid "bfb76d0b-0ae4-458d-aa2b-23a2751eb140")
+		)
+		(fp_text user "${REFERENCE}"
+			(at 0 0 0)
+			(layer "F.Fab")
+			(uuid "9e4df924-7bd2-4e1f-a94d-f0c25f69b416")
+			(effects
+				(font
+					(size 0.8 0.8)
+					(thickness 0.12)
+				)
+			)
+		)
+		(pad "1" smd roundrect
+			(at -3.975 -2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 43 "unconnected-(SW2-Pad1)")
+			(uuid "7fc9490e-2ba0-41ec-a154-5e49ee124ef1")
+		)
+		(pad "2" smd roundrect
+			(at 3.975 -2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 45 "DOWN_KEY")
+			(uuid "56875980-d76a-43c4-9bea-811ea021c537")
+		)
+		(pad "3" smd roundrect
+			(at -3.975 2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 44 "unconnected-(SW2-Pad3)")
+			(uuid "5e949368-228b-4581-ad1c-7ce5b1897fde")
+		)
+		(pad "4" smd roundrect
+			(at 3.975 2.25)
+			(size 1.45 1)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(roundrect_rratio 0.15)
+			(net 1 "GNDPWR")
+			(uuid "a5a520cf-0391-45e4-88b0-388a688f0835")
+		)
+		(embedded_fonts no)
 	)
 	(embedded_fonts no)
 )
