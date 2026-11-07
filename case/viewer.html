@@ -3,23 +3,28 @@
 <head>
   <meta charset="utf-8">
   <title>wifitalkie case</title>
-  <script type="module"
-    src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <style>
-    html, body { margin: 0; height: 100%; background: #f4f4f2; font-family: sans-serif; }
-    model-viewer { width: 100%; height: 100%; }
+    html, body { margin: 0; height: 100%; background: #f4f4f2; font-family: sans-serif; overflow: hidden; }
+    canvas { display: block; }
     #bar { position: fixed; left: 12px; top: 10px; display: flex; gap: 6px; }
-    #bar button { padding: 6px 12px; border: 1px solid #999; background: #fff;
-                  border-radius: 4px; cursor: pointer; font-size: 14px; }
-    #bar button.on { background: #333; color: #fff; }
+    button { padding: 6px 12px; border: 1px solid #999; background: #fff;
+             border-radius: 4px; cursor: pointer; font-size: 14px; }
+    button.on { background: #333; color: #fff; }
+    #pieces { position: fixed; left: 12px; top: 52px; display: none; flex-direction: column;
+              gap: 4px; background: #fffc; padding: 8px 10px; border-radius: 4px;
+              border: 1px solid #ccc; font-size: 14px; }
+    #pieces label { cursor: pointer; user-select: none; }
+    #pieces .row { display: flex; gap: 6px; margin-top: 4px; }
+    #pieces .row button { padding: 2px 8px; font-size: 12px; }
     #hint { position: fixed; left: 12px; bottom: 10px; color: #555; font-size: 13px; }
   </style>
+  <script type="importmap">
+    { "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+  </script>
 </head>
 <body>
-  <model-viewer id="mv" src="exports/closed.glb" alt="wifitalkie case"
-    camera-controls interaction-prompt="none" shadow-intensity="1"
-    exposure="1.6" tone-mapping="neutral" environment-image="neutral" camera-orbit="-10deg 30deg auto">
-  </model-viewer>
   <div id="bar">
     <button data-f="exploded">exploded</button>
     <button data-f="closed" class="on">closed</button>
@@ -27,19 +32,112 @@
     <button data-f="back">back shell</button>
     <button data-f="test">fit test</button>
   </div>
-  <div id="hint">drag = rotate · scroll = zoom · right-drag = pan</div>
-  <script>
-    const mv = document.getElementById('mv');
+  <div id="pieces"></div>
+  <div id="hint">drag = rotate · scroll = zoom · right-drag = pan · click a name to show only it</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setClearColor(0xf4f4f2);
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 2.2));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+    sun.position.set(1, 2, 3);
+    scene.add(sun);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.8);
+    fill.position.set(-2, -1, -2);
+    scene.add(fill);
+
+    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 5000);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    const loader = new GLTFLoader();
+    const root = new THREE.Group();
+    scene.add(root);
+    const panel = document.getElementById('pieces');
+    let framed = false;
+
+    const load = url => new Promise((ok, bad) =>
+      loader.load(`${url}?v=${Date.now()}`, g => ok(g.scene), undefined, bad));
+
+    function frame() {
+      const box = new THREE.Box3().setFromObject(root);
+      const c = box.getCenter(new THREE.Vector3());
+      const r = box.getSize(new THREE.Vector3()).length() / 2;
+      const d = r / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2));
+      controls.target.copy(c);
+      camera.position.copy(c).add(new THREE.Vector3(-0.25, 0.5, 1).normalize().multiplyScalar(d));
+      camera.near = d / 100; camera.far = d * 10;
+      camera.updateProjectionMatrix();
+    }
+
+    async function show(f) {
+      root.clear();
+      panel.innerHTML = '';
+      panel.style.display = 'none';
+      if (f !== 'exploded') {
+        root.add(await load(`exports/${f}.glb`));
+      } else {
+        const names = await (await fetch(`exports/pieces/list.json?v=${Date.now()}`)).json();
+        const objs = {};
+        const boxes = {};
+        for (const n of names) {
+          const o = await load(`exports/pieces/${n}.glb`);
+          objs[n] = o;
+          root.add(o);
+          const lab = document.createElement('label');
+          const cb = document.createElement('input');
+          cb.type = 'checkbox'; cb.checked = true;
+          cb.onchange = () => { o.visible = cb.checked; };
+          boxes[n] = cb;
+          lab.append(cb, ' ');
+          const t = document.createElement('span');
+          t.textContent = n;
+          t.title = 'show only this';
+          t.onclick = e => { e.preventDefault();
+            for (const m of names) { boxes[m].checked = m === n; objs[m].visible = m === n; } };
+          lab.append(t);
+          panel.append(lab);
+        }
+        const row = document.createElement('div');
+        row.className = 'row';
+        for (const [txt, v] of [['all', true], ['none', false]]) {
+          const b = document.createElement('button');
+          b.textContent = txt;
+          b.onclick = () => names.forEach(m => { boxes[m].checked = v; objs[m].visible = v; });
+          row.append(b);
+        }
+        panel.append(row);
+        panel.style.display = 'flex';
+      }
+      if (!framed) { frame(); framed = true; }
+    }
+
     for (const b of document.querySelectorAll('#bar button')) {
       b.onclick = () => {
-        mv.src = `exports/${b.dataset.f}.glb?v=${Date.now()}`;
         document.querySelectorAll('#bar button').forEach(x => x.classList.toggle('on', x === b));
+        framed = false;
+        show(b.dataset.f);
       };
     }
-    // viewer.html?f=test opens straight on one model
-    const f = new URLSearchParams(location.search).get('f');
-    const pick = f && document.querySelector(`#bar button[data-f="${f}"]`);
-    if (pick) pick.click();
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+
+    // viewer.html?f=exploded opens straight on one model
+    const f = new URLSearchParams(location.search).get('f') || 'closed';
+    (document.querySelector(`#bar button[data-f="${f}"]`) ||
+     document.querySelector('#bar button[data-f="closed"]')).click();
   </script>
 </body>
 </html>
