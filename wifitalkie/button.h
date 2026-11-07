@@ -26,6 +26,7 @@ extern "C" {
 #define BUTTON_FAST_AFTER_MS 2000
 #define BUTTON_FAST_EVERY_MS 50
 #define BUTTON_HELD_MS 1000
+#define BUTTON_HELD_EVERY_MS 600
 
 struct button {
 	int kind;

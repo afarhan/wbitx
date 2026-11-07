@@ -26,6 +26,7 @@ struct entry {
 
 void entry_begin(struct entry *e, const char *set, const char *text, int most);
 void entry_scroll(struct entry *e, int up);
+int entry_put(struct entry *e, char letter);
 int entry_add(struct entry *e);
 int entry_delete(struct entry *e);
 char entry_around(const struct entry *e, int offset);

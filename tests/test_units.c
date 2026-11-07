@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Ashhar Farhan
 //
 // test_units.c — the talkie's code that knows nothing of the ESP32, tried on
-// this computer: mu-law, the filters, the duty, the keys, the dial, the text entry, the networks remembered, the speech's
+// this computer: mu-law, the filters, the duty, the keys, the dial, the text entry, the letters halved, the networks remembered, the speech's
 // high-pass and gate, the cookie and the stretch.
 //
 //     make check
@@ -22,6 +22,7 @@
 #include "../wifitalkie/button.h"
 #include "../wifitalkie/dial.h"
 #include "../wifitalkie/entry.h"
+#include "../wifitalkie/halves.h"
 #include "../wifitalkie/known.h"
 #include "../wifitalkie/playback.h"
 #include "../wifitalkie/settings.h"
@@ -273,10 +274,10 @@ static void test_buttons(void) {
 	count = button_run(&b, 0, 2 * KEY_SHORT_MS + KEY_HELD_TRY_MS, 3 * KEY_SHORT_MS + KEY_HELD_TRY_MS, &last);
 	expect(count == 0, "a holding key let go after held says nothing");
 	button_begin(&b, BUTTON_HOLDING_REPEATING);
-	count = button_run(&b, 1, 0, BUTTON_DEBOUNCE_MS + BUTTON_HELD_MS + 2 * BUTTON_REPEAT_EVERY_MS + 1, &last);
+	count = button_run(&b, 1, 0, BUTTON_DEBOUNCE_MS + BUTTON_HELD_MS + 2 * BUTTON_HELD_EVERY_MS + 1, &last);
 	expect(count == 3 && last == BUTTON_REPEATED, "a holding, repeating key held says held, then repeats");
-	count = button_run(&b, 0, BUTTON_DEBOUNCE_MS + BUTTON_HELD_MS + 2 * BUTTON_REPEAT_EVERY_MS + 1,
-		2 * BUTTON_HELD_MS, &last);
+	count = button_run(&b, 0, BUTTON_DEBOUNCE_MS + BUTTON_HELD_MS + 2 * BUTTON_HELD_EVERY_MS + 1,
+		3 * BUTTON_HELD_MS, &last);
 	expect(count == 0, "a holding, repeating key let go after held says nothing");
 
 	button_begin(&b, BUTTON_REPEATING);
@@ -384,6 +385,92 @@ static void test_entry(void) {
 	printf("entry: scrolled round, added, taken off, kept to its length\n");
 }
 
+#define KEYED_WPM 12
+#define KEYED_UNIT_MS (HALVES_MS_A_WPM / KEYED_WPM)
+#define KEYED_TURN_MS 5
+
+// the paddles held as they are from *now for ms, a turn at a time; the
+// letter taken, if one is, in *letter
+static int keyed_for(struct halves *h, int is_up, int is_down, long *now, long ms, char *letter) {
+	long until = *now + ms;
+	int taken = 0;
+
+	for (; *now < until; *now += KEYED_TURN_MS) {
+		if (halves_keys(h, is_up, is_down, *now, letter))
+			taken = 1;
+	}
+	return taken;
+}
+
+// the letter keyed, '.' a dit and '-' a dah, each key pressed a turn and
+// let go for a unit, then the gap between letters; 0 if nothing was taken
+static char halved(const char *code) {
+	struct halves h;
+	long now = 0;
+	char letter = 0;
+
+	halves_begin(&h, KEYED_WPM);
+	for (; *code != 0; code++) {
+		keyed_for(&h, *code == '.', *code == '-', &now, KEYED_TURN_MS, &letter);
+		keyed_for(&h, 0, 0, &now, KEYED_UNIT_MS, &letter);
+	}
+	if (!keyed_for(&h, 0, 0, &now, KEYED_UNIT_MS * HALVES_LETTER_UNITS, &letter))
+		return 0;
+	return letter;
+}
+
+// the letter keyed with a key held for ms, then let go
+static char held(int is_up, int is_down, long ms) {
+	struct halves h;
+	long now = 0;
+	char letter = 0;
+
+	halves_begin(&h, KEYED_WPM);
+	keyed_for(&h, is_up, is_down, &now, ms, &letter);
+	if (!keyed_for(&h, 0, 0, &now, KEYED_UNIT_MS * HALVES_LETTER_UNITS + KEYED_TURN_MS, &letter))
+		return 0;
+	return letter;
+}
+
+static void test_halves(void) {
+	static const char *codes[] = {
+		"E.", "T-", "I..", "A.-", "N-.", "M--", "S...", "U..-",
+		"R.-.", "W.--", "D-..", "K-.-", "O---", "H....", "V...-",
+		"F..-.", "L.-..", "P.--.", "J.---", "B-...", "X-..-", "C-.-.",
+		"Y-.--", "Z--..", "Q--.-", "?..--", "0-----", "1-----.", ")------",
+	};
+	struct halves h;
+	char letter = 0;
+	long now;
+	int i;
+
+	for (i = 0; i < (int)(sizeof(codes) / sizeof(codes[0])); i++)
+		expect(halved(codes[i] + 1) == codes[i][0], "each character is its Morse code, UP a dit");
+	expect(held(1, 0, 3 * HALVES_FIGURES_HELD_MS) == 'E' && held(0, 1, HALVES_FIGURES_HELD_MS / 2) == 'T',
+		"a key held is one element, and does not repeat");
+	expect(held(0, 1, HALVES_FIGURES_HELD_MS + KEYED_TURN_MS) == '0', "DOWN held brings the figures, at 0");
+	expect(halved("-----.....") == '5' && halved("------------") == ',', "and along them, kept to their ends");
+	halves_begin(&h, KEYED_WPM);
+	expect(halves_offered(&h, 0, 7) && halves_offered(&h, 1, 7) && !halves_offered(&h, 0, 3),
+		"E and T are offered first");
+	now = 0;
+	keyed_for(&h, 1, 0, &now, KEYED_TURN_MS, &letter);
+	expect(halves_offered(&h, 0, 3) && halves_offered(&h, 0, 11) && !halves_offered(&h, 1, 7),
+		"after E, I and A");
+	expect(!keyed_for(&h, 0, 0, &now, KEYED_UNIT_MS * HALVES_LETTER_UNITS - KEYED_TURN_MS, &letter),
+		"nothing is taken before the gap");
+	expect(keyed_for(&h, 0, 0, &now, 2 * KEYED_TURN_MS, &letter) && letter == 'E' && h.at < 0,
+		"taken after the gap, then nothing is chosen");
+	keyed_for(&h, 0, 1, &now, KEYED_TURN_MS, &letter);
+	halves_abort(&h);
+	expect(h.at < 0 && !keyed_for(&h, 0, 0, &now, 10 * HALVES_FIGURES_HELD_MS, &letter), "dropped, nothing is taken");
+	halves_begin(&h, 1);
+	expect(h.unit_ms == HALVES_MS_A_WPM / HALVES_WPM_LEAST, "the speed is kept to its least");
+	halves_begin(&h, KEYED_WPM);
+	expect(h.unit_ms == 100, "12 WPM is a unit of 100 ms");
+	printf("halves: thirty letters and sixteen figures, a press an element\n");
+}
+
 static void test_known(void) {
 	struct settings s;
 	char ssid[SETTINGS_SSID_ROOM];
@@ -478,6 +565,7 @@ int main(void) {
 	test_buttons();
 	test_dial();
 	test_entry();
+	test_halves();
 	test_known();
 	test_speech();
 	test_cookie();

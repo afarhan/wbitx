@@ -36,6 +36,8 @@
 
 #include <Arduino.h>
 
+#include "esp_system.h"
+
 #include "console.h"
 #include "microphone.h"
 #include "network.h"
@@ -50,6 +52,12 @@
 
 #define TICKS_GIVEN_UP 1
 
+// a probe for now: any poll that keeps the loop SLOW_MS or more is said
+#define SLOW_MS 150
+#define TIMED(call) do { long began_ = (long)millis(); call; \
+	if ((long)millis() - began_ >= SLOW_MS) \
+		console_say("SLOW: %s %ld MS", #call, (long)millis() - began_); } while (0)
+
 void setup() {
 	console_begin();
 	settings_load();
@@ -60,6 +68,8 @@ void setup() {
 	service_open();
 	network_open();
 	console_say("WIFITALKIE READY: TYPE STATUS");
+	if (esp_reset_reason() == ESP_RST_BROWNOUT)
+		console_say("STARTED AFTER A BROWNOUT: THE SUPPLY SAGGED");
 }
 
 void loop() {
@@ -68,13 +78,16 @@ void loop() {
 
 	if (console_line(line, sizeof(line)))
 		verbs_do(line, now);
-	verbs_poll(now);
-	network_poll(now);
-	ptt_poll(now);
-	microphone_poll(now);
-	service_poll(now);
-	voip_poll(now);
-	speaker_poll(now);
-	screen_poll(now);
+	TIMED(verbs_poll(now));
+	TIMED(network_poll(now));
+	TIMED(ptt_poll(now));
+	TIMED(microphone_poll(now));
+	TIMED(service_poll(now));
+	TIMED(voip_poll(now));
+	TIMED(speaker_poll(now));
+	TIMED(screen_poll(now));
+	long turned = (long)millis();
 	vTaskDelay(TICKS_GIVEN_UP);
+	if ((long)millis() - turned >= SLOW_MS)
+		console_say("SLOW: vTaskDelay %ld MS", (long)millis() - turned);
 }

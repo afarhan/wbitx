@@ -18,7 +18,7 @@
 //                        that long, and then nothing as it comes up (MENU,
 //                        which is BACK pressed and HOME held)
 //     BUTTON_HOLDING_REPEATING   as BUTTON_HOLDING, but after held it is
-//                        repeated every BUTTON_REPEAT_EVERY_MS while it
+//                        repeated every BUTTON_HELD_EVERY_MS while it
 //                        stays down (ENTER, which held takes characters
 //                        off one after another)
 //
@@ -67,11 +67,11 @@ static int staying_down(struct button *b, long now) {
 	}
 	if (is_holding(b) && !b->is_held_given && now - b->down_ms >= BUTTON_HELD_MS) {
 		b->is_held_given = 1;
-		b->repeat_ms = now + BUTTON_REPEAT_EVERY_MS;
+		b->repeat_ms = now + BUTTON_HELD_EVERY_MS;
 		return BUTTON_HELD;
 	}
 	if (b->kind == BUTTON_HOLDING_REPEATING && b->is_held_given && now >= b->repeat_ms) {
-		b->repeat_ms += BUTTON_REPEAT_EVERY_MS;
+		b->repeat_ms += BUTTON_HELD_EVERY_MS;
 		return BUTTON_REPEATED;
 	}
 	return BUTTON_NOTHING;

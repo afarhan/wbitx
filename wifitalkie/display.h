@@ -19,9 +19,12 @@ extern "C" {
 int display_open(void);
 void display_clear(void);
 void display_text(int x, int row, int scale, const char *text);
+void display_text_at(int x, int y, int scale, const char *text);
 void display_fill(int x, int y, int wide, int high);
+void display_invert(int x, int y, int wide, int high);
 void display_bar(int x, int row, int wide, int filled);
 void display_poll(void);
+void display_describe(char *text, int room);
 void display_off(void);
 void display_on(void);
 

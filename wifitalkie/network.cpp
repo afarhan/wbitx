@@ -19,7 +19,9 @@
 // access points but was never heard back (the driver's reason 2, the login
 // timed out); at 8.5 dBm it joined, at once with a hotspot heard at -44 dBm,
 // and only now and then with the house's, heard at -75. A talkie is used
-// near its access point.
+// near its access point. It is set before each join as well as after, so
+// that the first frames of a join, the most current the talkie draws, are
+// not sent at full power: on a weak 3.3 V regulator they browned it out.
 //
 // Each network joined is remembered with its key, known.c, up to
 // SETTINGS_KNOWN of them. When the one set is not joined within
@@ -81,6 +83,7 @@ static void on_lost(arduino_event_id_t event, arduino_event_info_t info) {
 
 void network_open(void) {
 	WiFi.mode(WIFI_STA);
+	WiFi.setTxPower(TX_POWER);
 	WiFi.setHostname(HOSTNAME);
 	WiFi.setSleep(false);
 	WiFi.setAutoReconnect(true);
@@ -90,6 +93,7 @@ void network_open(void) {
 
 static void begin(const char *ssid, const char *password) {
 	WiFi.disconnect();
+	WiFi.setTxPower(TX_POWER);
 	WiFi.begin(ssid, password);
 	WiFi.setTxPower(TX_POWER);
 	join_began_ms = (long)millis();
@@ -143,6 +147,7 @@ void network_off(void) {
 
 void network_on(void) {
 	WiFi.mode(WIFI_STA);
+	WiFi.setTxPower(TX_POWER);
 	WiFi.setSleep(false);
 	console_say("RADIO ON");
 	network_join();

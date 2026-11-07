@@ -25,15 +25,20 @@
 //     LEVELS ON|OFF             the microphone's levels each second
 //     VOX ON|OFF                the gaps between words as comfort noise
 //     KEYS                      each key's pin as it is now, DOWN or up
+//     SCREEN                    the page shown, the last key, the display's
+//                               pages sent and failed
 //     RECORD                    3 s of the microphone, in hex, after
 //     MICPIN <0-4>              read the microphone on another ADC1 pin
 //     DISPLAY ON|OFF            the OLED, and its I2C, on or off
+//     AUDIO ON|OFF              GPIO1: the preamplifiers and the amplifier
+//     BATTERY                   the cell's volts, or USB
 //     STATUS                    all of it
+//     SLEEP                     sleep until a key is pressed (sleep.c)
 //     RESTART                   start the talkie again
 //
 // A verb that changes what the line to my.sbitx.net is made with, CALL,
 // SERVER, NEW_KEY and VOIP, has it made again. Whatever is set is kept
-// across power-ups, but PTT, TONE, LEVELS, RECORD, MICPIN, DISPLAY and RADIO, which are for now.
+// across power-ups, but PTT, TONE, LEVELS, RECORD, MICPIN, DISPLAY, AUDIO and RADIO, which are for now.
 
 #include <ctype.h>
 #include <stdio.h>
@@ -49,13 +54,16 @@
 #include "microphone.h"
 #include "network.h"
 #include "ptt.h"
+#include "screen.h"
 #include "service.h"
 #include "settings.h"
+#include "sleep.h"
 #include "speaker.h"
 #include "verbs.h"
 #include "voip.h"
 
 #define WORD_ROOM 80
+#define SAID_ROOM 200
 #define TEXT_ROOM 96
 #define NEW_KEY_AGAIN_MS 5000
 #define MS_A_SECOND 1000
@@ -115,6 +123,18 @@ static int is_on_off(const char *word, int *is_on) {
 	return 0;
 }
 
+static void say_battery(void) {
+	int millivolts;
+	int what = microphone_battery(&millivolts);
+
+	if (what == MICROPHONE_BATTERY)
+		console_say("BATTERY %d.%02d V", millivolts / 1000, millivolts % 1000 / 10);
+	else if (what == MICROPHONE_USB)
+		console_say("BATTERY ON USB");
+	else
+		console_say("BATTERY NOT READ YET");
+}
+
 static void say_status(void) {
 	char text[TEXT_ROOM];
 	char shown[AUTH_COOKIE_SHOWN_ROOM];
@@ -145,6 +165,7 @@ static void say_status(void) {
 	console_say("MIC %u, PEAK %d RMS %d, ADC %d A SECOND (%d READ, %d STRANGE, %u RESTARTS)",
 		(unsigned)settings.mic, levels.peak, levels.rms, levels.samples_a_second,
 		levels.results, levels.strangers, levels.restarts);
+	say_battery();
 }
 
 static void level_set(const char *what, const char *word, uint32_t *level) {
@@ -190,6 +211,7 @@ void verbs_do(const char *line, long now) {
 	char verb[WORD_ROOM];
 	char first[WORD_ROOM] = "";
 	char second[WORD_ROOM] = "";
+	char said[SAID_ROOM];
 	int is_on;
 
 	if (!next_word(&at, verb, sizeof(verb)))
@@ -320,16 +342,34 @@ void verbs_do(const char *line, long now) {
 		return;
 	}
 	if (!strcmp(verb, "KEYS")) {
-		keys_describe(first, sizeof(first));
-		console_say("KEYS %s", first);
+		keys_describe(said, sizeof(said));
+		console_say("KEYS %s", said);
+		return;
+	}
+	if (!strcmp(verb, "SCREEN")) {
+		screen_describe(first, sizeof(first));
+		console_say("SCREEN %s", first);
 		return;
 	}
 	if (!strcmp(verb, "RECORD")) {
 		microphone_record();
 		return;
 	}
+	if (!strcmp(verb, "AUDIO") && is_on_off(first, &is_on)) {
+		microphone_power(is_on);
+		console_say("AUDIO %s", is_on ? "ON" : "OFF");
+		return;
+	}
+	if (!strcmp(verb, "BATTERY")) {
+		say_battery();
+		return;
+	}
 	if (!strcmp(verb, "STATUS")) {
 		say_status();
+		return;
+	}
+	if (!strcmp(verb, "SLEEP")) {
+		sleep_now();
 		return;
 	}
 	if (!strcmp(verb, "RESTART")) {
@@ -337,7 +377,7 @@ void verbs_do(const char *line, long now) {
 		esp_restart();
 		return;
 	}
-	console_say("? %s: WIFI SCAN RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX KEYS RECORD MICPIN DISPLAY STATUS RESTART", verb);
+	console_say("? %s: WIFI SCAN RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX KEYS SCREEN RECORD MICPIN DISPLAY AUDIO BATTERY STATUS SLEEP RESTART", verb);
 }
 
 void verbs_poll(long now) {

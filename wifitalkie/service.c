@@ -16,8 +16,20 @@
 // answers WELCOME with the name the owner gave the talkie on the website and
 // its own proof, which is checked, so that the talkie is not talking to an
 // impostor. Then "radio", and OK. auth.c makes the proofs. Each step is
-// waited for, STEP_WAIT_MS at most, during which nothing else is done: there
-// is nothing to hear or say before the line is up.
+// waited for, STEP_WAIT_MS at most, and the name looked up first may take
+// longer still; so the line is made on a task of its own, the connector,
+// and the loop goes on meanwhile, the keys and the screen with it. The
+// connector is given a copy of the settings to make it with, and the loop
+// leaves the line alone until it says it is done. While it works the
+// status says which step it is on, CONNECTING: LOOKING UP and so on.
+//
+// A step may wait on longer than it should: a name looked up while the
+// WiFi goes, a send that never drains. If the WiFi goes, or the connector
+// is not done in CONNECT_MOST_MS, its socket is shut, which wakes a send
+// or a recv, and the line is tried again as after any failure. If it is
+// still not done STUCK_MOST_MS after that, it is stuck where nothing wakes
+// it, inside lwIP, and the talkie starts afresh: a task deleted there would
+// leave lwIP to signal what it had freed.
 //
 // ERROR AUTH means the website does not know the talkie yet, or no longer:
 // SERVICE says the key to add there, and the service is asked again every
@@ -50,6 +62,9 @@
 #include <string.h>
 
 #include "esp_random.h"
+#include "esp_system.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lwip/netdb.h"
 #include "lwip/sockets.h"
 
@@ -70,6 +85,7 @@
 #define NONCE_HEX_ROOM (2 * NONCE_BYTES + 1)
 #define PORT_ROOM 8
 #define STEP_WAIT_MS 4000
+#define SBITX_ADDRESS "104.236.247.211"   // my.sbitx.net, 7 November 2026
 #define REFUSED_RETRY_MS 15000
 #define RETRY_FIRST_MS 5000
 #define RETRY_MORE_MS 5000
@@ -79,6 +95,10 @@
 #define STRETCH_ROUNDS_A_TURN 100
 #define MS_PER_SECOND 1000
 #define US_PER_MS 1000
+#define CONNECTOR_STACK 8192
+#define CONNECTOR_PRIORITY 1
+#define CONNECT_MOST_MS 30000
+#define STUCK_MOST_MS 60000
 
 #define AUTH_OK 0
 #define AUTH_REFUSED 1
@@ -88,6 +108,7 @@ enum state {
 	STATE_OFF,
 	STATE_STRETCHING,
 	STATE_WAITING,
+	STATE_CONNECTING,
 	STATE_ONLINE
 };
 
@@ -109,6 +130,14 @@ static char name[NAME_ROOM];
 static char failed_because[TEXT_ROOM];
 static char status[STATUS_ROOM];
 static int is_restart_asked;
+static TaskHandle_t connector;
+static struct settings asked;
+static volatile int is_connect_done;
+static int connect_result;
+static volatile int dialing_fd = NOT_OPEN;
+static const char *volatile connect_step = "";
+static long connect_began_ms;
+static long shut_ms;
 
 static uint8_t random_byte(void) {
 	return (uint8_t)esp_random();
@@ -125,6 +154,7 @@ static void close_line(void) {
 	if (line_fd != NOT_OPEN)
 		close(line_fd);
 	line_fd = NOT_OPEN;
+	dialing_fd = NOT_OPEN;
 	gathered_used = 0;
 	voip_close();
 }
@@ -158,16 +188,24 @@ static int read_line_waiting(char *line, int room) {
 	return -1;
 }
 
+// the service's address: my.sbitx.net's is SBITX_ADDRESS, not looked up,
+// for a lookup took seconds; any other host is looked up
 static int resolve(void) {
 	struct addrinfo hints;
 	struct addrinfo *found = NULL;
 	char port[PORT_ROOM];
 
+	if (!strcmp(asked.host, SETTINGS_DEFAULT_HOST)) {
+		memset(&service_address, 0, sizeof(service_address));
+		service_address.sin_family = AF_INET;
+		service_address.sin_port = htons((uint16_t)asked.port);
+		return inet_pton(AF_INET, SBITX_ADDRESS, &service_address.sin_addr) == 1 ? 0 : -1;
+	}
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
-	snprintf(port, sizeof(port), "%u", (unsigned)settings.port);
-	if (getaddrinfo(settings.host, port, &hints, &found) != 0 || found == NULL)
+	snprintf(port, sizeof(port), "%u", (unsigned)asked.port);
+	if (getaddrinfo(asked.host, port, &hints, &found) != 0 || found == NULL)
 		return -1;
 	memcpy(&service_address, found->ai_addr, sizeof(service_address));
 	freeaddrinfo(found);
@@ -192,9 +230,11 @@ static int dial(void) {
 		no_answer("no socket");
 		return NOT_OPEN;
 	}
+	dialing_fd = fd;
 	fcntl(fd, F_SETFL, O_NONBLOCK);
 	if (connect(fd, (struct sockaddr *)&service_address, sizeof(service_address)) < 0
 			&& errno != EINPROGRESS) {
+		dialing_fd = NOT_OPEN;
 		close(fd);
 		no_answer("the connection was refused");
 		return NOT_OPEN;
@@ -205,12 +245,14 @@ static int dial(void) {
 	wait.tv_usec = 0;
 	if (select(fd + 1, NULL, &writable, NULL, &wait) != 1
 			|| getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &error_length) < 0 || error != 0) {
+		dialing_fd = NOT_OPEN;
 		close(fd);
 		no_answer("no connection");
 		return NOT_OPEN;
 	}
 	fcntl(fd, F_SETFL, 0);
 	setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &wait, sizeof(wait));
+	setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &wait, sizeof(wait));
 	return fd;
 }
 
@@ -231,8 +273,8 @@ static int authenticate(void) {
 	esp_fill_random(random_bytes, sizeof(random_bytes));
 	for (i = 0; i < NONCE_BYTES; i++)
 		snprintf(nonce + 2 * i, 3, "%02x", random_bytes[i]);
-	auth_proof(settings.stretched, "radio", settings.callsign, challenge, nonce, proof);
-	snprintf(line, sizeof(line), "AUTH radio %s %s %s\n", settings.callsign, nonce, proof);
+	auth_proof(asked.stretched, "radio", asked.callsign, challenge, nonce, proof);
+	snprintf(line, sizeof(line), "AUTH radio %s %s %s\n", asked.callsign, nonce, proof);
 	if (send_text(line) < 0)
 		return no_answer("AUTH could not be sent");
 	if (read_line_waiting(line, sizeof(line)) < 0)
@@ -243,7 +285,7 @@ static int authenticate(void) {
 	}
 	if (sscanf(line, "WELCOME %39s %80s", name, theirs) != 2)
 		return no_answer("not a WELCOME");
-	auth_proof(settings.stretched, "server", settings.callsign, challenge, nonce, proof);
+	auth_proof(asked.stretched, "server", asked.callsign, challenge, nonce, proof);
 	if (strlen(theirs) != strlen(proof) || strcmp(proof, theirs))
 		return no_answer("the service's proof is wrong");
 	return AUTH_OK;
@@ -264,17 +306,72 @@ static void lost(long now, const char *because) {
 	say_status("NO ANSWER FROM SERVER");
 }
 
-static void go_online(long now) {
-	char said[STATUS_ROOM];
-	char shown[AUTH_COOKIE_SHOWN_ROOM];
+// on the connector: the line made, authenticated and made a radio's
+static int connect_line(void) {
 	char line[LINE_ROOM];
 	int result;
 
-	say_status("CONNECTING");
+	connect_step = "LOOKING UP";
 	line_fd = dial();
-	result = AUTH_NO_ANSWER;
-	if (line_fd != NOT_OPEN)
-		result = authenticate();
+	if (line_fd == NOT_OPEN)
+		return AUTH_NO_ANSWER;
+	connect_step = "SIGNING IN";
+	result = authenticate();
+	connect_step = "MAKING A RADIO";
+	if (result == AUTH_OK && (send_text("radio\n") < 0
+			|| read_line_waiting(line, sizeof(line)) < 0 || strcmp(line, "OK"))) {
+		no_answer("no OK to radio");
+		result = AUTH_NO_ANSWER;
+	}
+	return result;
+}
+
+static void connector_task(void *unused) {
+	(void)unused;
+	for (;;) {
+		ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		connect_result = connect_line();
+		connect_step = "";
+		is_connect_done = 1;
+	}
+}
+
+static void go_online(long now) {
+	say_status("CONNECTING");
+	memcpy(&asked, &settings, sizeof(asked));
+	is_connect_done = 0;
+	connect_step = "";
+	connect_began_ms = now;
+	shut_ms = 0;
+	state = STATE_CONNECTING;
+	xTaskNotifyGive(connector);
+}
+
+// the connector not done: its socket shut if the WiFi went or it took too
+// long, and the talkie started afresh if that did not wake it
+static void watch_connector(long now) {
+	int fd = dialing_fd;
+
+	if (shut_ms == 0 && (!network_is_up() || now - connect_began_ms >= CONNECT_MOST_MS)) {
+		console_say("SERVICE CONNECTOR SHUT AT %s", connect_step);
+		shut_ms = now;
+		if (fd != NOT_OPEN)
+			shutdown(fd, SHUT_RDWR);
+		return;
+	}
+	if (shut_ms == 0 || now - shut_ms < STUCK_MOST_MS)
+		return;
+	console_say("SERVICE CONNECTOR STUCK AT %s: RESTARTING", connect_step);
+	esp_restart();
+}
+
+// the connector done: online, or waiting to try again
+static void connected(long now) {
+	char said[STATUS_ROOM];
+	char shown[AUTH_COOKIE_SHOWN_ROOM];
+	int result = connect_result;
+
+	state = STATE_WAITING;
 	if (result == AUTH_REFUSED) {
 		console_say("SERVICE SAYS %s", failed_because);
 		wait_to_retry(now, REFUSED_RETRY_MS);
@@ -282,11 +379,6 @@ static void go_online(long now) {
 		snprintf(said, sizeof(said), "ADD KEY %s AT MY.SBITX.NET", shown);
 		say_status(said);
 		return;
-	}
-	if (result == AUTH_OK && (send_text("radio\n") < 0
-			|| read_line_waiting(line, sizeof(line)) < 0 || strcmp(line, "OK"))) {
-		no_answer("no OK to radio");
-		result = AUTH_NO_ANSWER;
 	}
 	if (result != AUTH_OK) {
 		lost(now, failed_because);
@@ -422,6 +514,7 @@ static int is_stretched(long now) {
 }
 
 void service_open(void) {
+	xTaskCreate(connector_task, "connector", CONNECTOR_STACK, NULL, CONNECTOR_PRIORITY, &connector);
 	have_a_cookie();
 	say_status("OFF");
 }
@@ -441,6 +534,12 @@ void service_restart(void) {
 }
 
 void service_poll(long now) {
+	if (state == STATE_CONNECTING && !is_connect_done)
+		watch_connector(now);
+	if (state == STATE_CONNECTING && !is_connect_done)
+		return;
+	if (state == STATE_CONNECTING)
+		connected(now);
 	if (is_restart_asked) {
 		is_restart_asked = 0;
 		close_line();
@@ -477,5 +576,10 @@ int service_is_online(void) {
 }
 
 void service_describe(char *text, int room) {
-	snprintf(text, room, "%s", status);
+	const char *step = connect_step;
+
+	if (state == STATE_CONNECTING && step[0] != 0)
+		snprintf(text, room, "%s: %s", status, step);
+	else
+		snprintf(text, room, "%s", status);
 }

@@ -28,6 +28,8 @@
 //     FREQUENCY      the channel, large; UP and DOWN step it in dial.c's
 //                    kilohertz steps, faster the longer they are held
 //     VOLUME         the volume, large
+//     MORSE WPM      the Morse speed for entering text, large; UP and
+//                    DOWN step it, from HALVES_WPM_LEAST to HALVES_WPM_MOST
 //     CALLSIGN       entered a character at a time, below
 //     MY.SBITX.NET   the code to add on the website, the service's state;
 //                    ENTER asks for a new code, ENTER again makes it
@@ -37,14 +39,30 @@
 //                    ENTER held enters its key afresh; the last item
 //                    scans again. Then a page says whether it joined.
 //     INFO           the network, the address, the signal, the build
+//     SLEEP          the talkie asleep, until any key wakes it (sleep.c)
 //
-// Text is entered on a page of its own, with entry.c: the text so far on
-// top, and below it the characters to choose from, large, the chosen one
-// in the middle. UP and DOWN scroll them, faster when held; ENTER adds the
-// chosen to the text, and ENTER held takes the last character off, and the
-// one before it, while it is held; MENU keeps the text, and MENU held
-// leaves it as it was and goes home. The help at the bottom changes every
-// HELP_EVERY_MS.
+// Text, such as a callsign, is entered on a page of its own:
+//
+//     Enter your callsign:      the prompt, a line
+//     VU2ES_                    the text so far, up to ENTRY_ROOM - 1,
+//                               its end on two lines, and a cursor
+//     HSVIFU?ELR.APWJ           halves.c's two lines of letters, LINE_GAP
+//                               dots apart, the two offered in reverse
+//     BDXNCKYTZGQM/O-           video, the chosen framed; or its line of
+//                               figures in their place
+//     PAUSE: TAKE LETTER        the help, changing every HELP_EVERY_MS
+//
+// UP and DOWN key a letter as its Morse, UP a dit and DOWN a dah, one
+// element a press (halves.c); DOWN held brings the figures. The gap between
+// letters, at settings.wpm, adds the chosen to the text. ENTER pressed while a letter is being
+// chosen drops it; with none, it keeps the text and goes back. ENTER held
+// takes the last character off, and the one before it, while it is held.
+// MENU goes back and leaves the text as it was.
+//
+// A WiFi key is entered as before, until the captive portal takes it over:
+// all of printable ASCII, large, the chosen in the middle; UP and DOWN
+// scroll them, faster when held, ENTER adds the chosen, ENTER held takes
+// characters off, and MENU keeps the key and joins.
 //
 // Volume and channel are written to the settings SAVE_AFTER_MS after the
 // last press, not at each: a flash write holds the interrupts up; voip.c
@@ -64,13 +82,17 @@
 #include "display.h"
 #include "entry.h"
 #include "font.h"
+#include "halves.h"
 #include "keys.h"
 #include "known.h"
+#include "microphone.h"
+#include "pins.h"
 #include "network.h"
 #include "ptt.h"
 #include "service.h"
 #include "settings.h"
 #include "screen.h"
+#include "sleep.h"
 #include "voip.h"
 
 #define DRAW_EVERY_MS 200
@@ -103,7 +125,15 @@
 #define MARK_X 0
 #define ITEM_X 8
 #define HZ_A_KHZ 1000
-#define TEXT_ROW 2
+#define PROMPT_ROWS 1
+#define TEXT_ROW 1
+#define TEXT_ROWS 2
+#define LETTERS_Y 30
+#define LINE_GAP 14
+#define FIGURES_Y (LETTERS_Y + LINE_GAP / 2)
+#define LETTER_PITCH 8
+#define LETTER_EDGE 2
+#define WPM_STEP 1
 #define CHOICE_ROW 4
 #define CHOICE_SCALE 2
 #define CHOICES_EACH_SIDE 4
@@ -127,6 +157,9 @@
 #define PAGE_INFO 8
 #define PAGE_WIFI_KEY 9
 #define PAGE_WIFI_JOINING 10
+#define PAGE_AUDIO 11
+#define PAGE_WPM 12
+#define PAGE_SLEEP 13
 
 struct item {
 	const char *name;
@@ -136,13 +169,33 @@ struct item {
 static const struct item items[] = {
 	{"FREQUENCY", PAGE_DIAL},
 	{"VOLUME", PAGE_VOLUME},
+	{"AUDIO", PAGE_AUDIO},
+	{"MORSE WPM", PAGE_WPM},
 	{"CALLSIGN", PAGE_CALLSIGN},
 	{"MY.SBITX.NET", PAGE_SBITX},
 	{"WIFI", PAGE_WIFI},
 	{"INFO", PAGE_INFO},
+	{"SLEEP", PAGE_SLEEP},
 };
 
 #define ITEMS ((int)(sizeof(items) / sizeof(items[0])))
+#define ITEM_COLUMNS ((DISPLAY_WIDE - ITEM_X) / FONT_STEP)
+#define MENU_ROWS (DISPLAY_ROWS - MENU_FIRST_ROW)
+
+// A page of choices, the pattern for a setting with a few values: the mark
+// begins on the value in use, UP and DOWN move it, ENTER takes the value
+// marked and goes back to the menu, MENU goes back with nothing changed.
+struct choices {
+	int page;
+	const char *title;
+	const char *const *names;
+	int count;
+	int (*in_use)(void);
+	void (*take)(int chosen);
+};
+
+static const struct choices *choices_of(int on_page);
+static int marked;
 
 static long drawn_ms;
 static long save_ms;
@@ -151,16 +204,29 @@ static char last_key[TEXT_ROOM];
 static long touched_ms;
 static int page = PAGE_HOME;
 static int chosen;
+static int menu_top;
 static struct entry entry;
+static struct halves halves;
 
 static const char *entry_help[] = {
+	"UP: DIT  DOWN: DAH",
+	"HOLD DOWN: FIGURES",
+	"PAUSE: TAKE LETTER",
+	"ENTER: DONE",
+	"HOLD ENTER: DELETE",
+	"MENU: CANCEL",
+};
+
+#define ENTRY_HELPS ((int)(sizeof(entry_help) / sizeof(entry_help[0])))
+
+static const char *key_help[] = {
 	"ENTER: ADD",
 	"HOLD ENTER: DELETE",
 	"MENU: SAVE",
 	"HOLD MENU: CANCEL",
 };
 
-#define ENTRY_HELPS ((int)(sizeof(entry_help) / sizeof(entry_help[0])))
+#define KEY_HELPS ((int)(sizeof(key_help) / sizeof(key_help[0])))
 
 static const char *wifi_help[] = {
 	"ENTER: JOIN",
@@ -204,8 +270,10 @@ static int is_entering(int on_page) {
 // to another page; ENTER is the PTT on the home page, the screen's on the
 // rest
 static void go(int to) {
-	if (to == PAGE_CALLSIGN)
+	if (to == PAGE_CALLSIGN) {
 		entry_begin(&entry, ENTRY_CALLSIGN, settings.callsign, SETTINGS_CALLSIGN_ROOM - 1);
+		halves_begin(&halves, (int)settings.wpm);
+	}
 	if (to == PAGE_WIFI_KEY)
 		entry_begin(&entry, ENTRY_ANY, "", SETTINGS_PASSWORD_ROOM - 1);
 	if (to == PAGE_WIFI && page == PAGE_MENU) {
@@ -213,8 +281,21 @@ static void go(int to) {
 		wifi_chosen = 0;
 		wifi_top = 0;
 	}
+	if (choices_of(to) != NULL)
+		marked = choices_of(to)->in_use();
 	ptt_lend(to != PAGE_HOME);
 	page = to;
+}
+
+static void wpm_step(const struct key_press *press, long now) {
+	int wpm = (int)settings.wpm + (press->key == KEY_UP ? WPM_STEP : -WPM_STEP);
+
+	if (wpm < HALVES_WPM_LEAST)
+		wpm = HALVES_WPM_LEAST;
+	if (wpm > HALVES_WPM_MOST)
+		wpm = HALVES_WPM_MOST;
+	settings.wpm = (uint32_t)wpm;
+	save_soon(now);
 }
 
 static void volume_step(const struct key_press *press, long now) {
@@ -230,6 +311,48 @@ static void volume_step(const struct key_press *press, long now) {
 		volume = SETTINGS_LEVEL_MOST;
 	settings.volume = (uint32_t)volume;
 	save_soon(now);
+}
+
+// AUDIO: the in-built mic or the handsfree's, kept across power-ups
+static const char *const audio_names[] = {"IN-BUILT", "HANDSFREE"};
+
+static int audio_in_use(void) {
+	return settings.is_headset ? 1 : 0;
+}
+
+static void audio_take(int chosen_one) {
+	if ((uint32_t)chosen_one == settings.is_headset)
+		return;
+	settings.is_headset = (uint32_t)chosen_one;
+	settings_save();
+	microphone_pin(settings.is_headset ? PIN_HEADSET_MIC : PIN_MICROPHONE);
+}
+
+static const struct choices all_choices[] = {
+	{PAGE_AUDIO, "AUDIO", audio_names, 2, audio_in_use, audio_take},
+};
+
+#define ALL_CHOICES ((int)(sizeof(all_choices) / sizeof(all_choices[0])))
+
+static const struct choices *choices_of(int on_page) {
+	int i;
+
+	for (i = 0; i < ALL_CHOICES; i++) {
+		if (all_choices[i].page == on_page)
+			return &all_choices[i];
+	}
+	return NULL;
+}
+
+static void take_choices(const struct choices *these, const struct key_press *press) {
+	if (press->key == KEY_UP)
+		marked = (marked + these->count - 1) % these->count;
+	if (press->key == KEY_DOWN)
+		marked = (marked + 1) % these->count;
+	if (press->key == KEY_ENTER)
+		these->take(marked);
+	if (press->key == KEY_ENTER || press->key == KEY_MENU)
+		go(PAGE_MENU);
 }
 
 static void dial_turn(const struct key_press *press, long now) {
@@ -258,6 +381,15 @@ static void take_menu(const struct key_press *press) {
 		chosen = (chosen + ITEMS - 1) % ITEMS;
 	if (press->key == KEY_DOWN)
 		chosen = (chosen + 1) % ITEMS;
+	if (press->key == KEY_ENTER && items[chosen].page == PAGE_SLEEP) {
+		if (is_save_due) {
+			is_save_due = 0;
+			settings_save();
+		}
+		go(PAGE_HOME);
+		sleep_now();
+		return;
+	}
 	if (press->key == KEY_ENTER)
 		go(items[chosen].page);
 }
@@ -318,12 +450,11 @@ static void take_wifi(const struct key_press *press, long now) {
 	pick(wifi_chosen, press->what == BUTTON_HELD, now);
 }
 
-// MENU pressed on a page of text entry: the text is kept
+// ENTER pressed on a page of text entry, no letter being chosen: the text
+// is kept
 static void accept(long now) {
-	if (page == PAGE_WIFI_KEY) {
-		join(entry.text, now);
-		return;
-	}
+	while (page == PAGE_CALLSIGN && entry.length > 0 && entry.text[entry.length - 1] == ' ')
+		entry_delete(&entry);
 	if (page == PAGE_CALLSIGN && entry.length > 0) {
 		snprintf(settings.callsign, sizeof(settings.callsign), "%s", entry.text);
 		settings_save();
@@ -333,15 +464,37 @@ static void accept(long now) {
 	go(PAGE_MENU);
 }
 
-static void take_entry(const struct key_press *press, long now) {
+// a WiFi key: UP and DOWN scroll, ENTER adds, ENTER held takes off, MENU
+// joins with it
+static void take_key(const struct key_press *press, long now) {
 	if (is_up_or_down(press))
 		entry_scroll(&entry, press->key == KEY_UP);
 	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED)
 		entry_add(&entry);
 	else if (press->key == KEY_ENTER)
 		entry_delete(&entry);
-	if (press->key == KEY_MENU)
-		accept(now);
+	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
+		join(entry.text, now);
+}
+
+// UP and DOWN are keyed in screen_poll(); ENTER drops the letter, or keeps the
+// text, and held takes characters off
+static void take_entry(const struct key_press *press, long now) {
+	if (page == PAGE_WIFI_KEY) {
+		take_key(press, now);
+		return;
+	}
+	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED) {
+		if (halves.at >= 0)
+			halves_abort(&halves);
+		else
+			accept(now);
+	} else if (press->key == KEY_ENTER) {
+		halves_abort(&halves);
+		entry_delete(&entry);
+	}
+	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
+		go(PAGE_MENU);
 }
 
 static void take_page(const struct key_press *press, long now) {
@@ -362,8 +515,16 @@ static void take_page(const struct key_press *press, long now) {
 		dial_turn(press, now);
 		return;
 	}
+	if (choices_of(page) != NULL) {
+		take_choices(choices_of(page), press);
+		return;
+	}
 	if (page == PAGE_VOLUME && is_up_or_down(press)) {
 		volume_step(press, now);
+		return;
+	}
+	if (page == PAGE_WPM && is_up_or_down(press)) {
+		wpm_step(press, now);
 		return;
 	}
 	if (press->key == KEY_MENU || press->key == KEY_ENTER)
@@ -506,14 +667,62 @@ static void draw_home(void) {
 	}
 }
 
+static void draw_choices(const struct choices *these) {
+	int i;
+
+	line(TITLE_ROW, these->title);
+	for (i = 0; i < these->count; i++) {
+		if (i == marked)
+			display_text(MARK_X, MENU_FIRST_ROW + i, 1, ">");
+		display_text(ITEM_X, MENU_FIRST_ROW + i, 1, these->names[i]);
+	}
+	line(LAST_ROW, "ENTER: TAKE MENU: BACK");
+}
+
+// what a menu item is set to, for the menu's line; nothing for those that
+// are not settings
+static void item_value(int of_page, char *text, int room) {
+	const struct choices *these = choices_of(of_page);
+
+	text[0] = 0;
+	if (these != NULL)
+		snprintf(text, room, "%s", these->names[these->in_use()]);
+	if (of_page == PAGE_DIAL)
+		snprintf(text, room, "%u", (unsigned)(settings.hz / HZ_A_KHZ));
+	if (of_page == PAGE_VOLUME)
+		snprintf(text, room, "%u", (unsigned)settings.volume);
+	if (of_page == PAGE_WPM)
+		snprintf(text, room, "%u", (unsigned)settings.wpm);
+	if (of_page == PAGE_CALLSIGN)
+		snprintf(text, room, "%s", settings.callsign);
+	if (of_page == PAGE_SBITX)
+		snprintf(text, room, "%s", service_is_online() ? "ONLINE" : "OFFLINE");
+	if (of_page == PAGE_WIFI)
+		snprintf(text, room, "%s", settings.ssid);
+}
+
 static void draw_menu(void) {
 	int i;
 
+	char value[TEXT_ROOM];
+	char text[TEXT_ROOM];
+
+	// the list scrolls to keep the chosen shown
+	if (chosen < menu_top)
+		menu_top = chosen;
+	if (chosen >= menu_top + MENU_ROWS)
+		menu_top = chosen - MENU_ROWS + 1;
 	line(TITLE_ROW, "MENU");
-	for (i = 0; i < ITEMS; i++) {
+	for (i = menu_top; i < ITEMS && i < menu_top + MENU_ROWS; i++) {
 		if (i == chosen)
-			display_text(MARK_X, MENU_FIRST_ROW + i, 1, ">");
-		display_text(ITEM_X, MENU_FIRST_ROW + i, 1, items[i].name);
+			display_text(MARK_X, MENU_FIRST_ROW + i - menu_top, 1, ">");
+		item_value(items[i].page, value, sizeof(value));
+		if (value[0] != 0)
+			snprintf(text, sizeof(text), "%s:%s", items[i].name, value);
+		else
+			snprintf(text, sizeof(text), "%s", items[i].name);
+		text[ITEM_COLUMNS] = 0;
+		display_text(ITEM_X, MENU_FIRST_ROW + i - menu_top, 1, text);
 	}
 }
 
@@ -561,8 +770,87 @@ static void draw_info(void) {
 	line(7, "MENU: BACK");
 }
 
-// the text so far, its end if it is longer than the screen, and a cursor
-static void draw_entry(const char *title, long now) {
+// text on rows from row, broken at spaces where it can be, cut after rows
+static void wrapped(int row, int rows, const char *text) {
+	char cut[COLUMNS + 1];
+	int length;
+	int i;
+
+	for (; *text != 0 && rows > 0; row++, rows--) {
+		length = (int)strlen(text);
+		if (length > COLUMNS) {
+			length = COLUMNS;
+			for (i = COLUMNS; i > 0; i--) {
+				if (text[i] == ' ') {
+					length = i;
+					break;
+				}
+			}
+		}
+		snprintf(cut, sizeof(cut), "%.*s", length, text);
+		display_text(0, row, 1, cut);
+		text += length;
+		while (*text == ' ')
+			text++;
+	}
+}
+
+// a box one dot wide round x, y, wide by high
+static void frame(int x, int y, int wide, int high) {
+	display_fill(x, y, wide, 1);
+	display_fill(x, y + high - 1, wide, 1);
+	display_fill(x, y, 1, high);
+	display_fill(x + wide - 1, y, 1, high);
+}
+
+// one of halves.c's characters at x, y: in reverse video if it is
+// offered, framed if it is the chosen
+static void letter_at(int x, int y, char c, int is_chosen, int is_offered) {
+	char one[2] = {c, 0};
+
+	display_text_at(x + 1, y, 1, one);
+	if (is_offered)
+		display_invert(x, y - LETTER_EDGE, LETTER_PITCH - 1, FONT_HIGH + 2 * LETTER_EDGE);
+	else if (is_chosen)
+		frame(x, y - LETTER_EDGE, LETTER_PITCH - 1, FONT_HIGH + 2 * LETTER_EDGE);
+}
+
+// the prompt, the text's end and a cursor, and halves.c's letters, or its
+// figures
+static void draw_entry(const char *prompt, long now) {
+	char text[TEXT_ROWS * COLUMNS + 1];
+	int shown = entry.length;
+	int left;
+	int which;
+	int at;
+
+	wrapped(TITLE_ROW, PROMPT_ROWS, prompt);
+	if (shown > TEXT_ROWS * COLUMNS - 1)
+		shown = TEXT_ROWS * COLUMNS - 1;
+	snprintf(text, sizeof(text), "%s_", entry.text + entry.length - shown);
+	line(TEXT_ROW, text);
+	if ((int)strlen(text) > COLUMNS)
+		line(TEXT_ROW + 1, text + COLUMNS);
+	if (halves.is_figures) {
+		left = (DISPLAY_WIDE - HALVES_FIGURES_ACROSS * LETTER_PITCH) / 2;
+		for (at = 0; at < HALVES_FIGURES_ACROSS; at++)
+			letter_at(left + at * LETTER_PITCH, FIGURES_Y, HALVES_FIGURES[at],
+				halves.at == at, halves_offered(&halves, 0, at));
+	} else {
+		left = (DISPLAY_WIDE - HALVES_ACROSS * LETTER_PITCH) / 2;
+		for (which = 0; which < 2; which++) {
+			for (at = 0; at < HALVES_ACROSS; at++)
+				letter_at(left + at * LETTER_PITCH, LETTERS_Y + which * LINE_GAP,
+					halves.lines[which][at], halves.at == at && halves.line == which,
+					halves_offered(&halves, which, at));
+		}
+	}
+	line(LAST_ROW, entry_help[now / HELP_EVERY_MS % ENTRY_HELPS]);
+}
+
+// a WiFi key: its end, a cursor, and the characters large, the chosen in
+// the middle
+static void draw_key(const char *title, long now) {
 	char text[COLUMNS + 1];
 	char one[2] = "";
 	int x = (DISPLAY_WIDE - (2 * CHOICES_EACH_SIDE + 1) * FONT_STEP * CHOICE_SCALE) / 2;
@@ -585,7 +873,7 @@ static void draw_entry(const char *title, long now) {
 		display_text(chosen_x - FONT_STEP * 2, CHOSEN_MARK_ROW, 1, "SPACE");
 	else
 		display_text(chosen_x + FONT_STEP / 2, CHOSEN_MARK_ROW, 1, "^");
-	line(LAST_ROW, entry_help[now / HELP_EVERY_MS % ENTRY_HELPS]);
+	line(LAST_ROW, key_help[now / HELP_EVERY_MS % KEY_HELPS]);
 }
 
 static void draw_wifi(long now) {
@@ -642,6 +930,8 @@ static void draw_joining(long now) {
 }
 
 static void draw(long now) {
+	char text[TEXT_ROOM];
+
 	display_clear();
 	if (page == PAGE_HOME)
 		draw_home();
@@ -652,15 +942,23 @@ static void draw(long now) {
 		big_frequency();
 		line(LAST_ROW, "UP/DOWN, MENU: BACK");
 	}
+	if (choices_of(page) != NULL)
+		draw_choices(choices_of(page));
+	if (page == PAGE_WPM) {
+		line(TITLE_ROW, "MORSE SPEED, WPM");
+		snprintf(text, sizeof(text), "%u", (unsigned)settings.wpm);
+		big(text);
+		line(LAST_ROW, "UP/DOWN, MENU: BACK");
+	}
 	if (page == PAGE_VOLUME) {
 		line(TITLE_ROW, "VOLUME");
 		volume_bar();
 		line(LAST_ROW, "UP/DOWN, MENU: BACK");
 	}
 	if (page == PAGE_CALLSIGN)
-		draw_entry("CALLSIGN", now);
+		draw_entry("Enter your callsign:", now);
 	if (page == PAGE_WIFI_KEY)
-		draw_entry(wifi_ssid, now);
+		draw_key(wifi_ssid, now);
 	if (page == PAGE_WIFI)
 		draw_wifi(now);
 	if (page == PAGE_WIFI_JOINING)
@@ -675,9 +973,13 @@ static void draw(long now) {
 
 void screen_poll(long now) {
 	struct key_press press;
+	char letter;
 
 	if (keys_poll(now, &press))
 		take(&press, now);
+	if (page == PAGE_CALLSIGN
+			&& halves_keys(&halves, keys_is_down(KEY_UP), keys_is_down(KEY_DOWN), now, &letter))
+		entry_put(&entry, letter);
 	if (page != PAGE_HOME && now - touched_ms >= MENU_IDLE_MS)
 		go(PAGE_HOME);
 	if (is_save_due && now >= save_ms) {
@@ -689,4 +991,13 @@ void screen_poll(long now) {
 		draw(now);
 	}
 	display_poll();
+}
+
+// for the verb SCREEN: the page shown, the last key, and the display's
+// pages sent
+void screen_describe(char *text, int room) {
+	char shown[TEXT_ROOM];
+
+	display_describe(shown, sizeof(shown));
+	snprintf(text, room, "PAGE %d, %s, %s", page, last_key, shown);
 }

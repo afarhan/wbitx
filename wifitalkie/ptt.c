@@ -20,8 +20,10 @@
 // minute, with ALWAYS_GAP_MS let go between, so that my.sbitx.net hears it
 // as overs. It is 0 in a talkie for use.
 //
-// The button speaks only on the home page; on every other page ENTER is the
-// screen's, and the screen says so with ptt_lend(). The verb still speaks.
+// ENTER speaks only on the home page; on every other page it is the
+// screen's, and the screen says so with ptt_lend(). The PTT key, PIN_KEY_PTT
+// on the right side, speaks on every page, debounced the same way, and is
+// set up here, an input with its pull-up. The verb still speaks.
 //
 // The lamp is lit while the talkie speaks or hears; voip.c says which. It
 // was the board's LED; that pin is now the UP key, and the lamp is shown on
@@ -43,6 +45,10 @@ static int is_verb_down;
 static int is_button_down;
 static int button_level_was = 1;
 static long button_changed_ms;
+static int is_key_down;
+static int key_level_was = 1;
+static long key_changed_ms;
+static int is_key_open;
 static int is_down;
 static long down_since_ms;
 static int is_cut;
@@ -54,17 +60,40 @@ void ptt_set(int is_verb) {
 	is_verb_down = is_verb;
 }
 
+static void key_open(void) {
+	gpio_config_t config = {
+		.pin_bit_mask = 1ULL << PIN_KEY_PTT,
+		.mode = GPIO_MODE_INPUT,
+		.pull_up_en = GPIO_PULLUP_ENABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE,
+	};
+
+	gpio_config(&config);
+	is_key_open = 1;
+}
+
 void ptt_poll(long now) {
 	int level = gpio_get_level(PIN_KEY_ENTER);
+	int key_level;
 	int is_wanted;
 
+	if (!is_key_open)
+		key_open();
+	key_level = gpio_get_level(PIN_KEY_PTT);
 	if (level != button_level_was) {
 		button_level_was = level;
 		button_changed_ms = now;
 	}
 	if (now - button_changed_ms >= DEBOUNCE_MS)
 		is_button_down = level == 0;
-	is_wanted = is_verb_down || (is_button_down && !is_lent);
+	if (key_level != key_level_was) {
+		key_level_was = key_level;
+		key_changed_ms = now;
+	}
+	if (now - key_changed_ms >= DEBOUNCE_MS)
+		is_key_down = key_level == 0;
+	is_wanted = is_verb_down || is_key_down || (is_button_down && !is_lent);
 	if (ALWAYS_SPEAKING && network_is_up()) {
 		is_wanted = 1;
 		if (is_cut && now - cut_ms >= ALWAYS_GAP_MS)

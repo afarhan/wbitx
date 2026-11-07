@@ -36,13 +36,18 @@ void entry_scroll(struct entry *e, int up) {
 		e->at = (e->at + e->set_length - 1) % e->set_length;
 }
 
-// 1 if the chosen was added, 0 with the text full
-int entry_add(struct entry *e) {
+// 1 if letter was added, 0 with the text full
+int entry_put(struct entry *e, char letter) {
 	if (e->length >= e->most)
 		return 0;
-	e->text[e->length++] = e->set[e->at];
+	e->text[e->length++] = letter;
 	e->text[e->length] = 0;
 	return 1;
+}
+
+// 1 if the chosen was added, 0 with the text full
+int entry_add(struct entry *e) {
+	return entry_put(e, e->set[e->at]);
 }
 
 // 1 if the last character was taken off, 0 with the text empty

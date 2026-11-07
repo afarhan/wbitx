@@ -9,15 +9,20 @@
 // a row on one edge, for one connector; the keys, top to bottom, MENU, UP,
 // DOWN, ENTER. GPIO9 is also the board's BOOT button, so BOOT is UP once
 // the board has started; GPIO8 is also its blue lamp, which lights while
-// MENU is held, and the talkie's lamp is now on the display. There is no
-// PTT key of its own: ENTER is the PTT on the home page. GPIO21 is spare;
-// it is UART0's TX, which the ROM drives at reset. GPIO4 and GPIO5 are the headset's left and right.
-// GPIO2 (MUTE) and GPIO0 (the headset's microphone) are for what is still
-// to be built.
+// MENU is held, and the talkie's lamp is now on the display. ENTER is the
+// PTT on the home page; the PTT key speaks on every page. GPIO4 and GPIO5
+// are the headset's left and right.
+// GPIO0 is the headset's microphone. GPIO1 powers both microphones'
+// preamplifiers and holds the PAM8403's shutdown up through 4.7k: low,
+// all three are off. The HW-104 module ties shutdown (pin 12) to PVDD
+// (pin 13) in its copper, so pin 12 is lifted off its pad. GPIO2 reads the 5 V line through a 100k and 100k divider: the
+// battery. GPIO21 is the PTT key, to ground; it is UART0's TX, driven
+// by the ROM at reset, so the key wants 1k in series.
 
 #pragma once
 
 #define PIN_MICROPHONE 3
+#define PIN_HEADSET_MIC 0
 #define PIN_SPEAKER_LEFT 4
 #define PIN_SPEAKER_RIGHT 5
 #define PIN_DISPLAY_SDA 6
@@ -26,3 +31,6 @@
 #define PIN_KEY_UP 9
 #define PIN_KEY_DOWN 10
 #define PIN_KEY_ENTER 20
+#define PIN_KEY_PTT 21
+#define PIN_MIC_POWER 1
+#define PIN_BATTERY 2

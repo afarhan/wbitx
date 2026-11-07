@@ -15,6 +15,7 @@
 #include <stdio.h>
 
 #include "driver/gpio.h"
+#include "soc/io_mux_reg.h"
 
 #include "keys.h"
 #include "pins.h"
@@ -62,16 +63,44 @@ const char *keys_name(int key) {
 	return names[key];
 }
 
-// each key's pin as it is now, DOWN or up, for the verb KEYS:
-// a key that says DOWN while nobody presses it is stuck or shorted
+// 1 while the key is down, as its presses are counted, the bounce gone
+int keys_is_down(int key) {
+	return buttons[key].is_down;
+}
+
+// how a pin is set, for keys_describe()
+static int describe_pin(const gpio_io_config_t *config, char *text, int room) {
+	int used = snprintf(text, room, " (");
+
+	if (config->pu)
+		used += snprintf(text + used, room - used, "PU ");
+	if (config->ie)
+		used += snprintf(text + used, room - used, "IE ");
+	if (config->oe)
+		used += snprintf(text + used, room - used, "OE ");
+	used += snprintf(text + used, room - used, "FUN %u)", (unsigned)config->fun_sel);
+	return used;
+}
+
+// each key's pin as it is now, DOWN or up, for the verb KEYS: a key that
+// says DOWN while nobody presses it is stuck or shorted. After each, how
+// the pin is set, if it is not as keys_open() left it, an input with its
+// pull-up and nothing driving it: PU and IE missing, OE an output, FUN
+// another function of the pin's.
 void keys_describe(char *text, int room) {
+	gpio_io_config_t config;
 	int used = 0;
 	int key;
 
-	for (key = 0; key < KEYS; key++) {
+	for (key = 0; key < KEYS && used < room; key++) {
 		if (gpio_get_level(pins[key]) == 0)
-			used += snprintf(text + used, room - used, "%s DOWN ", names[key]);
+			used += snprintf(text + used, room - used, "%s DOWN", names[key]);
 		else
-			used += snprintf(text + used, room - used, "%s up ", names[key]);
+			used += snprintf(text + used, room - used, "%s up", names[key]);
+		if (gpio_get_io_config(pins[key], &config) == ESP_OK && used < room
+				&& (!config.pu || !config.ie || config.oe || config.fun_sel != PIN_FUNC_GPIO))
+			used += describe_pin(&config, text + used, room - used);
+		if (used < room)
+			used += snprintf(text + used, room - used, " ");
 	}
 }

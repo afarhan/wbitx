@@ -25,6 +25,7 @@ extern "C" {
 #define SETTINGS_DEFAULT_VOLUME 50
 #define SETTINGS_DEFAULT_MIC 50
 #define SETTINGS_DEFAULT_VOX 1
+#define SETTINGS_DEFAULT_WPM 12
 #define SETTINGS_LEVEL_MOST 100
 
 struct settings {
@@ -42,6 +43,8 @@ struct settings {
 	uint32_t volume;
 	uint32_t mic;
 	uint32_t is_vox;
+	uint32_t wpm;                // the Morse keyer's words a minute, for text
+	uint32_t is_headset;         // the mic of the handsfree, not the in-built one
 	char known_ssid[SETTINGS_KNOWN][SETTINGS_SSID_ROOM];
 	char known_password[SETTINGS_KNOWN][SETTINGS_PASSWORD_ROOM];
 };

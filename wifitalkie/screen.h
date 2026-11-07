@@ -11,6 +11,7 @@ extern "C" {
 
 void screen_open(void);
 void screen_poll(long now);
+void screen_describe(char *text, int room);
 
 #ifdef __cplusplus
 }

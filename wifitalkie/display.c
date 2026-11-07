@@ -20,6 +20,7 @@
 // I2C runs near the microphone; display_on() turns it on and sends it all
 // again.
 
+#include <stdio.h>
 #include <string.h>
 
 #include "driver/i2c_master.h"
@@ -74,6 +75,8 @@ static uint8_t frame[DISPLAY_ROWS][DISPLAY_WIDE];
 static uint8_t sent[DISPLAY_ROWS][DISPLAY_WIDE];
 static int is_sent[DISPLAY_ROWS];
 static int next_page;
+static long pages_sent;
+static long pages_failed;
 
 int display_open(void) {
 	i2c_master_bus_config_t bus_config = {
@@ -133,8 +136,27 @@ void display_fill(int x, int y, int wide, int high) {
 	}
 }
 
+// a box wide by high dots, its top left at x, y, turned over: lit dots go
+// dark and dark ones lit, for reverse video
+void display_invert(int x, int y, int wide, int high) {
+	int i;
+	int j;
+
+	for (i = x; i < x + wide; i++) {
+		for (j = y; j < y + high; j++) {
+			if (i >= 0 && i < DISPLAY_WIDE && j >= 0 && j < DISPLAY_HIGH)
+				frame[j / DISPLAY_ROW_HIGH][i] ^= (uint8_t)(1 << (j % DISPLAY_ROW_HIGH));
+		}
+	}
+}
+
 // text with its top at the row's, each dot of the font scale by scale
 void display_text(int x, int row, int scale, const char *text) {
+	display_text_at(x, row * DISPLAY_ROW_HIGH, scale, text);
+}
+
+// text with its top at y, a dot's, not a row's
+void display_text_at(int x, int y, int scale, const char *text) {
 	const uint8_t *letter;
 	int column;
 	int bit;
@@ -149,7 +171,7 @@ void display_text(int x, int row, int scale, const char *text) {
 					continue;
 				for (i = 0; i < scale; i++) {
 					for (j = 0; j < scale; j++)
-						dot(x + column * scale + i, row * DISPLAY_ROW_HIGH + bit * scale + j);
+						dot(x + column * scale + i, y + bit * scale + j);
 				}
 			}
 		}
@@ -188,10 +210,23 @@ static void send_page(int page) {
 	data[0] = DATA;
 	memcpy(&data[1], frame[page], DISPLAY_WIDE);
 	if (i2c_master_transmit(device, where, sizeof(where), WAIT_MS) != ESP_OK
-			|| i2c_master_transmit(device, data, sizeof(data), WAIT_MS) != ESP_OK)
+			|| i2c_master_transmit(device, data, sizeof(data), WAIT_MS) != ESP_OK) {
+		pages_failed++;
 		return;
+	}
+	pages_sent++;
 	memcpy(sent[page], frame[page], DISPLAY_WIDE);
 	is_sent[page] = 1;
+}
+
+// for the verb SCREEN: whether it was found, and the pages sent to it and
+// those whose sending failed, since it started
+void display_describe(char *text, int room) {
+	if (!is_open) {
+		snprintf(text, room, "DISPLAY NOT FOUND");
+		return;
+	}
+	snprintf(text, room, "DISPLAY %ld PAGES SENT, %ld FAILED", pages_sent, pages_failed);
 }
 
 void display_poll(void) {

@@ -25,12 +25,12 @@
 // after MIC and how many came, which says whether the ADC keeps the rate
 // it was asked for: the packets go at the rate the microphone makes them.
 //
-// What comes out of the 8000 a second is put through speech.c's high-pass,
-// the hum taken off. Its gate, the VOX, sends the gaps between words as
+// What comes out of the 8000 a second goes as it is: speech.c's high-pass
+// was taken out on 6 November 2026. speech.c's gate, the VOX, sends the gaps between words as
 // comfort noise, while settings.is_vox, the verb VOX, has it on; it is on
 // unless turned off. It was made for a mic element whose voice stood little
 // above the noise, and keeps the gaps quiet with any.
-// LEVELS measures after the high-pass and before the gate, and RECORD keeps
+// LEVELS measures before the gate, and RECORD keeps
 // what is sent.
 //
 // microphone_pin() reads another pin from now on, until the next power-up:
@@ -41,6 +41,17 @@
 // samples at a time, one line a turn of the loop: RECORDING, lines of
 // "R" and four hex digits a sample, then RECORDED. It is for looking at
 // the microphone's noise from the laptop.
+//
+// The battery shares the ADC: PIN_BATTERY, behind a 100k and 100k divider
+// from the 5 V line, is the pattern's second channel, so the ADC runs at
+// twice SAMPLE_HZ and each channel has SAMPLE_HZ. The 5 V line is the cell
+// through the Schottky, BATTERY_DIODE_MV below it; with the USB in it is
+// the USB's, over the top of the ADC, and microphone_battery() says so.
+// (The C3 cannot read a pin by itself, one-shot, while ADC1 runs
+// continuously.)
+//
+// PIN_MIC_POWER feeds both microphones' preamplifiers, and holds the
+// PAM8403's shutdown up: microphone_open() raises it, at its strongest.
 //
 // On 30 October 2026 the ADC was twice found giving nothing from the start;
 // at other starts it ran. When it was next caught, it had stopped just as
@@ -54,6 +65,7 @@
 #include "esp_adc/adc_cali.h"
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_adc/adc_continuous.h"
+#include "driver/gpio.h"
 
 #include "console.h"
 #include "microphone.h"
@@ -77,9 +89,18 @@
 #define RECORD_SAMPLES (RECORD_SECONDS * TELEPHONE_RATE_HZ)
 #define RECORD_LINE 32
 #define ADC_CODES 4096
+#define BATTERY_SHIFT 10           // its mean's corner, well under 1 Hz
+#define BATTERY_DIODE_MV 300       // the Schottky between the cell and 5 V
+#define BATTERY_OVER 4080          // a code this high is the USB's 5 V
 
 static adc_continuous_handle_t handle;
 static adc_channel_t channel;
+static adc_channel_t battery_channel;
+static int is_battery_read;
+static int32_t battery_mean;
+static int battery_count;
+static adc_cali_handle_t cali;
+static int is_cali;
 static int is_open;
 static int32_t mean;
 static struct telephone_down down;
@@ -109,9 +130,10 @@ static void open_on(int pin) {
 		.conv_frame_size = FRAME_BYTES,
 		.flags.flush_pool = 1,
 	};
-	adc_digi_pattern_config_t pattern;
+	adc_digi_pattern_config_t pattern[2];
 	adc_continuous_config_t config;
 	adc_unit_t unit;
+	adc_unit_t battery_unit;
 
 	telephone_down_begin(&down);
 	speech_begin(&speech, TELEPHONE_RATE_HZ);
@@ -120,15 +142,21 @@ static void open_on(int pin) {
 		console_say("MIC: PIN %d IS NOT ON ADC1", pin);
 		return;
 	}
-	memset(&pattern, 0, sizeof(pattern));
-	pattern.atten = ADC_ATTEN_DB_12;
-	pattern.channel = channel;
-	pattern.unit = ADC_UNIT_1;
-	pattern.bit_width = SOC_ADC_DIGI_MAX_BITWIDTH;
+	memset(pattern, 0, sizeof(pattern));
+	pattern[0].atten = ADC_ATTEN_DB_12;
+	pattern[0].channel = channel;
+	pattern[0].unit = ADC_UNIT_1;
+	pattern[0].bit_width = SOC_ADC_DIGI_MAX_BITWIDTH;
+	pattern[1] = pattern[0];
+	is_battery_read = pin != PIN_BATTERY
+		&& adc_continuous_io_to_channel(PIN_BATTERY, &battery_unit, &battery_channel) == ESP_OK
+		&& battery_unit == ADC_UNIT_1;
+	pattern[1].channel = battery_channel;
+	battery_count = 0;
 	memset(&config, 0, sizeof(config));
-	config.pattern_num = 1;
-	config.adc_pattern = &pattern;
-	config.sample_freq_hz = SAMPLE_HZ;
+	config.pattern_num = is_battery_read ? 2 : 1;
+	config.adc_pattern = pattern;
+	config.sample_freq_hz = SAMPLE_HZ * config.pattern_num;
 	config.conv_mode = ADC_CONV_SINGLE_UNIT_1;
 	config.format = ADC_DIGI_OUTPUT_FORMAT_TYPE2;
 	if (adc_continuous_new_handle(&store, &handle) != ESP_OK
@@ -140,8 +168,31 @@ static void open_on(int pin) {
 	is_open = 1;
 }
 
+// the preamplifiers and the PAM8403, on or off together
+void microphone_power(int is_on) {
+	gpio_set_level(PIN_MIC_POWER, is_on ? 1 : 0);
+}
+
 void microphone_open(void) {
-	open_on(PIN_MICROPHONE);
+	gpio_config_t power = {
+		.pin_bit_mask = 1ULL << PIN_MIC_POWER,
+		.mode = GPIO_MODE_OUTPUT,
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE,
+	};
+	adc_cali_curve_fitting_config_t fitting = {
+		.unit_id = ADC_UNIT_1,
+		.chan = ADC_CHANNEL_0,
+		.atten = ADC_ATTEN_DB_12,
+		.bitwidth = ADC_BITWIDTH_12,
+	};
+
+	gpio_config(&power);
+	gpio_set_drive_capability(PIN_MIC_POWER, GPIO_DRIVE_CAP_3);
+	microphone_power(1);
+	is_cali = adc_cali_create_scheme_curve_fitting(&fitting, &cali) == ESP_OK;
+	open_on(settings.is_headset ? PIN_HEADSET_MIC : PIN_MICROPHONE);
 }
 
 void microphone_pin(int pin) {
@@ -186,7 +237,6 @@ static void take(int raw) {
 		sample = -INT16_MOST;
 	if (!telephone_down_take(&down, (int16_t)sample, &kept))
 		return;
-	kept = speech_high_pass(&speech, kept);
 	measure(kept);
 	if (settings.is_vox)
 		kept = speech_gate(&speech, kept, TELEPHONE_RATE_HZ);
@@ -215,22 +265,42 @@ static int square_root(int64_t value) {
 	return (int)root;
 }
 
-// what the ADC's level is, by its own calibration, or 0 without one
-static int adc_millivolts(void) {
-	adc_cali_curve_fitting_config_t config = {
-		.unit_id = ADC_UNIT_1,
-		.chan = channel,
-		.atten = ADC_ATTEN_DB_12,
-		.bitwidth = ADC_BITWIDTH_12,
-	};
-	adc_cali_handle_t cali;
+// what a code is in millivolts, by the ADC's own calibration, or 0
+// without one
+static int code_millivolts(int code) {
 	int millivolts = 0;
 
-	if (adc_cali_create_scheme_curve_fitting(&config, &cali) != ESP_OK)
+	if (!is_cali || adc_cali_raw_to_voltage(cali, code, &millivolts) != ESP_OK)
 		return 0;
-	adc_cali_raw_to_voltage(cali, (int)(mean >> MEAN_FRACTION_SHIFT), &millivolts);
-	adc_cali_delete_scheme_curve_fitting(cali);
 	return millivolts;
+}
+
+static int adc_millivolts(void) {
+	return code_millivolts((int)(mean >> MEAN_FRACTION_SHIFT));
+}
+
+static void take_battery(int raw) {
+	if (battery_count == 0)
+		battery_mean = raw << MEAN_FRACTION_SHIFT;
+	else
+		battery_mean += ((raw << MEAN_FRACTION_SHIFT) - battery_mean) >> BATTERY_SHIFT;
+	if (battery_count < (1 << BATTERY_SHIFT))
+		battery_count++;
+}
+
+// the cell, in millivolts: MICROPHONE_BATTERY when read, MICROPHONE_USB
+// when the 5 V line is the USB's, MICROPHONE_UNKNOWN before a second of
+// readings or while MICPIN reads the battery's pin
+int microphone_battery(int *millivolts) {
+	int code = (int)(battery_mean >> MEAN_FRACTION_SHIFT);
+
+	*millivolts = 0;
+	if (!is_open || !is_battery_read || battery_count < (1 << BATTERY_SHIFT) || !is_cali)
+		return MICROPHONE_UNKNOWN;
+	if (code >= BATTERY_OVER)
+		return MICROPHONE_USB;
+	*millivolts = 2 * code_millivolts(code) + BATTERY_DIODE_MV;
+	return MICROPHONE_BATTERY;
 }
 
 static void record_say(void) {
@@ -273,6 +343,9 @@ void microphone_poll(long now) {
 			results_a_second++;
 			if (result->type2.unit == 0 && result->type2.channel == channel)
 				take((int)result->type2.data);
+			else if (is_battery_read && result->type2.unit == 0
+					&& result->type2.channel == battery_channel)
+				take_battery((int)result->type2.data);
 			else
 				strangers_a_second++;
 		}

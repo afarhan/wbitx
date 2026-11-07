@@ -58,6 +58,7 @@ void settings_load(void) {
 	settings.volume = SETTINGS_DEFAULT_VOLUME;
 	settings.mic = SETTINGS_DEFAULT_MIC;
 	settings.is_vox = SETTINGS_DEFAULT_VOX;
+	settings.wpm = SETTINGS_DEFAULT_WPM;
 	settings.is_voip_online = 1;
 	if (nvs_open(NAMESPACE, NVS_READONLY, &handle) != ESP_OK)
 		return;
@@ -75,6 +76,8 @@ void settings_load(void) {
 	number_get(handle, "volume", &settings.volume);
 	number_get(handle, "mic", &settings.mic);
 	number_get(handle, "vox", &settings.is_vox);
+	number_get(handle, "headset", &settings.is_headset);
+	number_get(handle, "wpm", &settings.wpm);
 	for (i = 0; i < SETTINGS_KNOWN; i++) {
 		snprintf(key, sizeof(key), "kssid%d", i);
 		text_get(handle, key, settings.known_ssid[i], sizeof(settings.known_ssid[i]));
@@ -105,6 +108,8 @@ void settings_save(void) {
 	nvs_set_u32(handle, "volume", settings.volume);
 	nvs_set_u32(handle, "mic", settings.mic);
 	nvs_set_u32(handle, "vox", settings.is_vox);
+	nvs_set_u32(handle, "headset", settings.is_headset);
+	nvs_set_u32(handle, "wpm", settings.wpm);
 	for (i = 0; i < SETTINGS_KNOWN; i++) {
 		snprintf(key, sizeof(key), "kssid%d", i);
 		nvs_set_str(handle, key, settings.known_ssid[i]);
