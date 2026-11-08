@@ -71,6 +71,8 @@ static int scanned_count;
 // key's handshake failed, 202 refused, 200 its beacons lost), once for each
 // change of reason, so that a join tried over and over does not fill the
 // console
+static int is_off;
+
 static void on_lost(arduino_event_id_t event, arduino_event_info_t info) {
 	int reason = info.wifi_sta_disconnected.reason;
 
@@ -141,11 +143,13 @@ static void joined(void) {
 }
 
 void network_off(void) {
+	is_off = 1;
 	WiFi.mode(WIFI_OFF);
 	console_say("RADIO OFF");
 }
 
 void network_on(void) {
+	is_off = 0;
 	WiFi.mode(WIFI_STA);
 	WiFi.setTxPower(TX_POWER);
 	WiFi.setSleep(false);
@@ -219,6 +223,8 @@ void network_poll(long now) {
 
 	if (is_scanning)
 		scan_poll();
+	if (is_off)
+		return;
 	if (!is_up && !is_scanning && settings.ssid[0] != 0 && now - join_began_ms >= JOIN_WAIT_MS)
 		try_next();
 	if (is_up == was_up)

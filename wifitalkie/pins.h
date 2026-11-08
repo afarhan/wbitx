@@ -34,3 +34,8 @@
 #define PIN_KEY_PTT 21
 #define PIN_MIC_POWER 1
 #define PIN_BATTERY 2
+
+// 0 on the hand-wired talkie, whose divider is on the 5 V line, the cell
+// through a Schottky; 1 on the wificomms board, whose divider is on the
+// cell itself, and the USB cannot be told from it
+#define BATTERY_DIVIDER_ON_CELL 0

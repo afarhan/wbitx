@@ -20,7 +20,17 @@
 // A timer interrupts PLAYBACK_RATE_HZ times a second, every fifth cycle of
 // the PWM, both counted from the same 80 MHz, and sets the next duty from
 // the ring, which the loop keeps filled RING_MS ahead; an empty ring holds
-// the duty at the middle, silence. The interrupt writes the LEDC's
+// the duty at rest_duty.
+//
+// At rest, between overs, the duty is not the middle but nothing, the pin
+// held at 0 V. The PWM's level is its duty times the 3.3 V supply, so any
+// ripple on that supply comes out at the middle as half of it, and the
+// amplifier plays it: on a cell below 4 V the SuperMini's regulator runs out
+// of room and the WiFi's bursts ripple it, a hum heard on 8 November 2026.
+// At 0 V nothing comes out. The duty is taken down to nothing over
+// REST_DOWN_MS once an over ends, and up to the middle over REST_UP_MS
+// before the next is played, slowly enough that the capacitor before the
+// amplifier makes no thump of it. The interrupt writes the LEDC's
 // registers itself, through the HAL's inline functions, since the driver's
 // calls take locks that an interrupt may not. playback.c makes the duties,
 // why at that rate is written there.
@@ -86,6 +96,8 @@
 #define PACE_FULL_OFF_SAMPLES (120 * SAMPLES_A_MS)
 #define FILL_SMOOTH_SHIFT 6
 #define FILL_FRACTION_SHIFT 8
+#define REST_UP_MS 100
+#define REST_DOWN_MS 250
 
 static uint8_t ring[RING_SAMPLES];
 static volatile uint32_t ring_in;
@@ -99,6 +111,10 @@ static int is_muted;
 static long taken_ms;
 static struct playback play;
 static gptimer_handle_t timer;
+static volatile uint32_t rest_duty;
+static volatile uint32_t count_interrupts;
+static volatile uint32_t last_duty;
+static long rested_ms;
 
 _Static_assert(PWM_HZ % PLAYBACK_RATE_HZ == 0, "each sample is held for whole cycles of the PWM");
 _Static_assert(TIMER_HZ % PLAYBACK_RATE_HZ == 0, "the timer counts a whole number to each sample");
@@ -117,7 +133,7 @@ static inline void IRAM_ATTR duty_set(ledc_channel_t channel, uint32_t duty) {
 }
 
 static bool IRAM_ATTR next_duty(gptimer_handle_t t, const gptimer_alarm_event_data_t *event, void *context) {
-	uint32_t duty = PWM_MIDDLE;
+	uint32_t duty = rest_duty;
 
 	(void)t;
 	(void)event;
@@ -128,6 +144,8 @@ static bool IRAM_ATTR next_duty(gptimer_handle_t t, const gptimer_alarm_event_da
 	}
 	duty_set(PWM_LEFT, duty);
 	duty_set(PWM_RIGHT, duty);
+	last_duty = duty;
+	count_interrupts++;
 	return false;
 }
 
@@ -144,7 +162,7 @@ void speaker_open(void) {
 		.speed_mode = PWM_MODE,
 		.channel = PWM_LEFT,
 		.timer_sel = PWM_TIMER,
-		.duty = PWM_MIDDLE,
+		.duty = 0,
 		.hpoint = 0,
 	};
 	ledc_channel_config_t right = {
@@ -152,7 +170,7 @@ void speaker_open(void) {
 		.speed_mode = PWM_MODE,
 		.channel = PWM_RIGHT,
 		.timer_sel = PWM_TIMER,
-		.duty = PWM_MIDDLE,
+		.duty = 0,
 		.hpoint = 0,
 	};
 	gptimer_config_t timer_config = {
@@ -242,10 +260,41 @@ static int16_t queue_next(void) {
 	return sample;
 }
 
+// rest_duty a step toward the middle, or toward nothing, by the time gone
+// since the last step; 1 once it is there
+static int rest_toward(int is_up, long now) {
+	uint32_t want = is_up ? PWM_MIDDLE : 0;
+	uint32_t at = rest_duty;
+	long gone = now - rested_ms;
+	uint32_t step;
+
+	if (gone <= 0)
+		return at == want;
+	rested_ms = now;
+	step = (uint32_t)(gone * PWM_MIDDLE / (is_up ? REST_UP_MS : REST_DOWN_MS));
+	if (step == 0)
+		step = 1;
+	if (at < want)
+		at = at + step > want ? want : at + step;
+	else if (at > want)
+		at = at < want + step ? want : at - step;
+	rest_duty = at;
+	if (is_muted) {
+		ledc_set_duty(PWM_MODE, PWM_LEFT, at);
+		ledc_update_duty(PWM_MODE, PWM_LEFT);
+		ledc_set_duty(PWM_MODE, PWM_RIGHT, at);
+		ledc_update_duty(PWM_MODE, PWM_RIGHT);
+	}
+	return at == want;
+}
+
 void speaker_poll(long now) {
 	int32_t level;
 	uint32_t step;
+	int is_wanted = !is_muted && (is_playing || queue_fill() > 0);
 
+	if (!rest_toward(is_wanted, now) && !is_playing)
+		return;
 	if (!is_playing && queue_fill() >= START_MS * SAMPLES_A_MS) {
 		is_playing = 1;
 		fill_smoothed = (int32_t)queue_fill() << FILL_FRACTION_SHIFT;
@@ -264,8 +313,8 @@ void speaker_poll(long now) {
 	}
 }
 
-// the timer is stopped while the speaker is muted, the PWM held at the
-// middle: its interrupts, 62500 a second, draw current from the supply in
+// the timer is stopped while the speaker is muted, the PWM taken down to
+// rest by speaker_poll(): its interrupts, 62500 a second, draw current from the supply in
 // pulses the microphone hears, folded by the ADC's 16000 a second to
 // about 1.6 kHz, as was found on 30 October 2026
 void speaker_mute(int is_muting) {
@@ -279,10 +328,18 @@ void speaker_mute(int is_muting) {
 	queue_empty();
 	gptimer_stop(timer);
 	ring_out = ring_in;
-	ledc_set_duty(PWM_MODE, PWM_LEFT, PWM_MIDDLE);
+	ledc_set_duty(PWM_MODE, PWM_LEFT, rest_duty);
 	ledc_update_duty(PWM_MODE, PWM_LEFT);
-	ledc_set_duty(PWM_MODE, PWM_RIGHT, PWM_MIDDLE);
+	ledc_set_duty(PWM_MODE, PWM_RIGHT, rest_duty);
 	ledc_update_duty(PWM_MODE, PWM_RIGHT);
+}
+
+// a line for the display: playing or not, the queue, the duty last set,
+// the timer's interrupts in thousands, and M if muted
+void speaker_brief(char *text, int room) {
+	snprintf(text, room, "%s Q%u D%u T%u%s", is_playing ? "PLAY" : "REST",
+		(unsigned)(queue_fill() / SAMPLES_A_MS), (unsigned)last_duty,
+		(unsigned)(count_interrupts / 1000 % 10000), is_muted ? " M" : "");
 }
 
 void speaker_describe(char *text, int room) {

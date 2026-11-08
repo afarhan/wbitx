@@ -10,6 +10,7 @@ extern "C" {
 #endif
 
 void sleep_now(void);
+void sleep_poll(long now);
 
 #ifdef __cplusplus
 }

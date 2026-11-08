@@ -45,6 +45,7 @@
 #include "screen.h"
 #include "service.h"
 #include "settings.h"
+#include "sleep.h"
 #include "speaker.h"
 #include "telephone.h"
 #include "verbs.h"
@@ -86,6 +87,7 @@ void loop() {
 	TIMED(voip_poll(now));
 	TIMED(speaker_poll(now));
 	TIMED(screen_poll(now));
+	TIMED(sleep_poll(now));
 	long turned = (long)millis();
 	vTaskDelay(TICKS_GIVEN_UP);
 	if ((long)millis() - turned >= SLOW_MS)

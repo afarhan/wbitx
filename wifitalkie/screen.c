@@ -38,7 +38,8 @@
 //                    with its key remembered, or entered if it is not;
 //                    ENTER held enters its key afresh; the last item
 //                    scans again. Then a page says whether it joined.
-//     INFO           the network, the address, the signal, the build
+//     INFO           the network, the address, the signal, the speaker,
+//                    the battery; it stays up, not sent home when idle
 //     SLEEP          the talkie asleep, until any key wakes it (sleep.c)
 //
 // Text, such as a callsign, is entered on a page of its own:
@@ -92,6 +93,7 @@
 #include "service.h"
 #include "settings.h"
 #include "screen.h"
+#include "speaker.h"
 #include "sleep.h"
 #include "voip.h"
 
@@ -750,6 +752,7 @@ static void draw_new_code(void) {
 }
 
 static void draw_info(void) {
+	int millivolts;
 	char text[TEXT_ROOM];
 	char address[TEXT_ROOM];
 
@@ -766,7 +769,13 @@ static void draw_info(void) {
 	}
 	snprintf(text, sizeof(text), "CALL %s", settings.callsign);
 	line(4, text);
-	line(6, "BUILT " __DATE__);
+	speaker_brief(text, sizeof(text));
+	line(5, text);
+	if (microphone_battery(&millivolts) == MICROPHONE_BATTERY)
+		snprintf(text, sizeof(text), "BATTERY %d.%02d V", millivolts / 1000, millivolts % 1000 / 10);
+	else
+		snprintf(text, sizeof(text), "ON USB, " __DATE__);
+	line(6, text);
 	line(7, "MENU: BACK");
 }
 
@@ -980,7 +989,7 @@ void screen_poll(long now) {
 	if (page == PAGE_CALLSIGN
 			&& halves_keys(&halves, keys_is_down(KEY_UP), keys_is_down(KEY_DOWN), now, &letter))
 		entry_put(&entry, letter);
-	if (page != PAGE_HOME && now - touched_ms >= MENU_IDLE_MS)
+	if (page != PAGE_HOME && page != PAGE_INFO && now - touched_ms >= MENU_IDLE_MS)
 		go(PAGE_HOME);
 	if (is_save_due && now >= save_ms) {
 		is_save_due = 0;

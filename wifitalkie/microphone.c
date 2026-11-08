@@ -44,9 +44,11 @@
 //
 // The battery shares the ADC: PIN_BATTERY, behind a 100k and 100k divider
 // from the 5 V line, is the pattern's second channel, so the ADC runs at
-// twice SAMPLE_HZ and each channel has SAMPLE_HZ. The 5 V line is the cell
-// through the Schottky, BATTERY_DIODE_MV below it; with the USB in it is
-// the USB's, over the top of the ADC, and microphone_battery() says so.
+// twice SAMPLE_HZ and each channel has SAMPLE_HZ. On the hand-wired talkie
+// the divider is on the 5 V line, the cell through the Schottky,
+// BATTERY_DIODE_MV below it; with the USB in it is the USB's, over the top
+// of the ADC, and microphone_battery() says so. On the wificomms board,
+// BATTERY_DIVIDER_ON_CELL, it is on the cell, and is the cell's.
 // (The C3 cannot read a pin by itself, one-shot, while ADC1 runs
 // continuously.)
 //
@@ -90,7 +92,11 @@
 #define RECORD_LINE 32
 #define ADC_CODES 4096
 #define BATTERY_SHIFT 10           // its mean's corner, well under 1 Hz
+#if BATTERY_DIVIDER_ON_CELL
+#define BATTERY_DIODE_MV 0
+#else
 #define BATTERY_DIODE_MV 300       // the Schottky between the cell and 5 V
+#endif
 #define BATTERY_OVER 4080          // a code this high is the USB's 5 V
 
 static adc_continuous_handle_t handle;
@@ -297,7 +303,7 @@ int microphone_battery(int *millivolts) {
 	*millivolts = 0;
 	if (!is_open || !is_battery_read || battery_count < (1 << BATTERY_SHIFT) || !is_cali)
 		return MICROPHONE_UNKNOWN;
-	if (code >= BATTERY_OVER)
+	if (!BATTERY_DIVIDER_ON_CELL && code >= BATTERY_OVER)
 		return MICROPHONE_USB;
 	*millivolts = 2 * code_millivolts(code) + BATTERY_DIODE_MV;
 	return MICROPHONE_BATTERY;
