@@ -120,7 +120,7 @@ LIP_H, LIP_T, LIP_GAP = 1.5, 0.8, 0.2
 HEAD_DEEP = 1.3     # the screw head's recess, past the inside of the back
 COLLAR_D = HEAD_D + 2 * 1.2   # three lines round the recess
 PED_D = BOSS_D      # M3 x 6 through the board into a pedestal
-SCREW_L = 15.0      # every screw from the back: M3 x 15, under the head
+SCREW_L = 20.0      # every screw from the back: M3 x 20, under the head
 PILOT_SHORT = 0.6   # the screw's tip short of the pilot hole's end
 SEAT_WALL = 1.6     # round a screw head sunk deep, for the column's strength
 # the back's columns under the board stop short of it: the last print's
@@ -134,7 +134,7 @@ BOARD_R = 2.5       # the board's corners, sanded round
 # the PTT: a right-angle 6x6 tactile switch at the board's right edge just
 # under the notch, its face flush with the edge, its plunger out through the
 # right wall wearing a printed keytop
-PTT_Y = 19.7                              # board y of the plunger's axis
+PTT_Y = 20.8                              # board y of the plunger's axis: fit5's hole sat 1.1 above it
 PTT_UP = 4.6                              # the plunger's axis behind the board, as soldered
 PTT_PLUNGER_D, PTT_PLUNGER_L = 3.5, 2.7   # past the switch's face
 PTT_BODY_X, PTT_BODY_Y, PTT_BODY_H = 7.3, 7.0, 7.5   # in from the edge, across, tall
@@ -262,7 +262,8 @@ HEAD_CLR = 3.0      # an M3 pan head's radius, and some
 JACK_Y = 0.5 + 3.0
 USB_Y = JACK_Y + 3.0 + 0.3 + MINI_W / 2 + PITCH   # a hole lower, clear of the jack's tabs
 
-# the charger under the speaker's back unit, its USB-C out of the top
+# the charger under the speaker's back unit; its USB-C is not used, the
+# cell is charged through the SuperMini's
 CHG_Y1 = WALL + IH - CLR
 CHG_Y0 = CHG_Y1 - CHG_L
 CHG_X0 = WALL + CLR + BOSS_D + 1.6
@@ -420,12 +421,6 @@ def mouth_y(y0, y1, cx, cz, w, h):
     return (cyl_y(cx - (w / 2 - r), y0, y1, cz, r)
             + cyl_y(cx + (w / 2 - r), y0, y1, cz, r)
             + box(cx - (w / 2 - r), cx + (w / 2 - r), y0, y1, cz - r, cz + r))
-
-
-def chg_mouth():
-    """The charger's USB-C through the top wall, all in the back tray."""
-    return mouth_y(WALL + IH - 1, OH + 1, (CHG_X0 + CHG_X1) / 2,
-                   WALL + CHG_T + CHG_USB_H / 2, CHG_USB_W, CHG_USB_H)
 
 
 def cell_round(extra=0.0):
@@ -602,10 +597,15 @@ def back_tray():
     s += ptt_notch(-0.1) & box(OW - WALL, OW, -1, OH + 1, zt, D)
 
     zb = z(WALL + FRONT_H + BT) - BOARD_GAP
+    # the columns under the board run up past the seam, into the front: up
+    # there they keep off its walls and its lip, which comes down inside
+    # the back's walls, or the two halves wedge on them (fit5)
+    zl = Z_SPLIT - LIP_H - LIP_GAP - 0.2
+    keep = inner(0, zl, 0.6) + inner(zl, D, -(LIP_T + LIP_GAP))
     for (x, y) in BOSSES:
         s += cyl_z(x, y, BOSS_D / 2, WALL - 0.5, Z_SPLIT - LIP_GAP)
     for (x, y) in board_boss_xy():
-        s += cyl_z(x, y, BOSS_D / 2, WALL - 0.5, zb) & inner(0, D, 0.6)
+        s += cyl_z(x, y, BOSS_D / 2, WALL - 0.5, zb) & keep
     # a collar round each column's foot, so that the wall round the screw
     # head's recess is a few lines thick and the column stands on the plate;
     # under the board, where the head is sunk deep, it runs up past the
@@ -615,7 +615,7 @@ def back_tray():
     zs = board_seat()
     for (x, y) in board_boss_xy():
         s += cyl_z(x, y, HEAD_D / 2 + SEAT_WALL, WALL - 0.5,
-                   zs + (HEAD_D - SCREW_D) / 2 + 1.0) & inner(0, D, 0.6)
+                   zs + (HEAD_D - SCREW_D) / 2 + 1.0) & keep
 
     # the cell: two semicircular cradles up to its axis and the wall at its
     # lower end, kept off the front's lip inside the walls
@@ -645,7 +645,8 @@ def back_tray():
     s -= jack_hole()
     s -= usb_hole()
     s -= ptt_hole() + ptt_body(CLR)
-    s -= chg_mouth()
+    # no mouth for the charger's USB-C: the cell is charged through the
+    # SuperMini's USB-C
     return s
 
 
