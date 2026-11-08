@@ -57,6 +57,11 @@ OUT = os.path.join(HERE, "exports")
 FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf"
 
 # ------------------------------------------------------------------ sizes
+# the board the case is for: "proto", the hand-wired perf board, or "pcb",
+# the wificomms board; make BOARD=pcb
+BOARD = os.environ.get("BOARD", "proto")
+assert BOARD in ("proto", "pcb"), "BOARD is proto or pcb"
+
 WALL = 1.2          # every wall
 CLR = 0.3           # slip between a part and what it sits against
 CORNER = 3.2
@@ -210,9 +215,17 @@ PEDESTALS = [(CX - PED_DX, KEY_Y),
 # drilled hole came, four and a half out. The prototype's holes wander off
 # its grid: the right one a quarter hole lower and nearer the wall. A proper
 # board puts both on the grid.
+#
+# The wificomms PCB, BOARD=pcb, keeps the left one and mirrors it across
+# for the right, at the prototype's right one's height, to stay clear of
+# the mic: the prototype's right hole is 1.8 mm from the edge, too near
+# for a made board. Its holes are H1 and H2.
 _bdx = KEY_PITCH + KEY_PINS_X / 2 + 5 * PITCH
-BOARD_BOSSES = [(CX - _bdx + PITCH / 2, KEY_Y + KEY_ROWS),
-                (CX + _bdx + PITCH / 4, KEY_Y + KEY_ROWS + PITCH / 4)]
+_left = (CX - _bdx + PITCH / 2, KEY_Y + KEY_ROWS)
+if BOARD == "pcb":
+    BOARD_BOSSES = [_left, (BW - _left[0], KEY_Y + KEY_ROWS + PITCH / 4)]
+else:
+    BOARD_BOSSES = [_left, (CX + _bdx + PITCH / 4, KEY_Y + KEY_ROWS + PITCH / 4)]
 # the mic right of the three keys, on their line, centred across between
 # the right switch and the case's right edge
 _gx = (CX + KEY_PITCH + 3.0 + OW - (WALL + CLR)) / 2   # board x
