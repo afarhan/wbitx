@@ -139,7 +139,7 @@ BOARD_R = 2.5       # the board's corners, sanded round
 # the PTT: a right-angle 6x6 tactile switch at the board's right edge just
 # under the notch, its face flush with the edge, its plunger out through the
 # right wall wearing a printed keytop
-PTT_Y = 20.8                              # board y of the plunger's axis: fit5's hole sat 1.1 above it
+PTT_Y = 21.11                             # board y of the plunger's axis: its centre 22.5 from the outer bottom, by calipers
 PTT_UP = 4.6                              # the plunger's axis behind the board, as soldered
 PTT_PLUNGER_D, PTT_PLUNGER_L = 3.5, 2.7   # past the switch's face
 PTT_BODY_X, PTT_BODY_Y, PTT_BODY_H = 7.3, 7.0, 7.5   # in from the edge, across, tall
