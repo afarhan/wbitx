@@ -6416,7 +6416,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD:C_1206_3216Metric"
+		(property "Footprint" "Capacitor_SMD:C_0805_2012Metric"
 			(at 201.5998 48.895 0)
 			(effects
 				(font
@@ -8005,8 +8005,8 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C110293"
-			(at 92.71 108.585 0)
+		(property "Description" "Push button switch, generic, two pins"
+			(at 97.79 108.585 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8014,8 +8014,8 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Push button switch, generic, two pins"
-			(at 97.79 108.585 0)
+		(property "LCSC" "C110293"
+			(at 92.71 108.585 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8055,7 +8055,7 @@
 				)
 			)
 		)
-		(property "Value" "10R"
+		(property "Value" "100R"
 			(at 223.901 85.09 90)
 			(effects
 				(font
@@ -11818,8 +11818,8 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C128955"
-			(at 91.44 123.19 0)
+		(property "Description" "Switch, single pole double throw"
+			(at 91.44 130.81 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11827,8 +11827,8 @@
 				(hide yes)
 			)
 		)
-		(property "Description" "Switch, single pole double throw"
-			(at 91.44 130.81 0)
+		(property "LCSC" "C128955"
+			(at 91.44 123.19 0)
 			(effects
 				(font
 					(size 1.27 1.27)
