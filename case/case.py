@@ -105,6 +105,14 @@ PIN_GAP = 1         # holes from the display's pins down to the top switches'
 PED_HOLES = 2       # holes from the outer switches' pins out to the screws
 EDGE = PITCH / 2    # board past the last row of holes, cut between rows
 KEY_HOLE = 4.0      # the 3.5 mm plungers, pressed as they are
+# The wificomms PCB: Omron B3FS-1010P keys, SMD, a 3 mm plunger 4.3 mm
+# tall, and the display soldered down by wires, not on its header, its
+# glass 3.0 mm up. So the front comes 1.9 mm nearer the board, and the
+# plungers stand 0.3 mm proud; the glass sinks 0.4 mm into the front wall.
+SWITCH_BODY, PLUNGER_D = 3.5, 3.5    # the switch's body, its plunger across
+if BOARD == "pcb":
+    FRONT_H, SWITCH_TOP, OLED_TOP, KEY_HOLE = 2.8, 4.3, 3.0, 3.5
+    SWITCH_BODY, PLUNGER_D = 2.6, 3.0
 DISH_D, DISH_DEEP = 6.0, 1.0              # round each key, for the finger
 MIC_D, MIC_HOLE, MIC_PROUD = 9.7, 10.0, 1.0
 GROOVE_W, GROOVE_D = 0.8, 0.5             # the line under the speaker
@@ -127,6 +135,11 @@ COLLAR_D = HEAD_D + 2 * 1.2   # three lines round the recess
 PED_D = BOSS_D      # M3 x 6 through the board into a pedestal
 SCREW_L = 20.0      # every screw from the back: M3 x 20, under the head
 PILOT_SHORT = 0.6   # the screw's tip short of the pilot hole's end
+# where the board screws' pilots end: 0.6 short of the front wall's inside;
+# on the pcb, with the board 1.9 nearer the front, that left 1.6 of thread,
+# so there they run on into the wall, PILOT_SKIN under the front face
+PILOT_SKIN = 0.8
+BOARD_PILOT_END = D - WALL - 0.6 if BOARD != "pcb" else D - PILOT_SKIN
 SEAT_WALL = 1.6     # round a screw head sunk deep, for the column's strength
 # the back's columns under the board stop short of it: the last print's
 # back stood 0.5 proud of the front with them touching it, and fit4's
@@ -311,6 +324,14 @@ Z_SPLIT = D - SPLIT
 PROUD = SWITCH_TOP - FRONT_H - WALL       # plungers past the front face
 POCKET = OLED_TOP - FRONT_H + 0.2         # the glass into the front wall
 assert PROUD >= -DISH_DEEP, "the plungers don't reach the front; lower FRONT_H"
+THREAD = BOARD_PILOT_END - PILOT_SHORT - (D - WALL - FRONT_H)   # into the pedestal
+assert THREAD >= 2.5, "a board screw has too little thread in its pedestal"
+print(f"board screws: {THREAD:.1f} mm of thread", file=sys.stderr)
+for (x, y) in BOARD_BOSSES:
+    for (kx, ky) in KEYS:
+        assert math.hypot(_bx(x) - _bx(kx), _by(y) - _by(ky)) >= DISH_D / 2 + PILOT_D / 2 + 0.5, \
+            "a board screw's pilot runs under a key's dish"
+assert SWITCH_BODY <= FRONT_H - 0.2 + 1e-9, "the switches' bodies meet the front wall"
 assert CELL_X - SPK_X >= cell_gap(), "the cell meets the speaker's frame"
 assert WALL + SPK_DEEP + 0.5 <= D - WALL, "the speaker is too deep"
 assert WALL + CHG_H + CLR <= D - WALL - SPK_DEEP, "the charger meets the speaker"
@@ -496,7 +517,7 @@ def keytop():
 def board_seat():
     """How far in from the back a board screw's head sits: so deep that
     SCREW_L reaches PILOT_SHORT short of the end of the pedestal's pilot."""
-    return D - WALL - 0.6 - PILOT_SHORT - SCREW_L
+    return BOARD_PILOT_END - PILOT_SHORT - SCREW_L
 
 
 def board_boss_xy():
@@ -550,7 +571,7 @@ def front_shell():
     for (x, y) in BOSSES:
         s -= cyl_z(x, y, PILOT_D / 2, Z_SPLIT - 1, D - WALL - 0.6)
     for (x, y) in board_boss_xy():
-        s -= cyl_z(x, y, PILOT_D / 2, zf - 1, D - WALL - 0.6)
+        s -= cyl_z(x, y, PILOT_D / 2, zf - 1, BOARD_PILOT_END)
     for (x, y) in PEDESTALS:
         s -= cyl_z(bx(x), by(y), PILOT_D / 2, zf - 1, D - WALL - 0.6)
 
@@ -708,8 +729,8 @@ def parts():
     switches = None
     for (kx, ky) in KEYS:
         x, y = bx(kx), by(ky)
-        sw = (box(x - 3, x + 3, y - 3, y + 3, zbf, zbf + 3.5)
-              + cyl_z(x, y, 1.75, zbf + 3.4, zbf + SWITCH_TOP))
+        sw = (box(x - 3, x + 3, y - 3, y + 3, zbf, zbf + SWITCH_BODY)
+              + cyl_z(x, y, PLUNGER_D / 2, zbf + SWITCH_BODY - 0.1, zbf + SWITCH_TOP))
         switches = sw if switches is None else switches + sw
     mic = cyl_z(bx(MIC_XY[0]), by(MIC_XY[1]), MIC_D / 2, zbf, D + MIC_PROUD)
     jc = by(JACK_Y)

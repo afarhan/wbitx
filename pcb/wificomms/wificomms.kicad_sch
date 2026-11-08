@@ -7968,7 +7968,7 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5c77455e-dd12-4926-9e19-93f6617fda25")
-		(property "Reference" "PTT"
+		(property "Reference" "PTT1"
 			(at 99.06 108.5849 90)
 			(effects
 				(font
@@ -7977,7 +7977,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "SW_Push"
+		(property "Value" "SKRTLAE010"
 			(at 99.06 109.8549 90)
 			(effects
 				(font
@@ -7987,7 +7987,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" ""
+		(property "Footprint" "wificomms:SKRTLAE010"
 			(at 92.71 108.585 0)
 			(effects
 				(font
@@ -7997,6 +7997,15 @@
 			)
 		)
 		(property "Datasheet" "~"
+			(at 92.71 108.585 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C110293"
 			(at 92.71 108.585 0)
 			(effects
 				(font
@@ -8023,7 +8032,7 @@
 		(instances
 			(project "wificomms"
 				(path "/6f2219a8-04bf-4763-9f64-1aaef6254500"
-					(reference "PTT")
+					(reference "PTT1")
 					(unit 1)
 				)
 			)
@@ -8190,7 +8199,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "SW_SPST_4P_H"
+		(property "Value" "B3FS-1010P"
 			(at 55.8799 118.11 0)
 			(effects
 				(font
@@ -8200,7 +8209,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+		(property "Footprint" "wificomms:B3FS-1010P"
 			(at 54.61 113.03 0)
 			(effects
 				(font
@@ -8227,7 +8236,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2837533"
+		(property "LCSC" "C231324"
 			(at 54.61 113.03 0)
 			(effects
 				(font
@@ -8421,7 +8430,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "SW_SPST_4P_H"
+		(property "Value" "B3FS-1010P"
 			(at 55.8799 109.22 0)
 			(effects
 				(font
@@ -8431,7 +8440,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+		(property "Footprint" "wificomms:B3FS-1010P"
 			(at 54.61 104.14 0)
 			(effects
 				(font
@@ -8458,7 +8467,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2837533"
+		(property "LCSC" "C231324"
 			(at 54.61 104.14 0)
 			(effects
 				(font
@@ -8812,7 +8821,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "SW_SPST_4P_H"
+		(property "Value" "B3FS-1010P"
 			(at 55.8799 90.17 0)
 			(effects
 				(font
@@ -8822,7 +8831,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+		(property "Footprint" "wificomms:B3FS-1010P"
 			(at 54.61 85.09 0)
 			(effects
 				(font
@@ -8849,7 +8858,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2837533"
+		(property "LCSC" "C231324"
 			(at 54.61 85.09 0)
 			(effects
 				(font
@@ -8898,7 +8907,7 @@
 				(justify right)
 			)
 		)
-		(property "Value" "SW_SPST_4P_H"
+		(property "Value" "B3FS-1010P"
 			(at 55.8799 100.33 0)
 			(effects
 				(font
@@ -8908,7 +8917,7 @@
 				(hide yes)
 			)
 		)
-		(property "Footprint" "wificomms:SW_Tactile_6x6_KH-6X6xH-STM"
+		(property "Footprint" "wificomms:B3FS-1010P"
 			(at 54.61 95.25 0)
 			(effects
 				(font
@@ -8935,7 +8944,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C2837533"
+		(property "LCSC" "C231324"
 			(at 54.61 95.25 0)
 			(effects
 				(font
@@ -11783,7 +11792,7 @@
 				)
 			)
 		)
-		(property "Value" "SW_SPDT"
+		(property "Value" "K3-1296S-E1"
 			(at 91.44 123.444 0)
 			(effects
 				(font
@@ -11791,7 +11800,7 @@
 				)
 			)
 		)
-		(property "Footprint" "spdt_slide_switch_ss-12d11_xxx:SW-TH_SS-12D11G5R"
+		(property "Footprint" "wificomms:K3-1296S-E1"
 			(at 91.44 130.81 0)
 			(effects
 				(font
@@ -11801,6 +11810,15 @@
 			)
 		)
 		(property "Datasheet" "~"
+			(at 91.44 123.19 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C128955"
 			(at 91.44 123.19 0)
 			(effects
 				(font

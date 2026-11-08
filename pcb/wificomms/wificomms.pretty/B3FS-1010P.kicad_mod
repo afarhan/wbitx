@@ -1,0 +1,226 @@
+(footprint "B3FS-1010P"
+	(version 20241229)
+	(generator "pcbnew")
+	(generator_version "9.0")
+	(layer "F.Cu")
+	(descr "Omron B3FS-1010P tact switch, SMD, 6 x 6 mm, plunger 3 mm across, 4.3 mm tall, 0.98 N, 1,000,000 cycles, LCSC C231324. Pads as Omron's land drawing: 1.6 x 1.4 at +-4.0, +-2.25. 1 and 2 are one terminal, 3 and 4 the other. The 3D model is the 3.1 mm B3FS-1000P's, the plunger 1.2 mm short")
+	(property "Reference" "REF**"
+		(at 0 -6.25 0)
+		(layer "F.SilkS")
+		(uuid "dac42e72-24c7-4cad-9ba2-bc2f4dca04e3")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "B3FS-1010P"
+		(at 0 6.25 0)
+		(layer "F.Fab")
+		(uuid "c7decd63-4a37-4eda-b3c1-25ad903357bd")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "35243b57-bd61-4a7a-81ef-8c66256c1f61")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "d17ce0c4-f52e-4e6c-bc01-7f0ade32b769")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "LCSC Part" "C231324"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "e0ace014-7832-4cf6-9225-ae7e9e6df130")
+		(effects
+			(font
+				(size 1.27 1.27)
+				(thickness 0.15)
+			)
+		)
+	)
+	(attr smd)
+	(fp_line
+		(start -2.7 -3.2)
+		(end 2.7 -3.2)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "1df04d6e-f6ee-4a4d-973a-69348c206885")
+	)
+	(fp_line
+		(start -2.7 3.2)
+		(end -2.7 -3.2)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "7e764903-6dab-4856-98b6-11615ad0cfa1")
+	)
+	(fp_line
+		(start 2.7 -3.2)
+		(end 2.7 3.2)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "e2ef61ec-acd6-4f69-8700-e44b98349615")
+	)
+	(fp_line
+		(start 2.7 3.2)
+		(end -2.7 3.2)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "a2f85837-3f7b-48c4-865d-55c41f8fafab")
+	)
+	(fp_circle
+		(center 0.01 0)
+		(end 0.76 0)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "691465f8-163a-460e-9064-479d783aa315")
+	)
+	(fp_circle
+		(center 0.01 0)
+		(end 1.76 0)
+		(stroke
+			(width 0.25)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "7cb60816-13d5-482e-814d-42cd27d439e2")
+	)
+	(fp_circle
+		(center 4 3.15)
+		(end 4.03 3.15)
+		(stroke
+			(width 0.06)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.SilkS")
+		(uuid "1a55f2dc-70dd-4419-8ae2-d5b093351b61")
+	)
+	(fp_line
+		(start -3 -3.15)
+		(end 3 -3.15)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "5570837c-c6d6-47fe-b2e7-b8115328eafb")
+	)
+	(fp_line
+		(start -3 3.15)
+		(end -3 -3.15)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "185934b4-b073-4d37-a4a5-108d65e57014")
+	)
+	(fp_line
+		(start 3 -3.15)
+		(end 3 3.15)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "f514a36a-1266-43fa-9403-34c318868e95")
+	)
+	(fp_line
+		(start 3 3.15)
+		(end -3 3.15)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "b28dff85-a122-4074-a9be-b0f254ef2130")
+	)
+	(fp_text user "${REFERENCE}"
+		(at 0 0 0)
+		(layer "F.Fab")
+		(uuid "fba7f6d6-539d-4831-9168-fed88df7eefa")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(pad "1" smd rect
+		(at 4 2.25)
+		(size 1.6 1.4)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "047a01c0-9203-46ab-88b6-02f1e4d5861f")
+	)
+	(pad "2" smd rect
+		(at -4 2.25)
+		(size 1.6 1.4)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "7dabbf94-ee44-4af7-aa97-b23ce16dcb2d")
+	)
+	(pad "3" smd rect
+		(at 4 -2.25)
+		(size 1.6 1.4)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "1a64b11f-f4e2-4b6e-bc68-53e11588b174")
+	)
+	(pad "4" smd rect
+		(at -4 -2.25)
+		(size 1.6 1.4)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "d6eea70c-6e55-4640-8096-0f52799e138c")
+	)
+	(embedded_fonts no)
+	(model "${KIPRJMOD}/wificomms.3dshapes/B3FS-10x0P_H3.1.wrl"
+		(offset
+			(xyz 0 0 0)
+		)
+		(scale
+			(xyz 1 1 1)
+		)
+		(rotate
+			(xyz 0 0 0)
+		)
+	)
+)
