@@ -2718,155 +2718,6 @@
 			)
 		)
 	)
-	(footprint "phone_cad_2_parts:MEMS_LMA2718"
-		(layer "F.Cu")
-		(uuid "3d6d8260-2309-46a2-b094-7465189ccd47")
-		(at 152.13 96.62 180)
-		(descr "LinkMems LMA2718B381-OA7 (C5373222), analog bottom-port MEMS mic, SMD-4P 2.8x1.9mm. Land pattern per LinkMems LMA2718B381 datasheet section 7.1: pads 1=OUT 2=GND 3=VDD, 0.35/0.30/0.35 x 0.55mm, 0.625mm pitch (1.60 span); pad4=GND annular ring OD1.45/ID0.95; acoustic port (NPTH) Ø0.35 at ring centre (enlarged from datasheet Ø0.25 for manufacturability; still 0.30mm clear of the ring ID); 1.20mm pad-row to ring centre. No GND bridge (datasheet-faithful) - tie pad2 to pad4/pour on the board.")
-		(tags "microphone MEMS analog LMA2718")
-		(property "Reference" "MK2"
-			(at 0 -1.45 0)
-			(layer "F.SilkS")
-			(uuid "57775217-192a-4d28-96c0-c41510cda21a")
-			(effects
-				(font
-					(size 0.8 0.8)
-					(thickness 0.12)
-				)
-			)
-		)
-		(property "Value" "LMA2718"
-			(at 0 1.9 0)
-			(layer "F.Fab")
-			(uuid "a9978e50-2d6f-4797-ac75-c9030c271d17")
-			(effects
-				(font
-					(size 0.6 0.6)
-					(thickness 0.1)
-				)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "1d78c95a-a055-40b5-8f42-79ae08040963")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "Description" ""
-			(at 0 0 0)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "d17ee59d-8887-4e31-8324-925763e217fd")
-			(effects
-				(font
-					(size 1.27 1.27)
-					(thickness 0.15)
-				)
-			)
-		)
-		(property "LCSC" "C5373222"
-			(at 0 0 180)
-			(unlocked yes)
-			(layer "F.Fab")
-			(hide yes)
-			(uuid "bd2dadc3-7e89-461c-9f80-4760e4894dc6")
-			(effects
-				(font
-					(size 1 1)
-					(thickness 0.15)
-				)
-			)
-		)
-		(path "/7f7e000c-0000-4000-8000-000000003804")
-		(sheetname "/")
-		(sheetfile "wificomms.kicad_sch")
-		(attr smd)
-		(fp_rect
-			(start -0.95 -1.15)
-			(end 0.95 1.6)
-			(stroke
-				(width 0.1)
-				(type solid)
-			)
-			(fill no)
-			(layer "F.SilkS")
-			(uuid "f67bab56-f7c3-447e-a267-fe5454a52423")
-		)
-		(pad "" np_thru_hole circle
-			(at 0 0.6 180)
-			(size 0.35 0.35)
-			(drill 0.35)
-			(layers "F.Cu")
-			(uuid "4c86fe59-2262-4110-8278-fe6415386acb")
-		)
-		(pad "1" smd rect
-			(at 0.625 -0.6 180)
-			(size 0.35 0.55)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 7 "Net-(MK2-OUT)")
-			(pinfunction "OUT")
-			(pintype "passive")
-			(uuid "3aef2843-ecaa-4673-8638-93220e31b376")
-		)
-		(pad "2" smd rect
-			(at 0 -0.6 180)
-			(size 0.3 0.55)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 1 "GNDPWR")
-			(pinfunction "GND")
-			(pintype "power_in")
-			(uuid "3d7cb5c4-3127-41a5-b420-dcdbacae3ea1")
-		)
-		(pad "3" smd rect
-			(at -0.625 -0.6 180)
-			(size 0.35 0.55)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 2 "Net-(MK2-VDD)")
-			(pinfunction "VDD")
-			(pintype "power_in")
-			(uuid "51f8253b-9e52-4db2-bc83-e078293f0d65")
-		)
-		(pad "4" smd custom
-			(at 0 0 180)
-			(size 0.15 0.15)
-			(layers "F.Cu" "F.Mask" "F.Paste")
-			(net 1 "GNDPWR")
-			(pinfunction "GND")
-			(pintype "power_in")
-			(clearance 0.1)
-			(options
-				(clearance outline)
-				(anchor circle)
-			)
-			(primitives
-				(gr_circle
-					(center 0 0.6)
-					(end 0.6 0.6)
-					(width 0.25)
-					(fill no)
-				)
-			)
-			(uuid "55fc931b-a624-4191-aeeb-db5e649748f1")
-		)
-		(embedded_fonts no)
-		(model "phone_cad_2_parts.3dshapes/MEMS_LMA2718.wrl"
-			(offset
-				(xyz 0 0 0)
-			)
-			(scale
-				(xyz 1 1 1)
-			)
-			(rotate
-				(xyz 0 0 0)
-			)
-		)
-	)
 	(footprint "Capacitor_SMD:C_0805_2012Metric"
 		(layer "F.Cu")
 		(uuid "4117478a-f608-4dfc-b633-befce2c0d6fa")
@@ -4158,6 +4009,144 @@
 		)
 		(embedded_fonts no)
 		(model "${KICAD9_3DMODEL_DIR}/Capacitor_SMD.3dshapes/C_0805_2012Metric.step"
+			(offset
+				(xyz 0 0 0)
+			)
+			(scale
+				(xyz 1 1 1)
+			)
+			(rotate
+				(xyz 0 0 0)
+			)
+		)
+	)
+	(footprint "phone_cad_2_parts:MEMS_LMA2718"
+		(layer "F.Cu")
+		(uuid "6483fccf-f21f-4a49-b336-3d07c9afc25f")
+		(at 152.13 96.62 180)
+		(descr "LinkMems LMA2718B381-OA7 (C5373222), analog bottom-port MEMS mic, SMD-4P 2.8x1.9mm. Land pattern per LinkMems LMA2718B381 datasheet section 7.1: pads 1=OUT 2=GND 3=VDD, 0.35/0.30/0.35 x 0.55mm, 0.625mm pitch (1.60 span); pad4=GND annular ring OD1.45/ID0.95; acoustic port (NPTH) Ø0.35 at ring centre (enlarged from datasheet Ø0.25 for manufacturability; still 0.30mm clear of the ring ID); 1.20mm from the pads' inner edge to the ring centre (datasheet 6.2: 0.55 + 1.20 + 0.875 of the 2.75 length), so 1.475 centre to centre; origin at the package centre: pads at y -0.975, ring and port at +0.500. No GND bridge (datasheet-faithful) - tie pad2 to pad4/pour on the board.")
+		(tags "microphone MEMS analog LMA2718")
+		(property "Reference" "MK2"
+			(at 0 -2 180)
+			(layer "F.SilkS")
+			(uuid "bede5f30-25e9-4ed5-b7b6-640b65d796cc")
+			(effects
+				(font
+					(size 0.8 0.8)
+					(thickness 0.12)
+				)
+			)
+		)
+		(property "Value" "LMA2718"
+			(at 0 2 180)
+			(layer "F.Fab")
+			(uuid "b918c6eb-26a9-4b08-8a68-24f522598e57")
+			(effects
+				(font
+					(size 0.6 0.6)
+					(thickness 0.1)
+				)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 0 0 180)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "48cf0594-6947-44e3-9723-80accac76d66")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "Description" ""
+			(at 0 0 180)
+			(layer "F.Fab")
+			(hide yes)
+			(uuid "6d4886a0-7d72-4eb6-a6c8-ac4f7e53563a")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(property "LCSC" "C5373222"
+			(at 0 0 0)
+			(layer "F.SilkS")
+			(hide yes)
+			(uuid "cf40ae1d-734d-4484-811f-64856840e4b1")
+			(effects
+				(font
+					(size 1.27 1.27)
+					(thickness 0.15)
+				)
+			)
+		)
+		(path "/7f7e000c-0000-4000-8000-000000003804")
+		(attr smd)
+		(fp_rect
+			(start -1.025 -1.475)
+			(end 1.025 1.475)
+			(stroke
+				(width 0.1)
+				(type solid)
+			)
+			(fill no)
+			(layer "F.SilkS")
+			(uuid "ab45c573-3046-4500-8dca-c36f8485e3da")
+		)
+		(pad "" np_thru_hole circle
+			(at 0 0.5 180)
+			(size 0.35 0.35)
+			(drill 0.35)
+			(layers "F.Cu")
+			(uuid "ddec4e64-2a9e-42dd-a271-1e523bf9a784")
+		)
+		(pad "1" smd rect
+			(at 0.625 -0.975 180)
+			(size 0.35 0.55)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(net 7 "Net-(MK2-OUT)")
+			(uuid "ffab2a1a-3fda-467a-b82e-e039f5cb1483")
+		)
+		(pad "2" smd rect
+			(at 0 -0.975 180)
+			(size 0.3 0.55)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(net 1 "GNDPWR")
+			(uuid "e3dfa593-a1e0-464b-af87-ec02a812a851")
+		)
+		(pad "3" smd rect
+			(at -0.625 -0.975 180)
+			(size 0.35 0.55)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(net 2 "Net-(MK2-VDD)")
+			(uuid "14c23a57-96dd-464a-ac69-18771ee4a4e3")
+		)
+		(pad "4" smd custom
+			(at 0 -0.1 180)
+			(size 0.15 0.15)
+			(layers "F.Cu" "F.Mask" "F.Paste")
+			(net 1 "GNDPWR")
+			(clearance 0.1)
+			(options
+				(clearance outline)
+				(anchor circle)
+			)
+			(primitives
+				(gr_circle
+					(center 0 0.6)
+					(end 0.6 0.6)
+					(width 0.25)
+					(fill no)
+				)
+			)
+			(uuid "960b415b-b3f9-4270-84d2-243494761959")
+		)
+		(embedded_fonts no)
+		(model "phone_cad_2_parts.3dshapes/MEMS_LMA2718.wrl"
 			(offset
 				(xyz 0 0 0)
 			)
@@ -12156,14 +12145,6 @@
 		(uuid "09219736-7d53-42c3-91b4-2f22157575c1")
 	)
 	(segment
-		(start 152.13 97.945)
-		(end 152.125 97.95)
-		(width 0.381)
-		(layer "F.Cu")
-		(net 1)
-		(uuid "0fdf3c80-ec63-46e5-b185-cac276469c3e")
-	)
-	(segment
 		(start 151.98 101.17)
 		(end 152.03 101.22)
 		(width 0.381)
@@ -12202,6 +12183,14 @@
 		(layer "F.Cu")
 		(net 1)
 		(uuid "22f45302-d7c9-44d8-bdaa-4549cc8aabf2")
+	)
+	(segment
+		(start 152.73 96.25)
+		(end 153.45 96.97)
+		(width 0.3)
+		(layer "F.Cu")
+		(net 1)
+		(uuid "24d07166-daa1-4041-bb16-c026543077b5")
 	)
 	(segment
 		(start 127.9875 64.425)
@@ -12309,7 +12298,7 @@
 	)
 	(segment
 		(start 152.13 97.945)
-		(end 152.13 96.6355)
+		(end 152.13 96.78)
 		(width 0.381)
 		(layer "F.Cu")
 		(net 1)
@@ -12508,6 +12497,14 @@
 		(uuid "b9596d0b-4c10-4055-9b3e-339d3dde6308")
 	)
 	(segment
+		(start 153.45 96.97)
+		(end 153.45 98.2)
+		(width 0.3)
+		(layer "F.Cu")
+		(net 1)
+		(uuid "b9eb6c9d-f2e3-4d28-b369-8e31219f62eb")
+	)
+	(segment
 		(start 128.675 64.425)
 		(end 128.8 64.3)
 		(width 0.2)
@@ -12628,7 +12625,7 @@
 		(uuid "d5aa8b19-626a-43fc-a541-e117e0ff5cf3")
 	)
 	(segment
-		(start 152.13 97.22)
+		(start 152.13 97.595)
 		(end 152.13 97.945)
 		(width 0.381)
 		(layer "F.Cu")
@@ -12724,7 +12721,7 @@
 		(uuid "1a929c4c-5d1e-456b-9712-68e45e8a4fc1")
 	)
 	(via
-		(at 152.125 97.95)
+		(at 153.45 98.2)
 		(size 0.6)
 		(drill 0.3)
 		(layers "F.Cu" "B.Cu")
@@ -13021,7 +13018,7 @@
 	)
 	(segment
 		(start 152.755 98.595)
-		(end 152.755 97.22)
+		(end 152.755 97.595)
 		(width 0.2)
 		(layer "F.Cu")
 		(net 2)
@@ -13324,7 +13321,7 @@
 		(uuid "e1703318-af2c-4b93-b094-0cc0efd2ba8f")
 	)
 	(segment
-		(start 151.505 97.22)
+		(start 151.505 97.595)
 		(end 151.505 97.545)
 		(width 0.2)
 		(layer "F.Cu")
@@ -13348,7 +13345,7 @@
 		(uuid "651fe804-24ce-458a-af5a-8f4d3e2dc40f")
 	)
 	(segment
-		(start 151.505 97.22)
+		(start 151.505 97.595)
 		(end 151.2 96.915)
 		(width 0.2)
 		(layer "F.Cu")
@@ -16420,15 +16417,15 @@
 				(xy 149.458213 97.009707) (xy 149.45821 97.009711) (xy 149.370609 97.140814) (xy 149.370602 97.140827)
 				(xy 149.310264 97.286498) (xy 149.310261 97.28651) (xy 149.2795 97.441153) (xy 143.79036 97.441153)
 				(xy 143.917331 97.393796) (xy 144.032546 97.307546) (xy 144.118796 97.192331) (xy 144.169091 97.057483)
-				(xy 144.1755 96.997873) (xy 144.175499 95.963982) (xy 151.7045 95.963982) (xy 151.7045 96.076018)
-				(xy 151.733497 96.184237) (xy 151.789515 96.281263) (xy 151.868737 96.360485) (xy 151.965763 96.416503)
-				(xy 152.073982 96.4455) (xy 152.073984 96.4455) (xy 152.186016 96.4455) (xy 152.186018 96.4455)
-				(xy 152.294237 96.416503) (xy 152.391263 96.360485) (xy 152.470485 96.281263) (xy 152.526503 96.184237)
-				(xy 152.5555 96.076018) (xy 152.5555 95.963982) (xy 152.526503 95.855763) (xy 152.470485 95.758737)
-				(xy 152.391263 95.679515) (xy 152.294237 95.623497) (xy 152.186018 95.5945) (xy 152.073982 95.5945)
-				(xy 151.965763 95.623497) (xy 151.96576 95.623498) (xy 151.86874 95.679513) (xy 151.868734 95.679517)
-				(xy 151.789517 95.758734) (xy 151.789513 95.75874) (xy 151.733498 95.85576) (xy 151.733497 95.855763)
-				(xy 151.7045 95.963982) (xy 144.175499 95.963982) (xy 144.175499 95.502128) (xy 144.169091 95.442517)
+				(xy 144.1755 96.997873) (xy 144.175499 96.063982) (xy 151.7045 96.063982) (xy 151.7045 96.176018)
+				(xy 151.733497 96.284237) (xy 151.789515 96.381263) (xy 151.868737 96.460485) (xy 151.965763 96.516503)
+				(xy 152.073982 96.5455) (xy 152.073984 96.5455) (xy 152.186016 96.5455) (xy 152.186018 96.5455)
+				(xy 152.294237 96.516503) (xy 152.391263 96.460485) (xy 152.470485 96.381263) (xy 152.526503 96.284237)
+				(xy 152.5555 96.176018) (xy 152.5555 96.063982) (xy 152.526503 95.955763) (xy 152.470485 95.858737)
+				(xy 152.391263 95.779515) (xy 152.294237 95.723497) (xy 152.186018 95.6945) (xy 152.073982 95.6945)
+				(xy 151.965763 95.723497) (xy 151.96576 95.723498) (xy 151.86874 95.779513) (xy 151.868734 95.779517)
+				(xy 151.789517 95.858734) (xy 151.789513 95.85874) (xy 151.733498 95.95576) (xy 151.733497 95.955763)
+				(xy 151.7045 96.063982) (xy 144.175499 96.063982) (xy 144.175499 95.502128) (xy 144.169091 95.442517)
 				(xy 144.168715 95.44151) (xy 144.118797 95.307671) (xy 144.118793 95.307664) (xy 144.032547 95.192455)
 				(xy 144.032544 95.192452) (xy 143.917335 95.106206) (xy 143.917328 95.106202) (xy 143.822527 95.070844)
 				(xy 143.766593 95.028973) (xy 143.742176 94.963509) (xy 143.757028 94.895236) (xy 143.806433 94.84583)
@@ -16986,26 +16983,25 @@
 			"328d3fe9-196c-4ebc-8d7c-4d5ce210ce17" "35320161-72ce-4a9d-b839-13ff7e787de0"
 			"3706ddad-0b0a-40f9-85e1-e1ce76c620d2" "37aaa1a1-6016-474d-ac9e-e2cceb3311eb"
 			"3b29767f-fdfd-4f58-9c68-7b5456c5fc83" "3cec826a-f564-4870-8a71-c71ac0a8d133"
-			"3d6d8260-2309-46a2-b094-7465189ccd47" "3dc173c9-2de6-4a0e-b053-b28f7daa59fc"
-			"3f3b21bb-7726-4341-bd90-4e2c7bca40dc" "3fbcb39f-38ef-4e2c-95c9-fcc490c4cc92"
-			"45272ee1-6120-4914-801c-55df11067a2f" "456ebe26-8f30-49e4-b477-24dba16c8e4e"
-			"4cbac0a3-ed3f-410c-9a66-8b2fde579452" "56bfb812-02e6-4c6f-9bd0-676d98d2b5c0"
-			"651fe804-24ce-458a-af5a-8f4d3e2dc40f" "71e525b4-5311-472d-9d75-378f3fe4ad85"
-			"742df548-e680-4d95-82a6-797eec13371a" "757e1dc5-d12f-46c4-af7e-c4acfe5daf76"
-			"7663f506-3aab-4fbe-9478-8eb74e0149ea" "7a13b23e-0244-4a43-bb28-bcb0774675c6"
-			"7e7e7984-71d0-41a1-9d2a-3079bde4c90f" "8627d382-6915-4531-852f-dd3f19986bdf"
-			"8c351800-bb3d-44ba-826c-12fe92f67ce9" "9a92d484-39c3-47c8-b60d-35279ff2dd1f"
-			"a058c12d-37cf-46e8-bc51-e64355f47d5c" "a13e5d34-3e2f-46c3-be1e-a025eb93a7cf"
-			"a4d1b647-daff-4d96-b4a0-4e82b0f3b05c" "a7fb5571-2ac2-49a9-a7d9-0ab33bfb882b"
-			"ac391d9e-7e8a-41aa-b39e-e3edf799399c" "b0414ecc-b740-43be-99d5-e46ba45cc61d"
-			"b0a38674-a1d5-408c-b943-fc62badbe156" "b1515c52-f62d-44e7-ac2e-7fc429565ef5"
-			"c77cd95c-b3f0-4cb3-9912-c0e39cfc3f32" "c929b502-d28c-49a1-827b-c5df0a53dad6"
-			"d3a944d8-1330-43fb-9ce9-e61277c15aa1" "db90cac5-da71-49e4-9558-3e66d28f9180"
-			"ded8b200-cd98-4b26-bf8c-d856ad4446c9" "e0430b35-51e6-4afd-b664-7bca9ac5c7f8"
-			"e08cd90a-70af-4f5a-bb54-7ea17fa0555b" "e256735e-c0cd-4238-bed9-73b90fb1d1b7"
-			"e2954db0-1de1-4461-9be7-d51637f718f2" "edc64236-b01e-442c-a7b1-56acf7dd38e5"
-			"f2a44ab3-cf5b-4195-943d-b3f5b5c5047e" "fac6fbdd-f67c-400e-9929-1be7ccbf699d"
-			"fc47723e-5fe3-49a7-b3e8-538736a819f6"
+			"3dc173c9-2de6-4a0e-b053-b28f7daa59fc" "3f3b21bb-7726-4341-bd90-4e2c7bca40dc"
+			"3fbcb39f-38ef-4e2c-95c9-fcc490c4cc92" "45272ee1-6120-4914-801c-55df11067a2f"
+			"456ebe26-8f30-49e4-b477-24dba16c8e4e" "4cbac0a3-ed3f-410c-9a66-8b2fde579452"
+			"56bfb812-02e6-4c6f-9bd0-676d98d2b5c0" "651fe804-24ce-458a-af5a-8f4d3e2dc40f"
+			"71e525b4-5311-472d-9d75-378f3fe4ad85" "742df548-e680-4d95-82a6-797eec13371a"
+			"757e1dc5-d12f-46c4-af7e-c4acfe5daf76" "7663f506-3aab-4fbe-9478-8eb74e0149ea"
+			"7a13b23e-0244-4a43-bb28-bcb0774675c6" "7e7e7984-71d0-41a1-9d2a-3079bde4c90f"
+			"8627d382-6915-4531-852f-dd3f19986bdf" "8c351800-bb3d-44ba-826c-12fe92f67ce9"
+			"9a92d484-39c3-47c8-b60d-35279ff2dd1f" "a058c12d-37cf-46e8-bc51-e64355f47d5c"
+			"a13e5d34-3e2f-46c3-be1e-a025eb93a7cf" "a4d1b647-daff-4d96-b4a0-4e82b0f3b05c"
+			"a7fb5571-2ac2-49a9-a7d9-0ab33bfb882b" "ac391d9e-7e8a-41aa-b39e-e3edf799399c"
+			"b0414ecc-b740-43be-99d5-e46ba45cc61d" "b0a38674-a1d5-408c-b943-fc62badbe156"
+			"b1515c52-f62d-44e7-ac2e-7fc429565ef5" "c77cd95c-b3f0-4cb3-9912-c0e39cfc3f32"
+			"c929b502-d28c-49a1-827b-c5df0a53dad6" "d3a944d8-1330-43fb-9ce9-e61277c15aa1"
+			"db90cac5-da71-49e4-9558-3e66d28f9180" "ded8b200-cd98-4b26-bf8c-d856ad4446c9"
+			"e0430b35-51e6-4afd-b664-7bca9ac5c7f8" "e08cd90a-70af-4f5a-bb54-7ea17fa0555b"
+			"e256735e-c0cd-4238-bed9-73b90fb1d1b7" "e2954db0-1de1-4461-9be7-d51637f718f2"
+			"edc64236-b01e-442c-a7b1-56acf7dd38e5" "f2a44ab3-cf5b-4195-943d-b3f5b5c5047e"
+			"fac6fbdd-f67c-400e-9929-1be7ccbf699d" "fc47723e-5fe3-49a7-b3e8-538736a819f6"
 		)
 	)
 	(group ""
