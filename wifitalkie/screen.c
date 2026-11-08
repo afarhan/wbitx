@@ -3,16 +3,23 @@
 //
 // screen.c — what the display shows and what the keys do.
 //
-// The display shows one page at a time. The home page, the talkie at rest:
+// The display shows one page at a time, in two fonts (font.c): the main,
+// Helvetica Bold of ten dots, for what a page says, and a small one for
+// its title and help. Each but the home page has its title in the middle
+// of the top, a rule under it, and up to five lines below, LINE_PITCH
+// dots apart; with help at the foot, four. The menu shows five items at a
+// time, each with what it is set to at the right.
+//
+// The home page, the talkie at rest:
 //
 //     VU2ESE         TX  o  ||||     the callsign; TX or RX; a dot, filled
-//                                    when online at my.sbitx.net; the
+//     -------------------------      when online at my.sbitx.net; the
 //                                    WiFi's signal in four bars
 //          21080                     the channel, in kHz, large
-//     2 HERE                         how many are in the room, or, not
-//                                    online, what the service is doing
-//     VOL [#########     ] 50        the volume
-//     HEARD VU3XYZ                   who speaks, or the last key pressed
+//     2 here                         who speaks, or how many are in the
+//                                    room, or, not online, a few words on
+//                                    why (service_brief())
+//     Vol [#########     ] 50        the volume
 //
 // The bars: four at BARS_FOUR_DBM and above, then one fewer for each
 // BARS_STEP_DB below it, none when the WiFi is not joined.
@@ -27,26 +34,35 @@
 //
 //     FREQUENCY      the channel, large; UP and DOWN step it in dial.c's
 //                    kilohertz steps, faster the longer they are held
-//     VOLUME         the volume, large
+//     VOLUME         the volume
+//     AUDIO          the in-built mic or the handsfree's
 //     MORSE WPM      the Morse speed for entering text, large; UP and
 //                    DOWN step it, from HALVES_WPM_LEAST to HALVES_WPM_MOST
 //     CALLSIGN       entered a character at a time, below
+//     CONTACTS       the callsigns kept, added and deleted at SETUP
 //     MY.SBITX.NET   the code to add on the website, the service's state;
 //                    ENTER asks for a new code, ENTER again makes it
 //     WIFI           the networks heard, strongest first, with their
-//                    signal, * by those remembered; ENTER joins one,
-//                    with its key remembered, or entered if it is not;
-//                    ENTER held enters its key afresh; the last item
+//                    signal, * by those remembered; ENTER joins one that
+//                    is open or remembered; one with a key not known, or
+//                    ENTER held for a new key, opens SETUP; the last item
 //                    scans again. Then a page says whether it joined.
+//     SETUP          the setup portal (portal.cpp), open while the page
+//                    is shown: what to join on a telephone and where to
+//                    go. It opens by itself at power-up when the talkie
+//                    knows no network.
 //     INFO           the network, the address, the signal, the speaker,
-//                    the battery; it stays up, not sent home when idle
+//                    the battery
 //     SLEEP          the talkie asleep, until any key wakes it (sleep.c)
 //
-// Text, such as a callsign, is entered on a page of its own:
+// INFO and SETUP stay up; the others go home when idle.
 //
-//     Enter your callsign:      the prompt, a line
+// The callsign is entered on a page of its own:
+//
+//            CALLSIGN               the title
+//     -------------------------
 //     VU2ES_                    the text so far, up to ENTRY_ROOM - 1,
-//                               its end on two lines, and a cursor
+//                               its end if it is long, and a cursor
 //     HSVIFU?ELR.APWJ           halves.c's two lines of letters, LINE_GAP
 //                               dots apart, the two offered in reverse
 //     BDXNCKYTZGQM/O-           video, the chosen framed; or its line of
@@ -60,10 +76,7 @@
 // takes the last character off, and the one before it, while it is held.
 // MENU goes back and leaves the text as it was.
 //
-// A WiFi key is entered as before, until the captive portal takes it over:
-// all of printable ASCII, large, the chosen in the middle; UP and DOWN
-// scroll them, faster when held, ENTER adds the chosen, ENTER held takes
-// characters off, and MENU keeps the key and joins.
+// A WiFi key is not entered on the talkie: at SETUP, on a telephone.
 //
 // Volume and channel are written to the settings SAVE_AFTER_MS after the
 // last press, not at each: a flash write holds the interrupts up; voip.c
@@ -79,6 +92,7 @@
 
 #include "auth.h"
 #include "console.h"
+#include "contacts.h"
 #include "dial.h"
 #include "display.h"
 #include "entry.h"
@@ -89,6 +103,7 @@
 #include "microphone.h"
 #include "pins.h"
 #include "network.h"
+#include "portal.h"
 #include "ptt.h"
 #include "service.h"
 #include "settings.h"
@@ -102,16 +117,21 @@
 #define VOLUME_STEP 5
 #define MENU_IDLE_MS 30000
 #define TEXT_ROOM 64
-#define COLUMNS 21
+#define RULE_Y 8
+#define LINES_Y 10
+#define LINE_PITCH 11
+#define MENU_ROWS 5
+#define LIST_ROWS 4
+#define HELP_Y 57
 #define BIG_SCALE 3
-#define BIG_ROW 2
-#define TITLE_ROW 0
-#define CALL_ROW 0
-#define ROOM_ROW 5
-#define VOLUME_ROW 6
-#define LAST_ROW 7
-#define LAMP_X 76
-#define ONLINE_X 94
+#define PAGE_BIG_Y 18
+#define HOME_RULE_Y 9
+#define HOME_BIG_Y 12
+#define HOME_STATE_Y 39
+#define HOME_VOLUME_Y 52
+#define LAMP_X 72
+#define ONLINE_X 92
+#define ONLINE_Y 1
 #define ONLINE_SIZE 7
 #define BARS_X 106
 #define BARS 4
@@ -120,32 +140,19 @@
 #define BAR_RISE 2
 #define BARS_FOUR_DBM (-55)
 #define BARS_STEP_DB 10
-#define BAR_X 24
+#define BAR_X 22
 #define BAR_WIDE 80
-#define VOLUME_NUMBER_X 108
-#define MENU_FIRST_ROW 1
 #define MARK_X 0
 #define ITEM_X 8
+#define VALUE_GAP 4
 #define HZ_A_KHZ 1000
-#define PROMPT_ROWS 1
-#define TEXT_ROW 1
-#define TEXT_ROWS 2
-#define LETTERS_Y 30
-#define LINE_GAP 14
+#define LETTERS_Y 25
+#define LINE_GAP 13
 #define FIGURES_Y (LETTERS_Y + LINE_GAP / 2)
 #define LETTER_PITCH 8
 #define LETTER_EDGE 2
 #define WPM_STEP 1
-#define CHOICE_ROW 4
-#define CHOICE_SCALE 2
-#define CHOICES_EACH_SIDE 4
-#define CHOSEN_MARK_ROW 6
 #define HELP_EVERY_MS 2000
-#define LIST_ROWS 6
-#define LIST_FIRST_ROW 1
-#define NAME_COLUMNS 13
-#define KNOWN_X 92
-#define RSSI_X 104
 #define JOIN_SHOWN_MS 20000
 
 #define PAGE_HOME 0
@@ -157,11 +164,12 @@
 #define PAGE_NEW_CODE 6
 #define PAGE_WIFI 7
 #define PAGE_INFO 8
-#define PAGE_WIFI_KEY 9
+#define PAGE_SETUP 9
 #define PAGE_WIFI_JOINING 10
 #define PAGE_AUDIO 11
 #define PAGE_WPM 12
 #define PAGE_SLEEP 13
+#define PAGE_CONTACTS 14
 
 struct item {
 	const char *name;
@@ -169,20 +177,21 @@ struct item {
 };
 
 static const struct item items[] = {
-	{"FREQUENCY", PAGE_DIAL},
-	{"VOLUME", PAGE_VOLUME},
-	{"AUDIO", PAGE_AUDIO},
-	{"MORSE WPM", PAGE_WPM},
-	{"CALLSIGN", PAGE_CALLSIGN},
-	{"MY.SBITX.NET", PAGE_SBITX},
-	{"WIFI", PAGE_WIFI},
-	{"INFO", PAGE_INFO},
-	{"SLEEP", PAGE_SLEEP},
+	{"Frequency", PAGE_DIAL},
+	{"Volume", PAGE_VOLUME},
+	{"Audio", PAGE_AUDIO},
+	{"Morse speed", PAGE_WPM},
+	{"Callsign", PAGE_CALLSIGN},
+	{"Contacts", PAGE_CONTACTS},
+	{"My.sbitx.net", PAGE_SBITX},
+	{"Wifi", PAGE_WIFI},
+	{"Setup", PAGE_SETUP},
+	{"Info", PAGE_INFO},
+	{"Sleep", PAGE_SLEEP},
 };
 
 #define ITEMS ((int)(sizeof(items) / sizeof(items[0])))
-#define ITEM_COLUMNS ((DISPLAY_WIDE - ITEM_X) / FONT_STEP)
-#define MENU_ROWS (DISPLAY_ROWS - MENU_FIRST_ROW)
+#define MENU_ROWS 5
 
 // A page of choices, the pattern for a setting with a few values: the mark
 // begins on the value in use, UP and DOWN move it, ENTER takes the value
@@ -221,18 +230,10 @@ static const char *entry_help[] = {
 
 #define ENTRY_HELPS ((int)(sizeof(entry_help) / sizeof(entry_help[0])))
 
-static const char *key_help[] = {
-	"ENTER: ADD",
-	"HOLD ENTER: DELETE",
-	"MENU: SAVE",
-	"HOLD MENU: CANCEL",
-};
-
-#define KEY_HELPS ((int)(sizeof(key_help) / sizeof(key_help[0])))
-
 static const char *wifi_help[] = {
 	"ENTER: JOIN",
 	"HOLD ENTER: NEW KEY",
+	"NEW KEYS: AT SETUP",
 	"*: REMEMBERED",
 	"MENU: BACK",
 };
@@ -243,6 +244,8 @@ static int wifi_chosen;
 static int wifi_top;
 static char wifi_ssid[SETTINGS_SSID_ROOM];
 static long joining_since_ms;
+static int contacts_top;
+static int is_begun;
 
 void screen_open(void) {
 	keys_open();
@@ -266,7 +269,7 @@ static void save_soon(long now) {
 }
 
 static int is_entering(int on_page) {
-	return on_page == PAGE_CALLSIGN || on_page == PAGE_WIFI_KEY;
+	return on_page == PAGE_CALLSIGN;
 }
 
 // to another page; ENTER is the PTT on the home page, the screen's on the
@@ -276,8 +279,12 @@ static void go(int to) {
 		entry_begin(&entry, ENTRY_CALLSIGN, settings.callsign, SETTINGS_CALLSIGN_ROOM - 1);
 		halves_begin(&halves, (int)settings.wpm);
 	}
-	if (to == PAGE_WIFI_KEY)
-		entry_begin(&entry, ENTRY_ANY, "", SETTINGS_PASSWORD_ROOM - 1);
+	if (page == PAGE_SETUP && to != PAGE_SETUP)
+		portal_close();
+	if (to == PAGE_SETUP)
+		portal_open();
+	if (to == PAGE_CONTACTS)
+		contacts_top = 0;
 	if (to == PAGE_WIFI && page == PAGE_MENU) {
 		network_scan_begin();
 		wifi_chosen = 0;
@@ -316,7 +323,7 @@ static void volume_step(const struct key_press *press, long now) {
 }
 
 // AUDIO: the in-built mic or the handsfree's, kept across power-ups
-static const char *const audio_names[] = {"IN-BUILT", "HANDSFREE"};
+static const char *const audio_names[] = {"In-built", "Handsfree"};
 
 static int audio_in_use(void) {
 	return settings.is_headset ? 1 : 0;
@@ -406,8 +413,8 @@ static void join(const char *password, long now) {
 	go(PAGE_WIFI_JOINING);
 }
 
-// a network chosen from the list: joined if it is open or remembered, its
-// key asked for if not, or if is_new_key
+// a network chosen from the list: joined if it is open or remembered; if
+// not, or if is_new_key, SETUP is opened for its key to be entered there
 static void pick(int i, int is_new_key, long now) {
 	int rssi;
 	int is_open;
@@ -420,7 +427,7 @@ static void pick(int i, int is_new_key, long now) {
 	else if (known >= 0 && !is_new_key)
 		join(settings.known_password[known], now);
 	else
-		go(PAGE_WIFI_KEY);
+		go(PAGE_SETUP);
 }
 
 static void take_wifi(const struct key_press *press, long now) {
@@ -466,26 +473,9 @@ static void accept(long now) {
 	go(PAGE_MENU);
 }
 
-// a WiFi key: UP and DOWN scroll, ENTER adds, ENTER held takes off, MENU
-// joins with it
-static void take_key(const struct key_press *press, long now) {
-	if (is_up_or_down(press))
-		entry_scroll(&entry, press->key == KEY_UP);
-	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED)
-		entry_add(&entry);
-	else if (press->key == KEY_ENTER)
-		entry_delete(&entry);
-	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
-		join(entry.text, now);
-}
-
 // UP and DOWN are keyed in screen_poll(); ENTER drops the letter, or keeps the
 // text, and held takes characters off
 static void take_entry(const struct key_press *press, long now) {
-	if (page == PAGE_WIFI_KEY) {
-		take_key(press, now);
-		return;
-	}
 	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED) {
 		if (halves.at >= 0)
 			halves_abort(&halves);
@@ -497,6 +487,17 @@ static void take_entry(const struct key_press *press, long now) {
 	}
 	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
 		go(PAGE_MENU);
+}
+
+// the list of contacts moved a line, kept within it
+static void contacts_scroll(int is_up) {
+	int most = contacts_count(&settings) - LIST_ROWS;
+
+	contacts_top += is_up ? -1 : 1;
+	if (contacts_top > most)
+		contacts_top = most;
+	if (contacts_top < 0)
+		contacts_top = 0;
 }
 
 static void take_page(const struct key_press *press, long now) {
@@ -529,6 +530,10 @@ static void take_page(const struct key_press *press, long now) {
 		wpm_step(press, now);
 		return;
 	}
+	if (page == PAGE_CONTACTS && is_up_or_down(press)) {
+		contacts_scroll(press->key == KEY_UP);
+		return;
+	}
 	if (press->key == KEY_MENU || press->key == KEY_ENTER)
 		go(PAGE_MENU);
 }
@@ -558,53 +563,95 @@ static void take(const struct key_press *press, long now) {
 		take_page(press, now);
 }
 
-// text cut to the screen's width
-static void line(int row, const char *text) {
-	char cut[COLUMNS + 1];
+// the dot row of the top of line i below the rule
+static int line_y(int i) {
+	return LINES_Y + i * LINE_PITCH;
+}
 
-	snprintf(cut, sizeof(cut), "%s", text);
-	display_text(0, row, 1, cut);
+// text on line i below the rule, in the main font; what goes past the
+// edge is not shown
+static void line(int i, const char *text) {
+	display_text_at(0, line_y(i), 1, text);
+}
+
+// text cut from its end to fit in room dots
+static void fit(char *text, int room) {
+	int length;
+
+	for (length = (int)strlen(text); length > 0 && display_text_wide(text, 1) > room; length--)
+		text[length - 1] = 0;
+}
+
+// an item of a list on line i: a mark if it is the chosen, its name, and
+// what it is set to at the right, the name cut to leave it room
+static void item(int i, int is_chosen, const char *name, const char *value) {
+	char cut[TEXT_ROOM];
+	int y = line_y(i);
+	int value_x = DISPLAY_WIDE - display_text_wide(value, 1);
+
+	if (is_chosen)
+		display_text_at(MARK_X, y, 1, ">");
+	snprintf(cut, sizeof(cut), "%s", name);
+	fit(cut, value_x - ITEM_X - (value[0] != 0 ? VALUE_GAP : 0));
+	display_text_at(ITEM_X, y, 1, cut);
+	display_text_at(value_x, y, 1, value);
+}
+
+static void rule(int y) {
+	display_fill(0, y, DISPLAY_WIDE, 1);
+}
+
+// the title in the small font in the middle of the top, and the rule under
+// it
+static void title(const char *text) {
+	display_small_at((DISPLAY_WIDE - display_small_wide(text)) / 2, 0, text);
+	rule(RULE_Y);
+}
+
+// the help, in the small font at the foot
+static void help(const char *text) {
+	display_small_at(0, HELP_Y, text);
 }
 
 // text large and in the middle of the screen
-static void big(const char *text) {
-	int wide = (int)strlen(text) * FONT_STEP * BIG_SCALE;
-
-	display_text((DISPLAY_WIDE - wide) / 2, BIG_ROW, BIG_SCALE, text);
+static void big(const char *text, int y) {
+	display_text_at((DISPLAY_WIDE - display_text_wide(text, BIG_SCALE)) / 2, y, BIG_SCALE, text);
 }
 
-static void big_frequency(void) {
+static void big_frequency(int y) {
 	char text[TEXT_ROOM];
 
 	snprintf(text, sizeof(text), "%u", (unsigned)(settings.hz / HZ_A_KHZ));
-	big(text);
+	big(text, y);
 }
 
-static void volume_bar(void) {
+static void volume_bar(int y) {
 	char text[TEXT_ROOM];
 
-	display_text(0, VOLUME_ROW, 1, "VOL");
-	display_bar(BAR_X, VOLUME_ROW, BAR_WIDE, (int)settings.volume * BAR_WIDE / SETTINGS_LEVEL_MOST);
+	display_text_at(0, y, 1, "Vol");
+	display_bar(BAR_X, y, BAR_WIDE, (int)settings.volume * BAR_WIDE / SETTINGS_LEVEL_MOST);
 	snprintf(text, sizeof(text), "%u", (unsigned)settings.volume);
-	display_text(VOLUME_NUMBER_X, VOLUME_ROW, 1, text);
+	display_text_at(DISPLAY_WIDE - display_text_wide(text, 1), y, 1, text);
 }
 
 // a dot, filled when online at my.sbitx.net, a ring when not
 static void online_mark(void) {
 	int edge = ONLINE_SIZE - 1;
+	int y = ONLINE_Y;
 
 	if (service_is_online()) {
-		display_fill(ONLINE_X + 1, 0, ONLINE_SIZE - 2, ONLINE_SIZE);
-		display_fill(ONLINE_X, 1, ONLINE_SIZE, ONLINE_SIZE - 2);
+		display_fill(ONLINE_X + 1, y, ONLINE_SIZE - 2, ONLINE_SIZE);
+		display_fill(ONLINE_X, y + 1, ONLINE_SIZE, ONLINE_SIZE - 2);
 		return;
 	}
-	display_fill(ONLINE_X + 1, 0, ONLINE_SIZE - 2, 1);
-	display_fill(ONLINE_X + 1, edge, ONLINE_SIZE - 2, 1);
-	display_fill(ONLINE_X, 1, 1, ONLINE_SIZE - 2);
-	display_fill(ONLINE_X + edge, 1, 1, ONLINE_SIZE - 2);
+	display_fill(ONLINE_X + 1, y, ONLINE_SIZE - 2, 1);
+	display_fill(ONLINE_X + 1, y + edge, ONLINE_SIZE - 2, 1);
+	display_fill(ONLINE_X, y + 1, 1, ONLINE_SIZE - 2);
+	display_fill(ONLINE_X + edge, y + 1, 1, ONLINE_SIZE - 2);
 }
 
-// the WiFi's signal, bars rising left to right; those not earned a line
+// the WiFi's signal, bars rising left to right from the foot of the
+// capitals; those not earned a line
 static void signal_bars(void) {
 	int earned = 0;
 	int rssi = network_rssi();
@@ -622,63 +669,55 @@ static void signal_bars(void) {
 		high = 1;
 		if (i < earned)
 			high = (i + 1) * BAR_RISE;
-		display_fill(BARS_X + i * BAR_STEP_X, DISPLAY_ROW_HIGH - high, BAR_THICK, high);
+		display_fill(BARS_X + i * BAR_STEP_X, FONT_MAIN_HIGH - high, BAR_THICK, high);
 	}
 }
 
-// how many are in the room, or why not online
-static void room_line(void) {
+// who speaks; or how many are in the room; or, not online, a few words
+// on why
+static void state_line(int y) {
 	char text[TEXT_ROOM];
 	char why[TEXT_ROOM];
 
-	if (!service_is_online()) {
-		service_describe(text, sizeof(text));
-		line(ROOM_ROW, text);
-		return;
+	if (voip_hearing(why, sizeof(why))) {
+		snprintf(text, sizeof(text), "Heard %s", why);
+	} else if (!service_is_online()) {
+		service_brief(text, sizeof(text));
+	} else if (voip_busy(why, sizeof(why))) {
+		snprintf(text, sizeof(text), "Busy %s", why);
+	} else if (voip_here() >= 0) {
+		snprintf(text, sizeof(text), "%d here", voip_here());
+	} else {
+		text[0] = 0;
 	}
-	if (voip_busy(why, sizeof(why))) {
-		snprintf(text, sizeof(text), "BUSY %s", why);
-		line(ROOM_ROW, text);
-		return;
-	}
-	if (voip_here() >= 0) {
-		snprintf(text, sizeof(text), "%d HERE", voip_here());
-		line(ROOM_ROW, text);
-	}
+	display_text_at(0, y, 1, text);
 }
 
 static void draw_home(void) {
 	char text[TEXT_ROOM];
-	char heard[TEXT_ROOM];
 
-	line(CALL_ROW, settings.callsign);
+	snprintf(text, sizeof(text), "%s", settings.callsign);
+	fit(text, LAMP_X - 2);
+	display_text_at(0, 0, 1, text);
 	if (ptt_is_lit() && ptt_is_down())
-		display_text(LAMP_X, CALL_ROW, 1, "TX");
+		display_text_at(LAMP_X, 0, 1, "TX");
 	else if (ptt_is_lit())
-		display_text(LAMP_X, CALL_ROW, 1, "RX");
+		display_text_at(LAMP_X, 0, 1, "RX");
 	online_mark();
 	signal_bars();
-	big_frequency();
-	room_line();
-	volume_bar();
-	if (voip_hearing(heard, sizeof(heard))) {
-		snprintf(text, sizeof(text), "HEARD %s", heard);
-		line(LAST_ROW, text);
-	} else {
-		line(LAST_ROW, last_key);
-	}
+	rule(HOME_RULE_Y);
+	big_frequency(HOME_BIG_Y);
+	state_line(HOME_STATE_Y);
+	volume_bar(HOME_VOLUME_Y);
 }
 
 static void draw_choices(const struct choices *these) {
 	int i;
 
-	line(TITLE_ROW, these->title);
-	for (i = 0; i < these->count; i++) {
-		if (i == marked)
-			display_text(MARK_X, MENU_FIRST_ROW + i, 1, ">");
-		display_text(ITEM_X, MENU_FIRST_ROW + i, 1, these->names[i]);
-	}
-	line(LAST_ROW, "ENTER: TAKE MENU: BACK");
+	title(these->title);
+	for (i = 0; i < these->count && i < LIST_ROWS; i++)
+		item(i, i == marked, these->names[i], "");
+	help("ENTER: TAKE   MENU: BACK");
 }
 
 // what a menu item is set to, for the menu's line; nothing for those that
@@ -697,34 +736,29 @@ static void item_value(int of_page, char *text, int room) {
 		snprintf(text, room, "%u", (unsigned)settings.wpm);
 	if (of_page == PAGE_CALLSIGN)
 		snprintf(text, room, "%s", settings.callsign);
+	if (of_page == PAGE_CONTACTS)
+		snprintf(text, room, "%d", contacts_count(&settings));
 	if (of_page == PAGE_SBITX)
-		snprintf(text, room, "%s", service_is_online() ? "ONLINE" : "OFFLINE");
+		snprintf(text, room, "%s", service_is_online() ? "Online" : "Offline");
 	if (of_page == PAGE_WIFI)
 		snprintf(text, room, "%s", settings.ssid);
+	// a value too long for the line, a network's name, is cut
+	fit(text, DISPLAY_WIDE / 2);
 }
 
 static void draw_menu(void) {
-	int i;
-
 	char value[TEXT_ROOM];
-	char text[TEXT_ROOM];
+	int i;
 
 	// the list scrolls to keep the chosen shown
 	if (chosen < menu_top)
 		menu_top = chosen;
 	if (chosen >= menu_top + MENU_ROWS)
 		menu_top = chosen - MENU_ROWS + 1;
-	line(TITLE_ROW, "MENU");
+	title("MENU");
 	for (i = menu_top; i < ITEMS && i < menu_top + MENU_ROWS; i++) {
-		if (i == chosen)
-			display_text(MARK_X, MENU_FIRST_ROW + i - menu_top, 1, ">");
 		item_value(items[i].page, value, sizeof(value));
-		if (value[0] != 0)
-			snprintf(text, sizeof(text), "%s:%s", items[i].name, value);
-		else
-			snprintf(text, sizeof(text), "%s", items[i].name);
-		text[ITEM_COLUMNS] = 0;
-		display_text(ITEM_X, MENU_FIRST_ROW + i - menu_top, 1, text);
+		item(i - menu_top, i == chosen, items[i].name, value);
 	}
 }
 
@@ -732,23 +766,21 @@ static void draw_sbitx(void) {
 	char text[TEXT_ROOM];
 	char shown[AUTH_COOKIE_SHOWN_ROOM];
 
-	line(0, "MY.SBITX.NET");
-	service_describe(text, sizeof(text));
-	line(1, text);
-	line(3, "ADD THIS CODE THERE:");
+	title("MY.SBITX.NET");
+	service_brief(text, sizeof(text));
+	line(0, text);
+	line(1, "Add this code there:");
 	auth_cookie_show(settings.cookie, shown);
-	line(4, shown);
-	line(6, "ENTER: A NEW CODE");
-	line(7, "MENU: BACK");
+	line(2, shown);
+	help("ENTER: NEW   MENU: BACK");
 }
 
 static void draw_new_code(void) {
-	line(0, "MAKE A NEW CODE?");
-	line(2, "THE OLD ONE WILL NO");
-	line(3, "LONGER LET THIS");
-	line(4, "TALKIE IN.");
-	line(6, "ENTER: YES");
-	line(7, "MENU: NO");
+	title("A NEW CODE?");
+	line(0, "The old code will no");
+	line(1, "longer let this");
+	line(2, "talkie in.");
+	help("ENTER: YES   MENU: NO");
 }
 
 static void draw_info(void) {
@@ -756,52 +788,24 @@ static void draw_info(void) {
 	char text[TEXT_ROOM];
 	char address[TEXT_ROOM];
 
-	line(0, "INFO");
-	snprintf(text, sizeof(text), "WIFI %s", settings.ssid);
-	line(1, text);
+	title("INFO");
+	snprintf(text, sizeof(text), "Wifi %s", settings.ssid);
+	line(0, text);
 	network_address(address, sizeof(address));
 	if (address[0] == 0)
-		snprintf(address, sizeof(address), "NOT JOINED");
-	line(2, address);
+		snprintf(address, sizeof(address), "Not joined");
+	line(1, address);
 	if (network_is_up()) {
-		snprintf(text, sizeof(text), "SIGNAL %d DBM", network_rssi());
-		line(3, text);
+		snprintf(text, sizeof(text), "Signal %d dBm", network_rssi());
+		line(2, text);
 	}
-	snprintf(text, sizeof(text), "CALL %s", settings.callsign);
-	line(4, text);
-	speaker_brief(text, sizeof(text));
-	line(5, text);
+	snprintf(text, sizeof(text), "Call %s", settings.callsign);
+	line(3, text);
 	if (microphone_battery(&millivolts) == MICROPHONE_BATTERY)
-		snprintf(text, sizeof(text), "BATTERY %d.%02d V", millivolts / 1000, millivolts % 1000 / 10);
+		snprintf(text, sizeof(text), "Battery %d.%02d V", millivolts / 1000, millivolts % 1000 / 10);
 	else
-		snprintf(text, sizeof(text), "ON USB, " __DATE__);
-	line(6, text);
-	line(7, "MENU: BACK");
-}
-
-// text on rows from row, broken at spaces where it can be, cut after rows
-static void wrapped(int row, int rows, const char *text) {
-	char cut[COLUMNS + 1];
-	int length;
-	int i;
-
-	for (; *text != 0 && rows > 0; row++, rows--) {
-		length = (int)strlen(text);
-		if (length > COLUMNS) {
-			length = COLUMNS;
-			for (i = COLUMNS; i > 0; i--) {
-				if (text[i] == ' ') {
-					length = i;
-					break;
-				}
-			}
-		}
-		snprintf(cut, sizeof(cut), "%.*s", length, text);
-		display_text(0, row, 1, cut);
-		text += length;
-		while (*text == ' ')
-			text++;
-	}
+		snprintf(text, sizeof(text), "On USB");
+	line(4, text);
 }
 
 // a box one dot wide round x, y, wide by high
@@ -815,31 +819,28 @@ static void frame(int x, int y, int wide, int high) {
 // one of halves.c's characters at x, y: in reverse video if it is
 // offered, framed if it is the chosen
 static void letter_at(int x, int y, char c, int is_chosen, int is_offered) {
-	char one[2] = {c, 0};
-
-	display_text_at(x + 1, y, 1, one);
+	display_letter_at(x + 1, y, 1, c);
 	if (is_offered)
 		display_invert(x, y - LETTER_EDGE, LETTER_PITCH - 1, FONT_HIGH + 2 * LETTER_EDGE);
 	else if (is_chosen)
 		frame(x, y - LETTER_EDGE, LETTER_PITCH - 1, FONT_HIGH + 2 * LETTER_EDGE);
 }
 
-// the prompt, the text's end and a cursor, and halves.c's letters, or its
+// the title, the text's end and a cursor, and halves.c's letters, or its
 // figures
-static void draw_entry(const char *prompt, long now) {
-	char text[TEXT_ROWS * COLUMNS + 1];
+static void draw_entry(const char *heading, long now) {
+	char text[TEXT_ROOM];
 	int shown = entry.length;
 	int left;
 	int which;
 	int at;
 
-	wrapped(TITLE_ROW, PROMPT_ROWS, prompt);
-	if (shown > TEXT_ROWS * COLUMNS - 1)
-		shown = TEXT_ROWS * COLUMNS - 1;
-	snprintf(text, sizeof(text), "%s_", entry.text + entry.length - shown);
-	line(TEXT_ROW, text);
-	if ((int)strlen(text) > COLUMNS)
-		line(TEXT_ROW + 1, text + COLUMNS);
+	title(heading);
+	snprintf(text, sizeof(text), "%s_", entry.text);
+	// its end, if it is too long to show whole
+	while (shown > 0 && display_text_wide(text + entry.length - shown, 1) > DISPLAY_WIDE)
+		shown--;
+	line(0, text + entry.length - shown);
 	if (halves.is_figures) {
 		left = (DISPLAY_WIDE - HALVES_FIGURES_ACROSS * LETTER_PITCH) / 2;
 		for (at = 0; at < HALVES_FIGURES_ACROSS; at++)
@@ -854,88 +855,91 @@ static void draw_entry(const char *prompt, long now) {
 					halves_offered(&halves, which, at));
 		}
 	}
-	line(LAST_ROW, entry_help[now / HELP_EVERY_MS % ENTRY_HELPS]);
-}
-
-// a WiFi key: its end, a cursor, and the characters large, the chosen in
-// the middle
-static void draw_key(const char *title, long now) {
-	char text[COLUMNS + 1];
-	char one[2] = "";
-	int x = (DISPLAY_WIDE - (2 * CHOICES_EACH_SIDE + 1) * FONT_STEP * CHOICE_SCALE) / 2;
-	int chosen_x = x + CHOICES_EACH_SIDE * FONT_STEP * CHOICE_SCALE;
-	int shown = entry.length;
-	int i;
-
-	line(TITLE_ROW, title);
-	if (shown > COLUMNS - 1)
-		shown = COLUMNS - 1;
-	snprintf(text, sizeof(text), "%s_", entry.text + entry.length - shown);
-	line(TEXT_ROW, text);
-	for (i = -CHOICES_EACH_SIDE; i <= CHOICES_EACH_SIDE; i++) {
-		one[0] = entry_around(&entry, i);
-		one[1] = 0;
-		display_text(x, CHOICE_ROW, CHOICE_SCALE, one);
-		x += FONT_STEP * CHOICE_SCALE;
-	}
-	if (entry_around(&entry, 0) == ' ')
-		display_text(chosen_x - FONT_STEP * 2, CHOSEN_MARK_ROW, 1, "SPACE");
-	else
-		display_text(chosen_x + FONT_STEP / 2, CHOSEN_MARK_ROW, 1, "^");
-	line(LAST_ROW, key_help[now / HELP_EVERY_MS % KEY_HELPS]);
+	help(entry_help[now / HELP_EVERY_MS % ENTRY_HELPS]);
 }
 
 static void draw_wifi(long now) {
-	char name[NAME_COLUMNS + 1];
 	char ssid[SETTINGS_SSID_ROOM];
 	char text[TEXT_ROOM];
 	int count = network_scanned_count();
-	int row = LIST_FIRST_ROW;
+	int row = 0;
 	int rssi;
 	int is_open;
 	int i;
 
-	line(TITLE_ROW, "WIFI");
+	title("WIFI");
 	if (network_is_scanning()) {
-		line(3, "LISTENING FOR");
-		line(4, "NETWORKS...");
+		line(1, "Listening for");
+		line(2, "networks...");
 		return;
 	}
-	for (i = wifi_top; i <= count && row < LIST_FIRST_ROW + LIST_ROWS; i++, row++) {
-		if (i == wifi_chosen)
-			display_text(MARK_X, row, 1, ">");
+	for (i = wifi_top; i <= count && row < LIST_ROWS; i++, row++) {
 		if (i == count) {
-			display_text(ITEM_X, row, 1, "SCAN AGAIN");
+			item(row, i == wifi_chosen, "Scan again", "");
 			continue;
 		}
 		network_scanned(i, ssid, sizeof(ssid), &rssi, &is_open);
-		snprintf(name, sizeof(name), "%s", ssid);
-		display_text(ITEM_X, row, 1, name);
-		if (known_find(&settings, ssid) >= 0)
-			display_text(KNOWN_X, row, 1, "*");
-		snprintf(text, sizeof(text), "%d", rssi);
-		display_text(RSSI_X, row, 1, text);
+		snprintf(text, sizeof(text), "%s%d", known_find(&settings, ssid) >= 0 ? "* " : "", rssi);
+		item(row, i == wifi_chosen, ssid, text);
 	}
-	line(LAST_ROW, wifi_help[now / HELP_EVERY_MS % WIFI_HELPS]);
+	help(wifi_help[now / HELP_EVERY_MS % WIFI_HELPS]);
 }
 
 static void draw_joining(long now) {
 	char text[TEXT_ROOM];
 
-	line(TITLE_ROW, "WIFI");
-	line(1, wifi_ssid);
+	title("WIFI");
+	line(0, wifi_ssid);
 	network_ssid(text, sizeof(text));
 	if (network_is_up() && !strcmp(text, wifi_ssid)) {
-		line(3, "JOINED");
+		line(1, "Joined");
 		network_address(text, sizeof(text));
-		line(4, text);
+		line(2, text);
 	} else if (now - joining_since_ms < JOIN_SHOWN_MS) {
-		line(3, "JOINING...");
+		line(1, "Joining...");
 	} else {
-		line(3, "NOT JOINED.");
-		line(4, "IS THE KEY RIGHT?");
+		line(1, "Not joined.");
+		line(2, "Is the key right?");
 	}
-	line(LAST_ROW, "MENU: BACK");
+	help("MENU: BACK");
+}
+
+static void draw_setup(void) {
+	char text[TEXT_ROOM];
+
+	title("SETUP");
+	if (!portal_is_open()) {
+		line(1, "It did not start.");
+		help("MENU: BACK");
+		return;
+	}
+	line(0, "On a phone, join");
+	portal_name(text, sizeof(text));
+	line(1, text);
+	line(2, "then open");
+	line(3, "192.168.4.1");
+	if (network_ap_clients() > 0) {
+		snprintf(text, sizeof(text), "%d JOINED   MENU: CLOSE", network_ap_clients());
+		help(text);
+	} else {
+		help("MENU: CLOSE");
+	}
+}
+
+static void draw_contacts(long now) {
+	int count = contacts_count(&settings);
+	int i;
+
+	title("CONTACTS");
+	if (count == 0) {
+		line(0, "None yet.");
+		line(1, "Add them at Setup.");
+		help("MENU: BACK");
+		return;
+	}
+	for (i = 0; i < LIST_ROWS && contacts_top + i < count; i++)
+		line(i, settings.contacts[contacts_top + i]);
+	help(now / HELP_EVERY_MS % 2 ? "ADD THEM AT SETUP" : "UP/DOWN   MENU: BACK");
 }
 
 static void draw(long now) {
@@ -947,31 +951,33 @@ static void draw(long now) {
 	if (page == PAGE_MENU)
 		draw_menu();
 	if (page == PAGE_DIAL) {
-		line(TITLE_ROW, "FREQUENCY, KHZ");
-		big_frequency();
-		line(LAST_ROW, "UP/DOWN, MENU: BACK");
+		title("FREQUENCY, KHZ");
+		big_frequency(PAGE_BIG_Y);
+		help("UP/DOWN   MENU: BACK");
 	}
 	if (choices_of(page) != NULL)
 		draw_choices(choices_of(page));
 	if (page == PAGE_WPM) {
-		line(TITLE_ROW, "MORSE SPEED, WPM");
+		title("MORSE SPEED, WPM");
 		snprintf(text, sizeof(text), "%u", (unsigned)settings.wpm);
-		big(text);
-		line(LAST_ROW, "UP/DOWN, MENU: BACK");
+		big(text, PAGE_BIG_Y);
+		help("UP/DOWN   MENU: BACK");
 	}
 	if (page == PAGE_VOLUME) {
-		line(TITLE_ROW, "VOLUME");
-		volume_bar();
-		line(LAST_ROW, "UP/DOWN, MENU: BACK");
+		title("VOLUME");
+		volume_bar(line_y(1));
+		help("UP/DOWN   MENU: BACK");
 	}
 	if (page == PAGE_CALLSIGN)
-		draw_entry("Enter your callsign:", now);
-	if (page == PAGE_WIFI_KEY)
-		draw_key(wifi_ssid, now);
+		draw_entry("CALLSIGN", now);
 	if (page == PAGE_WIFI)
 		draw_wifi(now);
 	if (page == PAGE_WIFI_JOINING)
 		draw_joining(now);
+	if (page == PAGE_SETUP)
+		draw_setup();
+	if (page == PAGE_CONTACTS)
+		draw_contacts(now);
 	if (page == PAGE_SBITX)
 		draw_sbitx();
 	if (page == PAGE_NEW_CODE)
@@ -986,10 +992,21 @@ void screen_poll(long now) {
 
 	if (keys_poll(now, &press))
 		take(&press, now);
+	if (portal_joined(wifi_ssid, sizeof(wifi_ssid))) {
+		joining_since_ms = now;
+		touched_ms = now;
+		go(PAGE_WIFI_JOINING);
+	}
 	if (page == PAGE_CALLSIGN
 			&& halves_keys(&halves, keys_is_down(KEY_UP), keys_is_down(KEY_DOWN), now, &letter))
 		entry_put(&entry, letter);
-	if (page != PAGE_HOME && page != PAGE_INFO && now - touched_ms >= MENU_IDLE_MS)
+	if (!is_begun) {
+		is_begun = 1;
+		touched_ms = now;
+		if (settings.ssid[0] == 0 && known_count(&settings) == 0)
+			go(PAGE_SETUP);
+	}
+	if (page != PAGE_HOME && page != PAGE_INFO && page != PAGE_SETUP && now - touched_ms >= MENU_IDLE_MS)
 		go(PAGE_HOME);
 	if (is_save_due && now >= save_ms) {
 		is_save_due = 0;

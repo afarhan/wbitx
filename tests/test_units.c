@@ -23,6 +23,7 @@
 #include "../wifitalkie/dial.h"
 #include "../wifitalkie/entry.h"
 #include "../wifitalkie/halves.h"
+#include "../wifitalkie/contacts.h"
 #include "../wifitalkie/known.h"
 #include "../wifitalkie/playback.h"
 #include "../wifitalkie/settings.h"
@@ -492,7 +493,34 @@ static void test_known(void) {
 	expect(known_find(&s, "home") < 0 && known_find(&s, "club0") == SETTINGS_KNOWN - 1,
 		"the one joined longest ago is forgotten for a new one");
 	expect(!known_remember(&s, "", "x"), "a network without a name is not remembered");
+	expect(known_count(&s) == SETTINGS_KNOWN, "the list is full");
+	expect(known_forget(&s, 0) && known_find(&s, "club8") == 0 && known_count(&s) == SETTINGS_KNOWN - 1
+		&& s.known_ssid[SETTINGS_KNOWN - 1][0] == 0, "one forgotten, those after it move up");
+	expect(!known_forget(&s, SETTINGS_KNOWN - 1) && !known_forget(&s, -1), "nothing there, nothing forgotten");
 	printf("known: remembered, last first, the oldest forgotten\n");
+}
+
+static void test_contacts(void) {
+	struct settings s;
+	char call[SETTINGS_CALLSIGN_ROOM];
+	int i;
+
+	memset(&s, 0, sizeof(s));
+	expect(contacts_count(&s) == 0 && contacts_find(&s, "VU2ESE") < 0, "no contacts at first");
+	expect(contacts_add(&s, " vu2ese ") && !strcmp(s.contacts[0], "VU2ESE"), "added in capitals, trimmed");
+	expect(!contacts_add(&s, "VU2ESE"), "not added twice");
+	expect(!contacts_add(&s, "VU2 ESE") && !contacts_add(&s, "VU2-ESE") && !contacts_add(&s, "  "),
+		"not a callsign, not added");
+	expect(!contacts_add(&s, "ABCDEFGHIJKLMNOP"), "too long, not added");
+	expect(contacts_add(&s, "VU3XYZ/P") && contacts_find(&s, "VU3XYZ/P") == 1, "a stroke is kept");
+	expect(contacts_forget(&s, 0) && !strcmp(s.contacts[0], "VU3XYZ/P") && contacts_count(&s) == 1,
+		"one taken out, those after it move up");
+	for (i = 1; i < SETTINGS_CONTACTS; i++) {
+		snprintf(call, sizeof(call), "VU%d", i);
+		contacts_add(&s, call);
+	}
+	expect(contacts_count(&s) == SETTINGS_CONTACTS && !contacts_add(&s, "W1AW"), "full, no more added");
+	printf("contacts: added in capitals, once, taken out\n");
 }
 
 static void test_speech(void) {
@@ -567,6 +595,7 @@ int main(void) {
 	test_entry();
 	test_halves();
 	test_known();
+	test_contacts();
 	test_speech();
 	test_cookie();
 	test_stretch();

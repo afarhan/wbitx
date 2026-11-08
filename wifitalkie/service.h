@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include "auth.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -14,6 +16,8 @@ void service_poll(long now);
 void service_restart(void);
 void service_new_key(void);
 void service_describe(char *text, int room);
+void service_brief(char *text, int room);
+void service_code(char shown[AUTH_COOKIE_SHOWN_ROOM]);
 int service_is_online(void);
 
 #ifdef __cplusplus

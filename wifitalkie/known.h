@@ -13,6 +13,8 @@ extern "C" {
 
 int known_find(const struct settings *s, const char *ssid);
 int known_remember(struct settings *s, const char *ssid, const char *password);
+int known_forget(struct settings *s, int i);
+int known_count(const struct settings *s);
 
 #ifdef __cplusplus
 }

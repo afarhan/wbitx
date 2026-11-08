@@ -11,7 +11,8 @@
 //
 // The WiFi networks joined, up to SETTINGS_KNOWN with their keys (known.c),
 // are kept under "kssid0", "kpass0" and so on, NVS's keys being fifteen
-// characters at most.
+// characters at most. The contacts, up to SETTINGS_CONTACTS callsigns
+// (contacts.c), are kept under "contact0" and on.
 //
 // The cookie is kept here, and its stretch beside it with what it was made
 // for, "<callsign> <cookie>", so that the stretch is not done again at
@@ -84,6 +85,10 @@ void settings_load(void) {
 		snprintf(key, sizeof(key), "kpass%d", i);
 		text_get(handle, key, settings.known_password[i], sizeof(settings.known_password[i]));
 	}
+	for (i = 0; i < SETTINGS_CONTACTS; i++) {
+		snprintf(key, sizeof(key), "contact%d", i);
+		text_get(handle, key, settings.contacts[i], sizeof(settings.contacts[i]));
+	}
 	nvs_close(handle);
 }
 
@@ -115,6 +120,10 @@ void settings_save(void) {
 		nvs_set_str(handle, key, settings.known_ssid[i]);
 		snprintf(key, sizeof(key), "kpass%d", i);
 		nvs_set_str(handle, key, settings.known_password[i]);
+	}
+	for (i = 0; i < SETTINGS_CONTACTS; i++) {
+		snprintf(key, sizeof(key), "contact%d", i);
+		nvs_set_str(handle, key, settings.contacts[i]);
 	}
 	nvs_commit(handle);
 	nvs_close(handle);

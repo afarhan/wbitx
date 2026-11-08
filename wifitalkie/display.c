@@ -151,50 +151,95 @@ void display_invert(int x, int y, int wide, int high) {
 }
 
 // text with its top at the row's, each dot of the font scale by scale
-void display_text(int x, int row, int scale, const char *text) {
-	display_text_at(x, row * DISPLAY_ROW_HIGH, scale, text);
+void display_text(int x, int row, int scale, const char *t) {
+	display_text_at(x, row * DISPLAY_ROW_HIGH, scale, t);
 }
 
-// text with its top at y, a dot's, not a row's
-void display_text_at(int x, int y, int scale, const char *text) {
-	const uint8_t *letter;
+// the letter c of font, its left at x, its top row at y
+static void letter(int font, int x, int y, int scale, char c) {
+	const struct glyph *g = font_glyph(font, c);
 	int column;
 	int bit;
 	int i;
 	int j;
 
-	for (; *text != 0; text++) {
-		letter = font_letter(*text);
-		for (column = 0; column < FONT_WIDE; column++) {
-			for (bit = 0; bit < FONT_HIGH; bit++) {
-				if (!(letter[column] >> bit & 1))
-					continue;
-				for (i = 0; i < scale; i++) {
-					for (j = 0; j < scale; j++)
-						dot(x + column * scale + i, y + bit * scale + j);
-				}
+	for (column = 0; column < g->wide; column++) {
+		for (bit = 0; bit < FONT_MAIN_DEEP; bit++) {
+			if (!(g->columns[column] >> bit & 1))
+				continue;
+			for (i = 0; i < scale; i++) {
+				for (j = 0; j < scale; j++)
+					dot(x + (g->left + column) * scale + i, y + bit * scale + j);
 			}
 		}
-		x += FONT_STEP * scale;
 	}
 }
 
-// a bar wide dots across in the row, an outline with filled of them lit
-void display_bar(int x, int row, int wide, int filled) {
-	int top = row * DISPLAY_ROW_HIGH + 1;
-	int bottom = top + DISPLAY_ROW_HIGH - 3;
+static void text(int font, int x, int y, int scale, const char *t) {
+	for (; *t != 0; t++) {
+		letter(font, x, y, scale, *t);
+		x += font_glyph(font, *t)->advance * scale;
+	}
+}
+
+static int text_wide(int font, const char *t, int scale) {
+	const struct glyph *g = NULL;
+	int across = 0;
+
+	for (; *t != 0; t++) {
+		g = font_glyph(font, *t);
+		across += g->advance * scale;
+	}
+	// the last letter's own width, not its advance
+	if (g != NULL)
+		across += (g->left + g->wide - g->advance) * scale;
+	return across > 0 ? across : 0;
+}
+
+// text in the main font, its top at y, a dot's, not a row's
+void display_text_at(int x, int y, int scale, const char *t) {
+	text(FONT_MAIN, x, y, scale, t);
+}
+
+// how wide text in the main font is, in dots
+int display_text_wide(const char *t, int scale) {
+	return text_wide(FONT_MAIN, t, scale);
+}
+
+// text in the small font, for titles and help
+void display_small_at(int x, int y, const char *t) {
+	text(FONT_SMALL, x, y, 1, t);
+}
+
+int display_small_wide(const char *t) {
+	return text_wide(FONT_SMALL, t, 1);
+}
+
+// one letter of the small font in the middle of a cell FONT_WIDE dots
+// wide, for letters kept in columns
+void display_letter_at(int x, int y, int scale, char c) {
+	const struct glyph *g = font_glyph(FONT_SMALL, c);
+
+	letter(FONT_SMALL, x + (FONT_WIDE - g->wide) / 2 * scale, y, scale, c);
+}
+
+// a bar wide dots across, its top at y and as high as a capital, an
+// outline with filled of them lit
+void display_bar(int x, int y, int wide, int filled) {
+	int top = y;
+	int bottom = top + FONT_MAIN_HIGH - 1;
 	int i;
-	int y;
+	int j;
 
 	for (i = 0; i < wide; i++) {
 		dot(x + i, top);
 		dot(x + i, bottom);
-		for (y = top; y <= bottom && i < filled; y++)
-			dot(x + i, y);
+		for (j = top; j <= bottom && i < filled; j++)
+			dot(x + i, j);
 	}
-	for (y = top; y <= bottom; y++) {
-		dot(x, y);
-		dot(x + wide - 1, y);
+	for (j = top; j <= bottom; j++) {
+		dot(x, j);
+		dot(x + wide - 1, j);
 	}
 }
 

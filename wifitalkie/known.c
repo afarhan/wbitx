@@ -9,7 +9,8 @@
 // joined longest ago forgotten to make room. network.cpp remembers each
 // network as it is joined, tries the others when the one it was given is
 // not heard, and the screen joins one remembered without its key being
-// entered again. It knows nothing of the ESP32, so tests/test_units.c tries
+// entered again. The setup portal (portal.cpp) adds to it and forgets
+// from it. It knows nothing of the ESP32, so tests/test_units.c tries
 // it.
 
 #include <stdio.h>
@@ -48,4 +49,26 @@ int known_remember(struct settings *s, const char *ssid, const char *password) {
 	snprintf(s->known_ssid[0], sizeof(s->known_ssid[0]), "%s", ssid);
 	snprintf(s->known_password[0], sizeof(s->known_password[0]), "%s", password);
 	return 1;
+}
+
+// the i'th forgotten, those after it moved up; 1 if there was one
+int known_forget(struct settings *s, int i) {
+	if (i < 0 || i >= SETTINGS_KNOWN || s->known_ssid[i][0] == 0)
+		return 0;
+	for (; i < SETTINGS_KNOWN - 1; i++) {
+		memcpy(s->known_ssid[i], s->known_ssid[i + 1], sizeof(s->known_ssid[i]));
+		memcpy(s->known_password[i], s->known_password[i + 1], sizeof(s->known_password[i]));
+	}
+	s->known_ssid[i][0] = 0;
+	s->known_password[i][0] = 0;
+	return 1;
+}
+
+// how many are remembered
+int known_count(const struct settings *s) {
+	int i;
+
+	for (i = 0; i < SETTINGS_KNOWN && s->known_ssid[i][0] != 0; i++)
+		;
+	return i;
 }

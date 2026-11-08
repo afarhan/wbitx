@@ -22,6 +22,8 @@
 //     verbs.c          what can be typed
 //     settings.c       what is kept across power-ups
 //     network.cpp      the WiFi access point
+//     portal.cpp       the setup portal: networks and contacts, on a phone
+//     known.c          the networks remembered, contacts.c the callsigns
 //     service.c        the line to my.sbitx.net, the handshake
 //     auth.c           the cookie, the stretch, the proofs and keys
 //     voip.c           the stream by UDP, what is sent and heard
@@ -41,6 +43,7 @@
 #include "console.h"
 #include "microphone.h"
 #include "network.h"
+#include "portal.h"
 #include "ptt.h"
 #include "screen.h"
 #include "service.h"
@@ -81,6 +84,7 @@ void loop() {
 		verbs_do(line, now);
 	TIMED(verbs_poll(now));
 	TIMED(network_poll(now));
+	TIMED(portal_poll(now));
 	TIMED(ptt_poll(now));
 	TIMED(microphone_poll(now));
 	TIMED(service_poll(now));

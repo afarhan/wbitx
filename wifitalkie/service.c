@@ -129,6 +129,7 @@ static int is_allows_told;
 static char name[NAME_ROOM];
 static char failed_because[TEXT_ROOM];
 static char status[STATUS_ROOM];
+static int is_refused;
 static int is_restart_asked;
 static TaskHandle_t connector;
 static struct settings asked;
@@ -372,6 +373,7 @@ static void connected(long now) {
 	int result = connect_result;
 
 	state = STATE_WAITING;
+	is_refused = result == AUTH_REFUSED;
 	if (result == AUTH_REFUSED) {
 		console_say("SERVICE SAYS %s", failed_because);
 		wait_to_retry(now, REFUSED_RETRY_MS);
@@ -521,11 +523,20 @@ void service_open(void) {
 
 // a new cookie, for NEW_KEY and the screen's NEW CODE: the old one is
 // forgotten, a new one made at the next turn, and the line made again
+static void have_a_cookie(void);
+
+// a new code, made at once, the old forgotten
 void service_new_key(void) {
 	settings.cookie[0] = 0;
 	settings.stretched_for[0] = 0;
-	settings_save();
+	have_a_cookie();
 	service_restart();
+}
+
+// the code to add at my.sbitx.net, made first if there is none yet
+void service_code(char shown[AUTH_COOKIE_SHOWN_ROOM]) {
+	have_a_cookie();
+	auth_cookie_show(settings.cookie, shown);
 }
 
 // after a change to what the line is made with: it is made again
@@ -569,6 +580,26 @@ void service_poll(long now) {
 		go_online(now);
 	if (state == STATE_ONLINE)
 		line_poll(now);
+}
+
+// a few words for the home page, in place of the status, which can be
+// long: the code to add is on the MY.SBITX.NET page, not here
+void service_brief(char *text, int room) {
+	const char *said = "Offline";
+
+	if (state == STATE_ONLINE)
+		said = "Online";
+	else if (!settings.is_voip_online)
+		said = "VoIP off";
+	else if (settings.callsign[0] == 0)
+		said = "Set the callsign";
+	else if (!network_is_up())
+		said = "No WiFi";
+	else if (is_refused)
+		said = "Code not added";
+	else if (state == STATE_CONNECTING)
+		said = "Connecting";
+	snprintf(text, room, "%s", said);
 }
 
 int service_is_online(void) {

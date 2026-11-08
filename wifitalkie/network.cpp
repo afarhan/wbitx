@@ -27,7 +27,17 @@
 // SETTINGS_KNOWN of them. When the one set is not joined within
 // JOIN_WAIT_MS, the others remembered are tried in turn, each for as long,
 // and then the one set again; one joined so becomes the one set. A talkie
-// carried from home to a hotspot finds its way without being told.
+// carried from home to a hotspot finds its way without being told. A
+// network the driver says is not heard at all (reason 201) is left after
+// NOT_HEARD_MS, not JOIN_WAIT_MS, so that ten remembered are gone through
+// quickly. With none set, the remembered are tried all the same.
+//
+// network_ap_begin() puts up an access point of the talkie's own beside
+// the one it joins, for the setup portal (portal.cpp), and network_ap_end()
+// takes it down. While it is up the turn of the remembered is held: a
+// join being tried hops the radio from channel to channel, and the
+// telephone on the talkie's access point would lose it. A join asked for
+// at the portal is still made.
 //
 // network_scan_begin() lists the networks in hearing for the screen,
 // without holding the loop up: the driver scans by itself, network_poll()
@@ -53,6 +63,8 @@
 #define HOSTNAME "wifitalkie"
 #define TX_POWER WIFI_POWER_8_5dBm
 #define JOIN_WAIT_MS 20000
+#define NOT_HEARD_MS 3000
+#define REASON_NOT_HEARD 201
 #define SCAN_MOST 12
 
 static int was_up;
@@ -61,6 +73,9 @@ static int tried;
 static long join_began_ms;
 static int is_scanning;
 static int is_join_after_scan;
+static int is_held;
+static int is_ap_up;
+static volatile int is_not_heard;
 static char scanned_ssid[SCAN_MOST][SETTINGS_SSID_ROOM];
 static int scanned_rssi[SCAN_MOST];
 static int scanned_open[SCAN_MOST];
@@ -77,6 +92,8 @@ static void on_lost(arduino_event_id_t event, arduino_event_info_t info) {
 	int reason = info.wifi_sta_disconnected.reason;
 
 	(void)event;
+	if (reason == REASON_NOT_HEARD)
+		is_not_heard = 1;
 	if (reason == reason_said)
 		return;
 	reason_said = reason;
@@ -103,11 +120,18 @@ static void begin(const char *ssid, const char *password) {
 }
 
 // the network set, from the start of the turn of those remembered
+static void try_next(void);
+
 void network_join(void) {
 	tried = 0;
+	is_not_heard = 0;
+	if (settings.ssid[0] == 0 && known_count(&settings) > 0) {
+		try_next();
+		return;
+	}
 	if (settings.ssid[0] == 0) {
 		WiFi.disconnect();
-		console_say("WIFI NOT SET: WIFI <ssid> <password>");
+		console_say("WIFI NOT SET: WIFI <ssid> <password>, OR SETUP");
 		return;
 	}
 	begin(settings.ssid, settings.password);
@@ -115,6 +139,7 @@ void network_join(void) {
 
 // the next remembered network after the one tried, or the one set again
 static void try_next(void) {
+	is_not_heard = 0;
 	while (++tried <= SETTINGS_KNOWN) {
 		if (settings.known_ssid[tried - 1][0] != 0
 				&& strcmp(settings.known_ssid[tried - 1], settings.ssid)) {
@@ -214,7 +239,8 @@ static void scan_poll(void) {
 	WiFi.scanDelete();
 	if (is_join_after_scan) {
 		is_join_after_scan = 0;
-		network_join();
+		if (!is_held)
+			network_join();
 	}
 }
 
@@ -225,7 +251,8 @@ void network_poll(long now) {
 		scan_poll();
 	if (is_off)
 		return;
-	if (!is_up && !is_scanning && settings.ssid[0] != 0 && now - join_began_ms >= JOIN_WAIT_MS)
+	if (!is_up && !is_scanning && !is_held && (settings.ssid[0] != 0 || known_count(&settings) > 0)
+			&& (now - join_began_ms >= JOIN_WAIT_MS || (is_not_heard && now - join_began_ms >= NOT_HEARD_MS)))
 		try_next();
 	if (is_up == was_up)
 		return;
@@ -332,4 +359,42 @@ void network_describe(char *text, int room) {
 	}
 	snprintf(text, room, "UP %s %s RSSI %d", settings.ssid,
 		WiFi.localIP().toString().c_str(), (int)WiFi.RSSI());
+}
+
+// the talkie's own access point, open, named name, beside the one joined;
+// the turn of the remembered held while it is up
+int network_ap_begin(const char *name) {
+	is_held = 1;
+	if (!network_is_up())
+		WiFi.disconnect();
+	WiFi.mode(WIFI_AP_STA);
+	if (!WiFi.softAP(name)) {
+		console_say("SETUP: THE ACCESS POINT DID NOT START");
+		network_ap_end();
+		return 0;
+	}
+	WiFi.setTxPower(TX_POWER);
+	is_ap_up = 1;
+	console_say("SETUP: ACCESS POINT %s AT %s", name, WiFi.softAPIP().toString().c_str());
+	return 1;
+}
+
+void network_ap_end(void) {
+	if (is_ap_up)
+		WiFi.softAPdisconnect(true);
+	is_ap_up = 0;
+	is_held = 0;
+	WiFi.mode(WIFI_STA);
+	WiFi.setTxPower(TX_POWER);
+	if (!network_is_up())
+		network_join();
+}
+
+void network_ap_address(char *text, int room) {
+	snprintf(text, room, "%s", WiFi.softAPIP().toString().c_str());
+}
+
+// the telephones and such on the talkie's access point
+int network_ap_clients(void) {
+	return is_ap_up ? (int)WiFi.softAPgetStationNum() : 0;
 }

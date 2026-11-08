@@ -24,6 +24,10 @@ int network_is_up(void);
 void network_address(char *text, int room);
 int network_rssi(void);
 void network_describe(char *text, int room);
+int network_ap_begin(const char *name);
+void network_ap_end(void);
+void network_ap_address(char *text, int room);
+int network_ap_clients(void);
 
 #ifdef __cplusplus
 }
