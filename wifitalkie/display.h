@@ -31,6 +31,7 @@ void display_poll(void);
 void display_describe(char *text, int room);
 void display_off(void);
 void display_on(void);
+void display_white(int is_white);
 
 #ifdef __cplusplus
 }

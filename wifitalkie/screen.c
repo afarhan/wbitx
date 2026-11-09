@@ -12,17 +12,14 @@
 //
 // The home page, the talkie at rest:
 //
-//     VU2ESE         TX  o  ||||     the callsign; TX or RX; a dot, filled
-//     -------------------------      when online at my.sbitx.net; the
-//                                    WiFi's signal in four bars
+//     3.9V    VU2ESE    o 90%       the supply, as on the menu; the
+//     -------------------------      callsign; a dot, filled when online
+//                                    at my.sbitx.net; the WiFi's signal
 //          21080                     the channel, in kHz, large
-//     2 here                         who speaks, or how many are in the
+//     2 here                  TX     who speaks, or how many are in the
 //                                    room, or, not online, a few words on
-//                                    why (service_brief())
+//                                    why (service_brief()); TX or RX
 //     Vol [#########     ] 50        the volume
-//
-// The bars: four at BARS_FOUR_DBM and above, then one fewer for each
-// BARS_STEP_DB below it, none when the WiFi is not joined.
 //
 // On it ENTER is the PTT: the talkie speaks while it is held (ptt.c). UP
 // and DOWN set the volume, VOLUME_STEP a press, repeating while held. MENU
@@ -30,32 +27,36 @@
 //
 // The menu is a list, UP and DOWN to choose, ENTER to open; each page it
 // opens goes back to it with MENU, and the menu to the home page. MENU
-// held goes home from anywhere, and so does MENU_IDLE_MS untouched:
+// held goes home from anywhere, and so does MENU_IDLE_MS untouched. Its
+// title shows the supply at the left, 3.9V, or USB, and the WiFi's signal
+// at the right, 90%. A name ending in "..." opens what is beyond:
 //
-//     FREQUENCY      the channel, large; UP and DOWN step it in dial.c's
+//     Frequency      the channel, large; UP and DOWN step it in dial.c's
 //                    kilohertz steps, faster the longer they are held
-//     VOLUME         the volume
-//     AUDIO          the in-built mic or the handsfree's
-//     MORSE WPM      the Morse speed for entering text, large; UP and
-//                    DOWN step it, from HALVES_WPM_LEAST to HALVES_WPM_MOST
-//     CALLSIGN       entered a character at a time, below
-//     CONTACTS       the callsigns kept, added and deleted at SETUP
-//     MY.SBITX.NET   the code to add on the website, the service's state;
-//                    ENTER asks for a new code, ENTER again makes it
-//     WIFI           the networks heard, strongest first, with their
+//     WiFi           the networks heard, strongest first, with their
 //                    signal, * by those remembered; ENTER joins one that
 //                    is open or remembered; one with a key not known, or
-//                    ENTER held for a new key, opens SETUP; the last item
+//                    ENTER held for a new key, opens Setup; the last item
 //                    scans again. Then a page says whether it joined.
-//     SETUP          the setup portal (portal.cpp), open while the page
-//                    is shown: what to join on a telephone and where to
-//                    go. It opens by itself at power-up when the talkie
-//                    knows no network.
-//     INFO           the network, the address, the signal, the speaker,
-//                    the battery
-//     SLEEP          the talkie asleep, until any key wakes it (sleep.c)
+//     Contacts       the callsigns kept, added and deleted at Setup
+//     Sleep          the talkie asleep, until any key wakes it (sleep.c)
+//     Settings...    a list of its own, MENU back to the menu:
+//         Audio          the in-built mic or the handsfree's
+//         Morse speed    for entering text, large; UP and DOWN step it,
+//                        from HALVES_WPM_LEAST to HALVES_WPM_MOST
+//         Callsign       entered a character at a time, below
+//         Setup...       the setup portal (portal.cpp), open while the
+//                        page is shown: what to join on a telephone and
+//                        where to go. It opens by itself at power-up when
+//                        the talkie knows no network.
+//         Theme          Black, lit dots on black, or White, the display
+//                        turned over
+//         Info           the network, the address, the signal, the
+//                        callsign, the battery
 //
-// INFO and SETUP stay up; the others go home when idle.
+// The volume is UP and DOWN on the home page.
+//
+// Info and Setup stay up; the others go home when idle.
 //
 // The callsign is entered on a page of its own:
 //
@@ -117,29 +118,20 @@
 #define VOLUME_STEP 5
 #define MENU_IDLE_MS 30000
 #define TEXT_ROOM 64
-#define RULE_Y 8
-#define LINES_Y 10
+#define RULE_Y 9
+#define LINES_Y 11
 #define LINE_PITCH 11
 #define MENU_ROWS 5
 #define LIST_ROWS 4
 #define HELP_Y 57
 #define BIG_SCALE 3
 #define PAGE_BIG_Y 18
-#define HOME_RULE_Y 9
 #define HOME_BIG_Y 12
 #define HOME_STATE_Y 39
 #define HOME_VOLUME_Y 52
-#define LAMP_X 72
-#define ONLINE_X 92
 #define ONLINE_Y 1
 #define ONLINE_SIZE 7
-#define BARS_X 106
-#define BARS 4
-#define BAR_STEP_X 5
-#define BAR_THICK 3
-#define BAR_RISE 2
-#define BARS_FOUR_DBM (-55)
-#define BARS_STEP_DB 10
+#define ONLINE_GAP 3
 #define BAR_X 22
 #define BAR_WIDE 80
 #define MARK_X 0
@@ -158,10 +150,7 @@
 #define PAGE_HOME 0
 #define PAGE_MENU 1
 #define PAGE_DIAL 2
-#define PAGE_VOLUME 3
 #define PAGE_CALLSIGN 4
-#define PAGE_SBITX 5
-#define PAGE_NEW_CODE 6
 #define PAGE_WIFI 7
 #define PAGE_INFO 8
 #define PAGE_SETUP 9
@@ -170,27 +159,47 @@
 #define PAGE_WPM 12
 #define PAGE_SLEEP 13
 #define PAGE_CONTACTS 14
+#define PAGE_SETTINGS 15
+#define PAGE_THEME 16
 
 struct item {
 	const char *name;
 	int page;
 };
 
-static const struct item items[] = {
+// The menu and, a level below it, the settings; a name ending in an
+// ellipsis opens a list or a page of its own beyond
+static const struct item main_items[] = {
 	{"Frequency", PAGE_DIAL},
-	{"Volume", PAGE_VOLUME},
+	{"WiFi", PAGE_WIFI},
+	{"Contacts", PAGE_CONTACTS},
+	{"Sleep", PAGE_SLEEP},
+	{"Settings...", PAGE_SETTINGS},
+};
+
+static const struct item settings_items[] = {
 	{"Audio", PAGE_AUDIO},
 	{"Morse speed", PAGE_WPM},
 	{"Callsign", PAGE_CALLSIGN},
-	{"Contacts", PAGE_CONTACTS},
-	{"My.sbitx.net", PAGE_SBITX},
-	{"Wifi", PAGE_WIFI},
-	{"Setup", PAGE_SETUP},
+	{"Setup...", PAGE_SETUP},
+	{"Theme", PAGE_THEME},
 	{"Info", PAGE_INFO},
-	{"Sleep", PAGE_SLEEP},
 };
 
-#define ITEMS ((int)(sizeof(items) / sizeof(items[0])))
+struct menu {
+	const char *title;
+	const struct item *items;
+	int count;
+};
+
+#define MAIN_MENU 0
+#define SETTINGS_MENU 1
+#define MENUS 2
+
+static const struct menu menus[MENUS] = {
+	{"Menu", main_items, (int)(sizeof(main_items) / sizeof(main_items[0]))},
+	{"Settings", settings_items, (int)(sizeof(settings_items) / sizeof(settings_items[0]))},
+};
 #define MENU_ROWS 5
 
 // A page of choices, the pattern for a setting with a few values: the mark
@@ -214,8 +223,9 @@ static int is_save_due;
 static char last_key[TEXT_ROOM];
 static long touched_ms;
 static int page = PAGE_HOME;
-static int chosen;
-static int menu_top;
+static int level;
+static int chosen[MENUS];
+static int menu_top[MENUS];
 static struct entry entry;
 static struct halves halves;
 
@@ -250,6 +260,7 @@ static int is_begun;
 void screen_open(void) {
 	keys_open();
 	display_open();
+	display_white(settings.is_white != 0);
 }
 
 static void say_key(const struct key_press *press) {
@@ -337,8 +348,25 @@ static void audio_take(int chosen_one) {
 	microphone_pin(settings.is_headset ? PIN_HEADSET_MIC : PIN_MICROPHONE);
 }
 
+// THEME: lit dots on black, or dark dots on white, the whole display
+// turned over by the display itself (display_white())
+static const char *const theme_names[] = {"Black", "White"};
+
+static int theme_in_use(void) {
+	return settings.is_white ? 1 : 0;
+}
+
+static void theme_take(int chosen_one) {
+	if ((uint32_t)chosen_one == settings.is_white)
+		return;
+	settings.is_white = (uint32_t)chosen_one;
+	settings_save();
+	display_white(chosen_one);
+}
+
 static const struct choices all_choices[] = {
-	{PAGE_AUDIO, "AUDIO", audio_names, 2, audio_in_use, audio_take},
+	{PAGE_AUDIO, "Audio", audio_names, 2, audio_in_use, audio_take},
+	{PAGE_THEME, "Theme", theme_names, 2, theme_in_use, theme_take},
 };
 
 #define ALL_CHOICES ((int)(sizeof(all_choices) / sizeof(all_choices[0])))
@@ -375,22 +403,38 @@ static int is_up_or_down(const struct key_press *press) {
 
 static void take_home(const struct key_press *press, long now) {
 	if (press->key == KEY_MENU) {
+		level = MAIN_MENU;
+		chosen[MAIN_MENU] = 0;
 		go(PAGE_MENU);
-		chosen = 0;
 		return;
 	}
 	if (is_up_or_down(press))
 		volume_step(press, now);
 }
 
+// UP and DOWN choose, ENTER opens, MENU goes up a level, or home
 static void take_menu(const struct key_press *press) {
+	const struct menu *in = &menus[level];
+	int *at = &chosen[level];
+	int to = in->items[*at].page;
+
+	if (press->key == KEY_MENU && level == SETTINGS_MENU) {
+		level = MAIN_MENU;
+		return;
+	}
 	if (press->key == KEY_MENU)
 		go(PAGE_HOME);
 	if (press->key == KEY_UP)
-		chosen = (chosen + ITEMS - 1) % ITEMS;
+		*at = (*at + in->count - 1) % in->count;
 	if (press->key == KEY_DOWN)
-		chosen = (chosen + 1) % ITEMS;
-	if (press->key == KEY_ENTER && items[chosen].page == PAGE_SLEEP) {
+		*at = (*at + 1) % in->count;
+	if (press->key == KEY_ENTER && to == PAGE_SETTINGS) {
+		level = SETTINGS_MENU;
+		chosen[SETTINGS_MENU] = 0;
+		menu_top[SETTINGS_MENU] = 0;
+		return;
+	}
+	if (press->key == KEY_ENTER && to == PAGE_SLEEP) {
 		if (is_save_due) {
 			is_save_due = 0;
 			settings_save();
@@ -400,7 +444,7 @@ static void take_menu(const struct key_press *press) {
 		return;
 	}
 	if (press->key == KEY_ENTER)
-		go(items[chosen].page);
+		go(to);
 }
 
 // the network chosen, wifi_ssid, set and joined with this key
@@ -501,29 +545,12 @@ static void contacts_scroll(int is_up) {
 }
 
 static void take_page(const struct key_press *press, long now) {
-	if (page == PAGE_NEW_CODE) {
-		if (press->key == KEY_ENTER) {
-			service_new_key();
-			console_say("NEW CODE MADE; ADD IT AT MY.SBITX.NET IN PLACE OF THE OLD");
-		}
-		if (press->key == KEY_ENTER || press->key == KEY_MENU)
-			go(PAGE_SBITX);
-		return;
-	}
-	if (page == PAGE_SBITX && press->key == KEY_ENTER) {
-		go(PAGE_NEW_CODE);
-		return;
-	}
 	if (page == PAGE_DIAL && is_up_or_down(press)) {
 		dial_turn(press, now);
 		return;
 	}
 	if (choices_of(page) != NULL) {
 		take_choices(choices_of(page), press);
-		return;
-	}
-	if (page == PAGE_VOLUME && is_up_or_down(press)) {
-		volume_step(press, now);
 		return;
 	}
 	if (page == PAGE_WPM && is_up_or_down(press)) {
@@ -601,10 +628,9 @@ static void rule(int y) {
 	display_fill(0, y, DISPLAY_WIDE, 1);
 }
 
-// the title in the small font in the middle of the top, and the rule under
-// it
+// the title in the middle of the top, and the rule under it
 static void title(const char *text) {
-	display_small_at((DISPLAY_WIDE - display_small_wide(text)) / 2, 0, text);
+	display_text_at((DISPLAY_WIDE - display_text_wide(text, 1)) / 2, 0, 1, text);
 	rule(RULE_Y);
 }
 
@@ -634,43 +660,22 @@ static void volume_bar(int y) {
 	display_text_at(DISPLAY_WIDE - display_text_wide(text, 1), y, 1, text);
 }
 
-// a dot, filled when online at my.sbitx.net, a ring when not
-static void online_mark(void) {
+static void status_row(const char *middle, int is_online_shown);
+
+// a dot at x, filled when online at my.sbitx.net, a ring when not
+static void online_mark(int x) {
 	int edge = ONLINE_SIZE - 1;
 	int y = ONLINE_Y;
 
 	if (service_is_online()) {
-		display_fill(ONLINE_X + 1, y, ONLINE_SIZE - 2, ONLINE_SIZE);
-		display_fill(ONLINE_X, y + 1, ONLINE_SIZE, ONLINE_SIZE - 2);
+		display_fill(x + 1, y, ONLINE_SIZE - 2, ONLINE_SIZE);
+		display_fill(x, y + 1, ONLINE_SIZE, ONLINE_SIZE - 2);
 		return;
 	}
-	display_fill(ONLINE_X + 1, y, ONLINE_SIZE - 2, 1);
-	display_fill(ONLINE_X + 1, y + edge, ONLINE_SIZE - 2, 1);
-	display_fill(ONLINE_X, y + 1, 1, ONLINE_SIZE - 2);
-	display_fill(ONLINE_X + edge, y + 1, 1, ONLINE_SIZE - 2);
-}
-
-// the WiFi's signal, bars rising left to right from the foot of the
-// capitals; those not earned a line
-static void signal_bars(void) {
-	int earned = 0;
-	int rssi = network_rssi();
-	int high;
-	int i;
-
-	if (network_is_up()) {
-		earned = BARS - (BARS_FOUR_DBM - rssi + BARS_STEP_DB - 1) / BARS_STEP_DB;
-		if (rssi >= BARS_FOUR_DBM)
-			earned = BARS;
-		if (earned < 0)
-			earned = 0;
-	}
-	for (i = 0; i < BARS; i++) {
-		high = 1;
-		if (i < earned)
-			high = (i + 1) * BAR_RISE;
-		display_fill(BARS_X + i * BAR_STEP_X, FONT_MAIN_HIGH - high, BAR_THICK, high);
-	}
+	display_fill(x + 1, y, ONLINE_SIZE - 2, 1);
+	display_fill(x + 1, y + edge, ONLINE_SIZE - 2, 1);
+	display_fill(x, y + 1, 1, ONLINE_SIZE - 2);
+	display_fill(x + edge, y + 1, 1, ONLINE_SIZE - 2);
 }
 
 // who speaks; or how many are in the room; or, not online, a few words
@@ -690,22 +695,17 @@ static void state_line(int y) {
 	} else {
 		text[0] = 0;
 	}
+	if (ptt_is_lit())
+		fit(text, DISPLAY_WIDE - display_text_wide("TX", 1) - VALUE_GAP);
 	display_text_at(0, y, 1, text);
+	if (ptt_is_lit() && ptt_is_down())
+		display_text_at(DISPLAY_WIDE - display_text_wide("TX", 1), y, 1, "TX");
+	else if (ptt_is_lit())
+		display_text_at(DISPLAY_WIDE - display_text_wide("RX", 1), y, 1, "RX");
 }
 
 static void draw_home(void) {
-	char text[TEXT_ROOM];
-
-	snprintf(text, sizeof(text), "%s", settings.callsign);
-	fit(text, LAMP_X - 2);
-	display_text_at(0, 0, 1, text);
-	if (ptt_is_lit() && ptt_is_down())
-		display_text_at(LAMP_X, 0, 1, "TX");
-	else if (ptt_is_lit())
-		display_text_at(LAMP_X, 0, 1, "RX");
-	online_mark();
-	signal_bars();
-	rule(HOME_RULE_Y);
+	status_row(settings.callsign, 1);
 	big_frequency(HOME_BIG_Y);
 	state_line(HOME_STATE_Y);
 	volume_bar(HOME_VOLUME_Y);
@@ -730,57 +730,84 @@ static void item_value(int of_page, char *text, int room) {
 		snprintf(text, room, "%s", these->names[these->in_use()]);
 	if (of_page == PAGE_DIAL)
 		snprintf(text, room, "%u", (unsigned)(settings.hz / HZ_A_KHZ));
-	if (of_page == PAGE_VOLUME)
-		snprintf(text, room, "%u", (unsigned)settings.volume);
 	if (of_page == PAGE_WPM)
 		snprintf(text, room, "%u", (unsigned)settings.wpm);
 	if (of_page == PAGE_CALLSIGN)
 		snprintf(text, room, "%s", settings.callsign);
 	if (of_page == PAGE_CONTACTS)
 		snprintf(text, room, "%d", contacts_count(&settings));
-	if (of_page == PAGE_SBITX)
-		snprintf(text, room, "%s", service_is_online() ? "Online" : "Offline");
 	if (of_page == PAGE_WIFI)
 		snprintf(text, room, "%s", settings.ssid);
+	if (of_page == PAGE_CONTACTS && contacts_count(&settings) == 0)
+		text[0] = 0;
 	// a value too long for the line, a network's name, is cut
 	fit(text, DISPLAY_WIDE / 2);
 }
 
+// the top row of the home page and the menus: the supply at the left,
+// 3.9V, USB, or -- before it is read; the WiFi's signal at the right, as a
+// percentage, 2 for each dB above -100, or -- when not joined, with the
+// online mark before it if is_online_shown; middle in the middle, cut to
+// fit between them; and the rule under it all
+static void status_row(const char *middle, int is_online_shown) {
+	char left[TEXT_ROOM];
+	char right[TEXT_ROOM];
+	char cut[TEXT_ROOM];
+	int millivolts;
+	int supply = microphone_battery(&millivolts);
+	int percent;
+	int right_x;
+	int side;
+
+	if (supply == MICROPHONE_BATTERY)
+		snprintf(left, sizeof(left), "%d.%dV", millivolts / 1000, millivolts % 1000 / 100);
+	else if (supply == MICROPHONE_USB)
+		snprintf(left, sizeof(left), "USB");
+	else
+		snprintf(left, sizeof(left), "--");
+	display_text_at(0, 0, 1, left);
+	if (network_is_up()) {
+		percent = 2 * (network_rssi() + 100);
+		if (percent > 100)
+			percent = 100;
+		if (percent < 0)
+			percent = 0;
+		snprintf(right, sizeof(right), "%d%%", percent);
+	} else {
+		snprintf(right, sizeof(right), "--");
+	}
+	right_x = DISPLAY_WIDE - display_text_wide(right, 1);
+	display_text_at(right_x, 0, 1, right);
+	if (is_online_shown) {
+		right_x -= ONLINE_SIZE + ONLINE_GAP;
+		online_mark(right_x);
+	}
+	side = display_text_wide(left, 1);
+	if (DISPLAY_WIDE - right_x > side)
+		side = DISPLAY_WIDE - right_x;
+	snprintf(cut, sizeof(cut), "%s", middle);
+	fit(cut, DISPLAY_WIDE - 2 * (side + ONLINE_GAP));
+	display_text_at((DISPLAY_WIDE - display_text_wide(cut, 1)) / 2, 0, 1, cut);
+	rule(RULE_Y);
+}
+
 static void draw_menu(void) {
+	const struct menu *in = &menus[level];
 	char value[TEXT_ROOM];
+	int *top = &menu_top[level];
+	int at = chosen[level];
 	int i;
 
 	// the list scrolls to keep the chosen shown
-	if (chosen < menu_top)
-		menu_top = chosen;
-	if (chosen >= menu_top + MENU_ROWS)
-		menu_top = chosen - MENU_ROWS + 1;
-	title("MENU");
-	for (i = menu_top; i < ITEMS && i < menu_top + MENU_ROWS; i++) {
-		item_value(items[i].page, value, sizeof(value));
-		item(i - menu_top, i == chosen, items[i].name, value);
+	if (at < *top)
+		*top = at;
+	if (at >= *top + MENU_ROWS)
+		*top = at - MENU_ROWS + 1;
+	status_row(in->title, 0);
+	for (i = *top; i < in->count && i < *top + MENU_ROWS; i++) {
+		item_value(in->items[i].page, value, sizeof(value));
+		item(i - *top, i == at, in->items[i].name, value);
 	}
-}
-
-static void draw_sbitx(void) {
-	char text[TEXT_ROOM];
-	char shown[AUTH_COOKIE_SHOWN_ROOM];
-
-	title("MY.SBITX.NET");
-	service_brief(text, sizeof(text));
-	line(0, text);
-	line(1, "Add this code there:");
-	auth_cookie_show(settings.cookie, shown);
-	line(2, shown);
-	help("ENTER: NEW   MENU: BACK");
-}
-
-static void draw_new_code(void) {
-	title("A NEW CODE?");
-	line(0, "The old code will no");
-	line(1, "longer let this");
-	line(2, "talkie in.");
-	help("ENTER: YES   MENU: NO");
 }
 
 static void draw_info(void) {
@@ -788,7 +815,7 @@ static void draw_info(void) {
 	char text[TEXT_ROOM];
 	char address[TEXT_ROOM];
 
-	title("INFO");
+	title("Info");
 	snprintf(text, sizeof(text), "Wifi %s", settings.ssid);
 	line(0, text);
 	network_address(address, sizeof(address));
@@ -867,7 +894,7 @@ static void draw_wifi(long now) {
 	int is_open;
 	int i;
 
-	title("WIFI");
+	title("WiFi");
 	if (network_is_scanning()) {
 		line(1, "Listening for");
 		line(2, "networks...");
@@ -888,7 +915,7 @@ static void draw_wifi(long now) {
 static void draw_joining(long now) {
 	char text[TEXT_ROOM];
 
-	title("WIFI");
+	title("WiFi");
 	line(0, wifi_ssid);
 	network_ssid(text, sizeof(text));
 	if (network_is_up() && !strcmp(text, wifi_ssid)) {
@@ -907,7 +934,7 @@ static void draw_joining(long now) {
 static void draw_setup(void) {
 	char text[TEXT_ROOM];
 
-	title("SETUP");
+	title("Setup");
 	if (!portal_is_open()) {
 		line(1, "It did not start.");
 		help("MENU: BACK");
@@ -930,7 +957,7 @@ static void draw_contacts(long now) {
 	int count = contacts_count(&settings);
 	int i;
 
-	title("CONTACTS");
+	title("Contacts");
 	if (count == 0) {
 		line(0, "None yet.");
 		line(1, "Add them at Setup.");
@@ -951,25 +978,20 @@ static void draw(long now) {
 	if (page == PAGE_MENU)
 		draw_menu();
 	if (page == PAGE_DIAL) {
-		title("FREQUENCY, KHZ");
+		title("Frequency, kHz");
 		big_frequency(PAGE_BIG_Y);
 		help("UP/DOWN   MENU: BACK");
 	}
 	if (choices_of(page) != NULL)
 		draw_choices(choices_of(page));
 	if (page == PAGE_WPM) {
-		title("MORSE SPEED, WPM");
+		title("Morse speed, WPM");
 		snprintf(text, sizeof(text), "%u", (unsigned)settings.wpm);
 		big(text, PAGE_BIG_Y);
 		help("UP/DOWN   MENU: BACK");
 	}
-	if (page == PAGE_VOLUME) {
-		title("VOLUME");
-		volume_bar(line_y(1));
-		help("UP/DOWN   MENU: BACK");
-	}
 	if (page == PAGE_CALLSIGN)
-		draw_entry("CALLSIGN", now);
+		draw_entry("Callsign", now);
 	if (page == PAGE_WIFI)
 		draw_wifi(now);
 	if (page == PAGE_WIFI_JOINING)
@@ -978,10 +1000,6 @@ static void draw(long now) {
 		draw_setup();
 	if (page == PAGE_CONTACTS)
 		draw_contacts(now);
-	if (page == PAGE_SBITX)
-		draw_sbitx();
-	if (page == PAGE_NEW_CODE)
-		draw_new_code();
 	if (page == PAGE_INFO)
 		draw_info();
 }

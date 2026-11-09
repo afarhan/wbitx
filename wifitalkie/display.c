@@ -46,6 +46,8 @@
 #define NIBBLE_BITS 4
 #define PANEL_OFF 0xae
 #define PANEL_ON 0xaf
+#define SHOW_NORMAL 0xa6
+#define SHOW_INVERSE 0xa7
 
 static const uint8_t start[] = {
 	COMMANDS,
@@ -294,6 +296,14 @@ static void panel(uint8_t command) {
 	uint8_t sent_now[] = {COMMANDS, command};
 
 	i2c_master_transmit(device, sent_now, sizeof(sent_now), WAIT_MS);
+}
+
+// the whole display turned over, lit dots dark and dark lit, for the
+// white theme; the display does it, the frame is not changed
+void display_white(int is_white) {
+	if (!is_open)
+		return;
+	panel(is_white ? SHOW_INVERSE : SHOW_NORMAL);
 }
 
 void display_off(void) {

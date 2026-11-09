@@ -11,6 +11,10 @@
 // the laptop, a verb a line over USB, verbs.c has them, and from its own
 // display and four keys, screen.c.
 //
+// A watchdog watches the loop: held up WATCHDOG_MS, the talkie says where on
+// the console, its backtrace, and starts again; the longest it means to
+// wait, for a key let go before sleeping, is half of that.
+//
 // One loop and no tasks of its own: each module is polled in turn, and none
 // waits, but the handshake with my.sbitx.net, when the line is being made
 // and there is nothing to hear. The speaker's timer interrupt and the ADC's
@@ -39,6 +43,7 @@
 #include <Arduino.h>
 
 #include "esp_system.h"
+#include "esp_task_wdt.h"
 
 #include "console.h"
 #include "microphone.h"
@@ -55,6 +60,7 @@
 #include "voip.h"
 
 #define TICKS_GIVEN_UP 1
+#define WATCHDOG_MS 10000
 
 // a probe for now: any poll that keeps the loop SLOW_MS or more is said
 #define SLOW_MS 150
@@ -71,6 +77,14 @@ void setup() {
 	microphone_open();
 	service_open();
 	network_open();
+	esp_task_wdt_config_t watchdog = {
+		.timeout_ms = WATCHDOG_MS,
+		.idle_core_mask = 0,
+		.trigger_panic = true,
+	};
+	if (esp_task_wdt_reconfigure(&watchdog) != ESP_OK)
+		esp_task_wdt_init(&watchdog);
+	enableLoopWDT();
 	console_say("WIFITALKIE READY: TYPE STATUS");
 	if (esp_reset_reason() == ESP_RST_BROWNOUT)
 		console_say("STARTED AFTER A BROWNOUT: THE SUPPLY SAGGED");
