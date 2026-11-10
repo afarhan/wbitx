@@ -131,7 +131,11 @@ SEAT_WALL = 1.6     # round a screw head sunk deep, for the column's strength
 # the back's columns under the board stop short of it: the last print's
 # back stood 0.5 proud of the front with them touching it, and fit4's
 # pushed the board 1.5 too far forward
-BOARD_GAP = 2.0
+# fit5's halves still stood 1-1.5 apart on the USB side, held off by the
+# back's columns there: those under the board stop 4.75 short of it, the
+# two by the speaker COL_DROP short of the seam
+BOARD_GAP = 4.75
+COL_DROP = 1.5
 BOARD_R = 2.5       # the board's corners, sanded round
 
 # two switches added to the prototype's back, placed off its photos (one
@@ -616,7 +620,7 @@ def back_tray():
     zl = Z_SPLIT - LIP_H - LIP_GAP - 0.2
     keep = inner(0, zl, 0.6) + inner(zl, D, -(LIP_T + LIP_GAP))
     for (x, y) in BOSSES:
-        s += cyl_z(x, y, BOSS_D / 2, WALL - 0.5, Z_SPLIT - LIP_GAP)
+        s += cyl_z(x, y, BOSS_D / 2, WALL - 0.5, Z_SPLIT - LIP_GAP - COL_DROP)
     for (x, y) in board_boss_xy():
         s += cyl_z(x, y, BOSS_D / 2, WALL - 0.5, zb) & keep
     # a collar round each column's foot, so that the wall round the screw
