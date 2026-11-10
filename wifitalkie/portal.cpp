@@ -37,6 +37,14 @@
 //     /contacts    the callsigns kept, up to SETTINGS_CONTACTS, each with
 //                  DELETE, and ADD (contacts.c)
 //
+// A talkie new from its box, with no callsign or no network, is taken
+// through the pages as a wizard of three steps, the author's of
+// 2026-11-09: STEP 1 the callsign, STEP 2 the network, and STEP 3, on the
+// page after JOIN, the activation code and what to do with it: back on
+// the telephone's usual WiFi, at my.sbitx.net, make an account for the
+// callsign, or sign in, and add a radio with this code. The code is also
+// on the talkie, at Settings, Activate.
+//
 // JOIN keeps the network with its key (known.c) as the one set, says on
 // the page that the talkie is joining it, and JOIN_CLOSE_MS later closes
 // the access point and joins it as an ordinary WiFi client; the screen
@@ -73,6 +81,7 @@
 static WebServer server(WEB_PORT);
 static DNSServer dns;
 static int is_open;
+static int is_first_time;
 static int is_server_begun;
 static char name[NAME_ROOM];
 static String notice;
@@ -229,7 +238,10 @@ static void show_networks(void) {
 		page += "Joined to <b>" + html(joined) + "</b>, " + address + ".";
 	else
 		page += "Not joined to any network.";
-	page += "</p><p><b>Choose a network to join:</b></p>";
+	if (is_first_time)
+		page += "</p><p><b>Step 2 of 3.</b> Choose the WiFi the talkie will use:</p>";
+	else
+		page += "</p><p><b>Choose a network to join:</b></p>";
 	if (network_is_scanning())
 		page += "<p>Listening for networks&hellip; <a href=/ style='color:#036'>refresh</a></p>";
 	if (count > 0)
@@ -316,14 +328,14 @@ static void show_callsign(void) {
 	if (is_set)
 		page += "<a class=back href=/>&lsaquo; Networks</a>";
 	else
-		page += "<p>First, the callsign this talkie goes by.</p>";
+		page += "<p><b>Step 1 of 3.</b> The callsign this talkie goes by.</p>";
 	page += "<form method=post action=/callsign>"
 		"<input name=call placeholder=Callsign maxlength=15 autocapitalize=characters autofocus value=\"";
 	page += html(settings.callsign);
 	page += "\"><button class=go>Save</button></form>";
 	if (is_set) {
 		service_code(shown);
-		page += "<h2>Code for my.sbitx.net</h2><p class=code>";
+		page += "<h2>Activation code</h2><p class=code>";
 		page += html(shown);
 		page += "</p><p><small>Add this code at my.sbitx.net as a radio of ";
 		page += html(settings.callsign);
@@ -388,6 +400,8 @@ static void show_contacts(void) {
 	end_page(page);
 }
 
+static void show_activation(void);
+
 // JOIN: the network kept and set; the page says so, and the access point
 // closes JOIN_CLOSE_MS later, in portal_poll()
 static void wifi_join(void) {
@@ -421,13 +435,41 @@ static void wifi_join(void) {
 	settings_save();
 	snprintf(joining, sizeof(joining), "%s", ssid.c_str());
 	console_say("SETUP: JOIN %s", joining);
-	begin_page(page, "Joining");
-	page += "<p>The talkie is closing this access point and joining <b>" + html(joining) +
-		"</b>. Its screen says whether it joined.</p>"
-		"<p>Put this phone back on its usual WiFi.</p>";
-	end_page(page);
+	if (is_first_time)
+		show_activation();
+	else {
+		begin_page(page, "Joining");
+		page += "<p>The talkie is closing this access point and joining <b>" + html(joining) +
+			"</b>. Its screen says whether it joined.</p>"
+			"<p>Put this phone back on its usual WiFi.</p>";
+		end_page(page);
+	}
 	close_at_ms = (long)millis() + JOIN_CLOSE_MS;
 	is_join_due = 1;
+}
+
+// STEP 3, after JOIN on a talkie new from its box: the activation code
+// and what to do with it
+static void show_activation(void) {
+	char shown[AUTH_COOKIE_SHOWN_ROOM];
+	String page;
+
+	service_code(shown);
+	begin_page(page, "Activate");
+	page += "<p><b>Step 3 of 3.</b> The talkie is joining <b>" + html(joining) +
+		"</b>; its screen says whether it joined.</p>"
+		"<p>Your activation code:</p><p class=code>";
+	page += html(shown);
+	page += "</p><p>Take a screenshot of this page. Then:</p><ol>"
+		"<li>Put this phone back on its usual WiFi.</li>"
+		"<li>Go to <a style='color:#036' href=https://my.sbitx.net/><b>my.sbitx.net</b></a> and "
+		"make an account for <b>";
+	page += html(settings.callsign);
+	page += "</b>, or sign in if you have one.</li>"
+		"<li>Add a radio, and enter the code above.</li></ol>"
+		"<p>The talkie comes online by itself within a minute. The code is also "
+		"on the talkie, at Settings, Activate.</p>";
+	end_page(page);
 }
 
 static void wifi_forget(void) {
@@ -530,6 +572,7 @@ void portal_open(void) {
 	dns.start(DNS_PORT, "*", WiFi.softAPIP());
 	network_scan_begin();
 	is_join_due = 0;
+	is_first_time = settings.callsign[0] == 0 || known_count(&settings) == 0;
 	is_open = 1;
 }
 

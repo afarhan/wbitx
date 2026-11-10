@@ -596,10 +596,16 @@ void service_brief(char *text, int room) {
 	else if (!network_is_up())
 		said = "No WiFi";
 	else if (is_refused)
-		said = "Code not added";
+		said = "Not registered";
 	else if (state == STATE_CONNECTING)
 		said = "Connecting";
 	snprintf(text, room, "%s", said);
+}
+
+// 1 when the WiFi is up but my.sbitx.net refused the key: the talkie is
+// not yet a radio of anyone's there
+int service_is_unregistered(void) {
+	return is_refused && network_is_up() && settings.callsign[0] != 0;
 }
 
 int service_is_online(void) {

@@ -49,6 +49,8 @@
 //                        page is shown: what to join on a telephone and
 //                        where to go. It opens by itself at power-up when
 //                        the talkie knows no network.
+//         Device key     the talkie's key, to add at my.sbitx.net as one
+//                        of the owner's radios, and whether it is in yet
 //         Theme          Black, lit dots on black, or White, the display
 //                        turned over
 //         Info           the network, the address, the signal, the
@@ -56,7 +58,7 @@
 //
 // The volume is UP and DOWN on the home page.
 //
-// Info and Setup stay up; the others go home when idle.
+// Info, Setup and Device key stay up; the others go home when idle.
 //
 // The callsign is entered on a page of its own:
 //
@@ -161,6 +163,7 @@
 #define PAGE_CONTACTS 14
 #define PAGE_SETTINGS 15
 #define PAGE_THEME 16
+#define PAGE_ACTIVATE 18
 
 struct item {
 	const char *name;
@@ -182,6 +185,7 @@ static const struct item settings_items[] = {
 	{"Morse speed", PAGE_WPM},
 	{"Callsign", PAGE_CALLSIGN},
 	{"Setup...", PAGE_SETUP},
+	{"Device key", PAGE_ACTIVATE},
 	{"Theme", PAGE_THEME},
 	{"Info", PAGE_INFO},
 };
@@ -704,10 +708,21 @@ static void state_line(int y) {
 		display_text_at(DISPLAY_WIDE - display_text_wide("RX", 1), y, 1, "RX");
 }
 
+// with the WiFi up but the key not yet added at my.sbitx.net, the home
+// page says where to add it in place of the frequency and the room
 static void draw_home(void) {
+	char shown[AUTH_COOKIE_SHOWN_ROOM];
+
 	status_row(settings.callsign, 1);
-	big_frequency(HOME_BIG_Y);
-	state_line(HOME_STATE_Y);
+	if (service_is_unregistered()) {
+		service_code(shown);
+		line(0, "Register on");
+		line(1, "my.sbitx.net with");
+		line(2, shown);
+	} else {
+		big_frequency(HOME_BIG_Y);
+		state_line(HOME_STATE_Y);
+	}
 	volume_bar(HOME_VOLUME_Y);
 }
 
@@ -953,6 +968,25 @@ static void draw_setup(void) {
 	}
 }
 
+// the key to add at my.sbitx.net, and whether it is in yet
+static void draw_activate(void) {
+	char shown[AUTH_COOKIE_SHOWN_ROOM];
+	char text[TEXT_ROOM];
+
+	title("Device key");
+	service_code(shown);
+	line(0, shown);
+	if (service_is_online()) {
+		line(1, "Registered");
+	} else {
+		service_brief(text, sizeof(text));
+		line(1, text);
+		line(2, "Register it on");
+		line(3, "my.sbitx.net");
+	}
+	help("MENU: BACK");
+}
+
 static void draw_contacts(long now) {
 	int count = contacts_count(&settings);
 	int i;
@@ -1002,6 +1036,8 @@ static void draw(long now) {
 		draw_contacts(now);
 	if (page == PAGE_INFO)
 		draw_info();
+	if (page == PAGE_ACTIVATE)
+		draw_activate();
 }
 
 void screen_poll(long now) {
@@ -1024,7 +1060,8 @@ void screen_poll(long now) {
 		if (settings.ssid[0] == 0 && known_count(&settings) == 0)
 			go(PAGE_SETUP);
 	}
-	if (page != PAGE_HOME && page != PAGE_INFO && page != PAGE_SETUP && now - touched_ms >= MENU_IDLE_MS)
+	if (page != PAGE_HOME && page != PAGE_INFO && page != PAGE_SETUP
+			&& page != PAGE_ACTIVATE && now - touched_ms >= MENU_IDLE_MS)
 		go(PAGE_HOME);
 	if (is_save_due && now >= save_ms) {
 		is_save_due = 0;
