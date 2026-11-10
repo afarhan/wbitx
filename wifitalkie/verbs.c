@@ -19,12 +19,16 @@
 //     KEY                       the cookie, to add the talkie on the website
 //     NEW_KEY                   a new cookie; typed twice within 5 s
 //     VOIP ONLINE|OFFLINE       on line to the repeater, or not
+//     LINK INTERNET|LOCAL       by my.sbitx.net, or talkie to talkie by
+//                               ESP-NOW off the internet (local.c)
 //     PTT ON|OFF                speak, as ENTER held on the home page does
 //     TONE ON|OFF               1 kHz in place of the microphone
 //     VOL <0-100>  MIC <0-100>  the speaker's level and the microphone's
 //     LEVELS ON|OFF             the microphone's levels each second
 //     VOX ON|OFF                the gaps between words as comfort noise
 //     KEYS                      each key's pin as it is now, DOWN or up
+//     PIN <0-21>                how a GPIO is set now: its pulls, input,
+//                               output, function, and the level read
 //     SCREEN                    the page shown, the last key, the display's
 //                               pages sent and failed
 //     RECORD                    3 s of the microphone, in hex, after
@@ -44,14 +48,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "esp_system.h"
+#include "driver/gpio.h"
 
 #include "auth.h"
 #include "console.h"
 #include "display.h"
 #include "keys.h"
 #include "microphone.h"
+#include "local.h"
 #include "network.h"
 #include "ptt.h"
 #include "screen.h"
@@ -126,9 +133,13 @@ static int is_on_off(const char *word, int *is_on) {
 static void say_battery(void) {
 	int millivolts;
 	int what = microphone_battery(&millivolts);
+	int code;
+	int pin_millivolts;
 
+	microphone_battery_raw(&code, &pin_millivolts);
 	if (what == MICROPHONE_BATTERY)
-		console_say("BATTERY %d.%02d V", millivolts / 1000, millivolts % 1000 / 10);
+		console_say("BATTERY %d.%02d V (CODE %d, PIN %d MV)", millivolts / 1000,
+			millivolts % 1000 / 10, code, pin_millivolts);
 	else if (what == MICROPHONE_USB)
 		console_say("BATTERY ON USB");
 	else
@@ -140,6 +151,7 @@ static void say_status(void) {
 	char shown[AUTH_COOKIE_SHOWN_ROOM];
 	struct microphone_levels levels;
 
+	console_say("LINK %s", settings.is_local ? "LOCAL" : "INTERNET");
 	network_describe(text, sizeof(text));
 	console_say("WIFI %s", text);
 	console_say("CALL %s  GRID %s  FREQ %u", settings.callsign, settings.grid, (unsigned)settings.hz);
@@ -153,6 +165,10 @@ static void say_status(void) {
 	else
 		snprintf(text, sizeof(text), "OFFLINE");
 	console_say("VOIP %s", text);
+	if (settings.is_local) {
+		local_describe(text, sizeof(text));
+		console_say("LOCAL %s", text);
+	}
 	voip_counts(text, sizeof(text));
 	console_say("PACKETS %s", text);
 	speaker_describe(text, sizeof(text));
@@ -332,6 +348,13 @@ void verbs_do(const char *line, long now) {
 		microphone_pin(atoi(first));
 		return;
 	}
+	if (!strcmp(verb, "LINK") && (!strcasecmp(first, "LOCAL") || !strcasecmp(first, "INTERNET"))) {
+		settings.is_local = !strcasecmp(first, "LOCAL");
+		settings_save();
+		network_local((int)settings.is_local);
+		console_say("LINK %s", settings.is_local ? "LOCAL" : "INTERNET");
+		return;
+	}
 	if (!strcmp(verb, "VOX") && is_on_off(first, &is_on)) {
 		settings.is_vox = (uint32_t)is_on;
 		settings_save();
@@ -339,6 +362,19 @@ void verbs_do(const char *line, long now) {
 			console_say("VOX ON");
 		else
 			console_say("VOX OFF");
+		return;
+	}
+	if (!strcmp(verb, "PIN") && first[0] != 0) {
+		gpio_io_config_t config;
+		int pin = atoi(first);
+
+		if (pin < 0 || pin >= GPIO_NUM_MAX || gpio_get_io_config((gpio_num_t)pin, &config) != ESP_OK) {
+			console_say("PIN %s: NO SUCH PIN", first);
+			return;
+		}
+		console_say("PIN %d: PULL-UP %s, PULL-DOWN %s, INPUT %s, OUTPUT %s, FUNCTION %u, READS %d",
+			pin, config.pu ? "ON" : "off", config.pd ? "ON" : "off", config.ie ? "ON" : "off",
+			config.oe ? "ON" : "off", (unsigned)config.fun_sel, gpio_get_level((gpio_num_t)pin));
 		return;
 	}
 	if (!strcmp(verb, "KEYS")) {
@@ -377,7 +413,7 @@ void verbs_do(const char *line, long now) {
 		esp_restart();
 		return;
 	}
-	console_say("? %s: WIFI SCAN RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX KEYS SCREEN RECORD MICPIN DISPLAY AUDIO BATTERY STATUS SLEEP RESTART", verb);
+	console_say("? %s: WIFI SCAN LINK RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX KEYS PIN SCREEN RECORD MICPIN DISPLAY AUDIO BATTERY STATUS SLEEP RESTART", verb);
 }
 
 void verbs_poll(long now) {

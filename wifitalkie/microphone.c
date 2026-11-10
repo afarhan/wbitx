@@ -54,6 +54,13 @@
 // (The C3 cannot read a pin by itself, one-shot, while ADC1 runs
 // continuously.)
 //
+// Each pin the ADC reads has its pull-up and pull-down turned off first,
+// unheard(): the C3's weak pull-up, some 45k, is on at reset on some of
+// them, GPIO2 among them, a strapping pin, and it reads 3.3 V with nothing
+// on it, the author's measure of 2026-11-10. Against a divider of two 100k,
+// 50k seen from the pin, it would pull the reading half way to 3.3 V; on a
+// microphone's pin it would move the preamplifier's bias.
+//
 // PIN_MIC_POWER feeds both microphones' preamplifiers, and holds the
 // PAM8403's shutdown up: microphone_open() raises it, at its strongest.
 //
@@ -86,6 +93,9 @@
 #define MEAN_SHIFT 7
 #define MEAN_FRACTION_SHIFT 8
 #define MIC_AS_IT_CAME 50
+// the mic's level raised four times over, the author's of 2026-11-10:
+// the twelve bits of the ADC then fill the sixteen at MIC 50
+#define MIC_BOOST 4
 #define INT16_MOST 32767
 #define MS_A_SECOND 1000
 #define STALL_MS 500
@@ -131,6 +141,12 @@ static int is_recording;
 static int record_filled;
 static int record_said;
 
+// a pin the ADC reads let float: neither pull, so that only what is on
+// it is read
+static void unheard(int pin) {
+	gpio_set_pull_mode((gpio_num_t)pin, GPIO_FLOATING);
+}
+
 static void open_on(int pin) {
 	adc_continuous_handle_cfg_t store = {
 		.max_store_buf_size = STORE_BYTES,
@@ -149,6 +165,8 @@ static void open_on(int pin) {
 		console_say("MIC: PIN %d IS NOT ON ADC1", pin);
 		return;
 	}
+	unheard(pin);
+	unheard(PIN_BATTERY);
 	memset(pattern, 0, sizeof(pattern));
 	pattern[0].atten = ADC_ATTEN_DB_12;
 	pattern[0].channel = channel;
@@ -237,7 +255,7 @@ static void take(int raw) {
 
 	mean += ((raw << MEAN_FRACTION_SHIFT) - mean) >> MEAN_SHIFT;
 	sample = (raw - (mean >> MEAN_FRACTION_SHIFT)) * TO_16_BITS;
-	sample = sample * (int32_t)settings.mic / MIC_AS_IT_CAME;
+	sample = sample * (int32_t)settings.mic * MIC_BOOST / MIC_AS_IT_CAME;
 	if (sample > INT16_MOST)
 		sample = INT16_MOST;
 	if (sample < -INT16_MOST)
@@ -297,6 +315,14 @@ static void take_battery(int raw) {
 
 // the cell, in millivolts: MICROPHONE_BATTERY when read,
 // MICROPHONE_UNKNOWN before a second of readings or while MICPIN reads the battery's pin
+// for BATTERY: the battery pin's mean code, as the ADC gives it, and the
+// millivolts at the pin by the ADC's calibration, before the divider and
+// the diode are put back
+void microphone_battery_raw(int *code, int *pin_millivolts) {
+	*code = (int)(battery_mean >> MEAN_FRACTION_SHIFT);
+	*pin_millivolts = code_millivolts(*code);
+}
+
 int microphone_battery(int *millivolts) {
 	int code = (int)(battery_mean >> MEAN_FRACTION_SHIFT);
 

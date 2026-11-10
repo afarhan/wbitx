@@ -38,6 +38,8 @@
 //                    is open or remembered; one with a key not known, or
 //                    ENTER held for a new key, opens Setup; the last item
 //                    scans again. Then a page says whether it joined.
+//     Link           Internet, by my.sbitx.net, or Local, talkie to talkie
+//                    by ESP-NOW off the internet (local.c); set by hand
 //     Contacts       the callsigns kept, added and deleted at Setup
 //     Sleep          the talkie asleep, until any key wakes it (sleep.c)
 //     Settings...    a list of its own, MENU back to the menu:
@@ -103,6 +105,7 @@
 #include "halves.h"
 #include "keys.h"
 #include "known.h"
+#include "local.h"
 #include "microphone.h"
 #include "pins.h"
 #include "network.h"
@@ -164,6 +167,7 @@
 #define PAGE_SETTINGS 15
 #define PAGE_THEME 16
 #define PAGE_ACTIVATE 18
+#define PAGE_LINK 19
 
 struct item {
 	const char *name;
@@ -175,6 +179,7 @@ struct item {
 static const struct item main_items[] = {
 	{"Frequency", PAGE_DIAL},
 	{"WiFi", PAGE_WIFI},
+	{"Link", PAGE_LINK},
 	{"Contacts", PAGE_CONTACTS},
 	{"Sleep", PAGE_SLEEP},
 	{"Settings...", PAGE_SETTINGS},
@@ -368,7 +373,24 @@ static void theme_take(int chosen_one) {
 	display_white(chosen_one);
 }
 
+// LINK: by my.sbitx.net, or talkie to talkie off the internet, kept
+// across power-ups
+static const char *const link_names[] = {"Internet", "Local"};
+
+static int link_in_use(void) {
+	return settings.is_local ? 1 : 0;
+}
+
+static void link_take(int chosen_one) {
+	if ((uint32_t)chosen_one == settings.is_local)
+		return;
+	settings.is_local = (uint32_t)chosen_one;
+	settings_save();
+	network_local(chosen_one);
+}
+
 static const struct choices all_choices[] = {
+	{PAGE_LINK, "Link", link_names, 2, link_in_use, link_take},
 	{PAGE_AUDIO, "Audio", audio_names, 2, audio_in_use, audio_take},
 	{PAGE_THEME, "Theme", theme_names, 2, theme_in_use, theme_take},
 };
@@ -688,7 +710,9 @@ static void state_line(int y) {
 	char text[TEXT_ROOM];
 	char why[TEXT_ROOM];
 
-	if (voip_hearing(why, sizeof(why))) {
+	if (voip_hearing(why, sizeof(why)) && settings.is_local) {
+		snprintf(text, sizeof(text), "Heard %s %d", why, local_rssi());
+	} else if (voip_hearing(why, sizeof(why))) {
 		snprintf(text, sizeof(text), "Heard %s", why);
 	} else if (!service_is_online()) {
 		service_brief(text, sizeof(text));

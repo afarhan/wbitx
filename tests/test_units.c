@@ -29,6 +29,7 @@
 #include "../wifitalkie/settings.h"
 #include "../wifitalkie/speech.h"
 #include "../wifitalkie/telephone.h"
+#include "../wifitalkie/voip_packet.h"
 
 #define SETTLE_SAMPLES 200
 #define MEASURE_SAMPLES 1600
@@ -583,6 +584,28 @@ static void test_stretch(void) {
 	expect(!strcmp(ours, theirs), "the stretch in steps is sha256.c's PBKDF2");
 }
 
+// Local's packet: the callsign written in comes out, cut to ten, and the
+// tag is checked
+static void test_local_packet(void) {
+	static const uint8_t id[VOIP_STREAM_ID_BYTES] = {'W', 'T', 'L', 'O', 'C', 'A', 'L', '1'};
+	uint8_t packet[VOIP_PACKET_BYTES];
+	uint8_t sound[VOIP_SOUND_BYTES];
+	struct voip_heard heard;
+
+	memset(sound, 0x55, sizeof(sound));
+	voip_packet_make_as(packet, id, "local", "VU2TUV", VOIP_KIND_SPEECH, 21090000, 7, sound);
+	expect(voip_packet_open(packet, sizeof(packet), id, "local", &heard) == VOIP_OPENED,
+		"a local packet opens");
+	expect(!strcmp(heard.callsign, "VU2TUV") && heard.hz == 21090000 && heard.number == 7,
+		"a local packet says who sent it, where and its number");
+	voip_packet_make_as(packet, id, "local", "VU2TUV/P/QRP", VOIP_KIND_SPEECH, 1, 1, sound);
+	voip_packet_open(packet, sizeof(packet), id, "local", &heard);
+	expect(!strcmp(heard.callsign, "VU2TUV/P/Q"), "a callsign past ten is cut");
+	packet[VOIP_PACKET_BYTES - 1] ^= 1;
+	expect(voip_packet_open(packet, sizeof(packet), id, "local", &heard) == VOIP_WRONG_TAG,
+		"a local packet spoilt is refused");
+}
+
 int main(void) {
 	telephone_open();
 	playback_open();
@@ -599,6 +622,7 @@ int main(void) {
 	test_speech();
 	test_cookie();
 	test_stretch();
+	test_local_packet();
 	if (failures == 0)
 		printf("test_units: all passed\n");
 	return failures;

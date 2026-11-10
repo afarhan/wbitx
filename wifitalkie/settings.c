@@ -79,6 +79,7 @@ void settings_load(void) {
 	number_get(handle, "vox", &settings.is_vox);
 	number_get(handle, "headset", &settings.is_headset);
 	number_get(handle, "white", &settings.is_white);
+	number_get(handle, "local", &settings.is_local);
 	number_get(handle, "wpm", &settings.wpm);
 	for (i = 0; i < SETTINGS_KNOWN; i++) {
 		snprintf(key, sizeof(key), "kssid%d", i);
@@ -116,6 +117,7 @@ void settings_save(void) {
 	nvs_set_u32(handle, "vox", settings.is_vox);
 	nvs_set_u32(handle, "headset", settings.is_headset);
 	nvs_set_u32(handle, "white", settings.is_white);
+	nvs_set_u32(handle, "local", settings.is_local);
 	nvs_set_u32(handle, "wpm", settings.wpm);
 	for (i = 0; i < SETTINGS_KNOWN; i++) {
 		snprintf(key, sizeof(key), "kssid%d", i);

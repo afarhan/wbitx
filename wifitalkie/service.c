@@ -589,6 +589,8 @@ void service_brief(char *text, int room) {
 
 	if (state == STATE_ONLINE)
 		said = "Online";
+	else if (settings.is_local)
+		said = settings.callsign[0] != 0 ? "Local" : "Local: no callsign";
 	else if (!settings.is_voip_online)
 		said = "VoIP off";
 	else if (settings.callsign[0] == 0)

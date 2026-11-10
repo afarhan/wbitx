@@ -45,6 +45,18 @@
 // up to SCAN_MOST. A join being tried has to be stopped for the scan, and
 // is begun again after.
 //
+// network_local() leaves the WiFi for Local, talkie to talkie by ESP-NOW
+// (local.c), and comes back to it: while settings.is_local no network is
+// joined or tried, and the radio is held on LOCAL_CHANNEL, where every
+// talkie in Local is. In Local the radio also sends at LOCAL_TX_POWER, not
+// TX_POWER: the low power was for the access point's join on the SuperMini
+// (above), and at 8.5 dBm two talkies heard each other only a few metres
+// apart, the author's trial of 2026-11-10; and Espressif's Long Range
+// protocol, LR, is let in beside 802.11 b/g/n, for local.c to send at its
+// slow rate and the talkies to hear each other at it. Back on the WiFi
+// both are as they were. A scan for the WiFi page, or the setup portal's
+// access point, moves it for a while; network_join() puts it back.
+//
 // network_off() stops the radio altogether, until network_on(); it is for
 // measuring what the radio puts into the microphone.
 //
@@ -55,13 +67,18 @@
 
 #include <string.h>
 
+#include "esp_wifi.h"
+
 #include "console.h"
 #include "known.h"
+#include "local.h"
 #include "network.h"
 #include "settings.h"
 
 #define HOSTNAME "wifitalkie"
 #define TX_POWER WIFI_POWER_8_5dBm
+#define LOCAL_TX_POWER WIFI_POWER_19_5dBm
+#define PROTOCOLS (WIFI_PROTOCOL_11B | WIFI_PROTOCOL_11G | WIFI_PROTOCOL_11N)
 #define JOIN_WAIT_MS 20000
 #define NOT_HEARD_MS 3000
 #define REASON_NOT_HEARD 201
@@ -107,7 +124,36 @@ void network_open(void) {
 	WiFi.setSleep(false);
 	WiFi.setAutoReconnect(true);
 	WiFi.onEvent(on_lost, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
-	network_join();
+	if (settings.is_local)
+		network_local(1);
+	else
+		network_join();
+}
+
+// no network joined, and the radio on the channel every talkie in Local
+// is on
+static void hold_local_channel(void) {
+	WiFi.disconnect();
+	if (esp_wifi_set_protocol(WIFI_IF_STA, PROTOCOLS | WIFI_PROTOCOL_LR) != ESP_OK)
+		console_say("LOCAL: LONG RANGE NOT SET");
+	if (esp_wifi_set_channel(LOCAL_CHANNEL, WIFI_SECOND_CHAN_NONE) != ESP_OK)
+		console_say("LOCAL: CHANNEL %d NOT SET", LOCAL_CHANNEL);
+	WiFi.setTxPower(LOCAL_TX_POWER);
+}
+
+// to Local, is_on, or back to the WiFi; settings.is_local is set first
+void network_local(int is_on) {
+	if (is_on) {
+		WiFi.setAutoReconnect(false);
+		hold_local_channel();
+		local_open();
+	} else {
+		local_close();
+		esp_wifi_set_protocol(WIFI_IF_STA, PROTOCOLS);
+		WiFi.setTxPower(TX_POWER);
+		WiFi.setAutoReconnect(true);
+		network_join();
+	}
 }
 
 static void begin(const char *ssid, const char *password) {
@@ -125,6 +171,10 @@ static void try_next(void);
 void network_join(void) {
 	tried = 0;
 	is_not_heard = 0;
+	if (settings.is_local) {
+		hold_local_channel();
+		return;
+	}
 	if (settings.ssid[0] == 0 && known_count(&settings) > 0) {
 		try_next();
 		return;
@@ -169,6 +219,7 @@ static void joined(void) {
 
 void network_off(void) {
 	is_off = 1;
+	local_close();
 	WiFi.mode(WIFI_OFF);
 	console_say("RADIO OFF");
 }
@@ -180,6 +231,8 @@ void network_on(void) {
 	WiFi.setSleep(false);
 	console_say("RADIO ON");
 	network_join();
+	if (settings.is_local)
+		local_open();
 }
 
 // the scan done: each name once, at its strongest, strongest first
@@ -251,7 +304,7 @@ void network_poll(long now) {
 		scan_poll();
 	if (is_off)
 		return;
-	if (!is_up && !is_scanning && !is_held && (settings.ssid[0] != 0 || known_count(&settings) > 0)
+	if (!is_up && !is_scanning && !is_held && !settings.is_local && (settings.ssid[0] != 0 || known_count(&settings) > 0)
 			&& (now - join_began_ms >= JOIN_WAIT_MS || (is_not_heard && now - join_began_ms >= NOT_HEARD_MS)))
 		try_next();
 	if (is_up == was_up)
@@ -349,6 +402,10 @@ int network_is_up(void) {
 }
 
 void network_describe(char *text, int room) {
+	if (settings.is_local) {
+		snprintf(text, room, "NOT JOINED: LINK LOCAL");
+		return;
+	}
 	if (settings.ssid[0] == 0) {
 		snprintf(text, room, "NOT SET");
 		return;

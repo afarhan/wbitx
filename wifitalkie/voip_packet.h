@@ -42,6 +42,9 @@ int voip_id_of_hex(const char *hex, uint8_t id[VOIP_STREAM_ID_BYTES]);
 long voip_channel_of(uint32_t hz);
 void voip_packet_make(uint8_t packet[VOIP_PACKET_BYTES], const uint8_t id[VOIP_STREAM_ID_BYTES],
 	const char *key, int kind, uint32_t hz, uint32_t number, const uint8_t *sound);
+void voip_packet_make_as(uint8_t packet[VOIP_PACKET_BYTES], const uint8_t id[VOIP_STREAM_ID_BYTES],
+	const char *key, const char *callsign, int kind, uint32_t hz, uint32_t number,
+	const uint8_t *sound);
 int voip_packet_open(const uint8_t *packet, size_t length, const uint8_t id[VOIP_STREAM_ID_BYTES],
 	const char *key, struct voip_heard *heard);
 int voip_is_ahead(int is_begun, uint32_t last, uint32_t number);

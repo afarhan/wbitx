@@ -35,6 +35,7 @@ void microphone_power(int is_on);
 #define MICROPHONE_BATTERY 1
 #define MICROPHONE_USB 2
 int microphone_battery(int *millivolts);
+void microphone_battery_raw(int *code, int *pin_millivolts);
 
 #ifdef __cplusplus
 }

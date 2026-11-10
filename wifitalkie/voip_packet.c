@@ -86,11 +86,21 @@ long voip_channel_of(uint32_t hz) {
 // sound is NULL for a packet of kind 0, whose sound is silence
 void voip_packet_make(uint8_t packet[VOIP_PACKET_BYTES], const uint8_t id[VOIP_STREAM_ID_BYTES],
 		const char *key, int kind, uint32_t hz, uint32_t number, const uint8_t *sound) {
+	voip_packet_make_as(packet, id, key, "", kind, hz, number, sound);
+}
+
+// the same, with the callsign of who sends it written in, as the service
+// does going down; for Local (local.c), where there is no service
+void voip_packet_make_as(uint8_t packet[VOIP_PACKET_BYTES], const uint8_t id[VOIP_STREAM_ID_BYTES],
+		const char *key, const char *callsign, int kind, uint32_t hz, uint32_t number,
+		const uint8_t *sound) {
 	uint8_t *head = packet + VOIP_STREAM_ID_BYTES;
 	uint8_t hash[SHA256_BYTES];
+	size_t length = strlen(callsign);
 
 	memset(packet, 0, VOIP_PACKET_BYTES);
 	memcpy(packet, id, VOIP_STREAM_ID_BYTES);
+	memcpy(head + CALLSIGN_AT, callsign, length < VOIP_CALLSIGN_BYTES ? length : VOIP_CALLSIGN_BYTES);
 	head[KIND_AT] = (uint8_t)kind;
 	head[CODEC_AT] = VOIP_CODEC_MULAW;
 	put_be32(head + HZ_AT, hz);

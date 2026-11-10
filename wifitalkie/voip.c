@@ -35,6 +35,17 @@
 // the service wrote in from the speaker's account, is said on the console
 // when they begin, HEARD VU2ESE, and when they have been quiet for
 // OVER_GAP_MS, OVER VU2ESE.
+//
+// LOCAL
+//
+// With the link set to Local the same packets go to local.c instead, as
+// ESP-NOW broadcasts to every talkie in hearing, and come from it: the id
+// LOCAL_ID, the tag made with LOCAL_KEY, which every talkie knows, and the
+// sender's callsign written in by the talkie itself. No packets of kind 0
+// are sent, there being no repeater to tell. As at the repeater, the first
+// to speak holds the channel: while one is heard, another's speech is
+// dropped until OVER_GAP_MS after the first stops. The numbers are each
+// sender's own, so they are followed from the start of each over.
 
 #include <errno.h>
 #include <fcntl.h>
@@ -45,6 +56,7 @@
 
 #include "auth.h"
 #include "console.h"
+#include "local.h"
 #include "microphone.h"
 #include "ptt.h"
 #include "settings.h"
@@ -65,6 +77,10 @@
 static const int16_t tone_steps[TONE_STEPS] = {
 	0, 7071, 10000, 7071, 0, -7071, -10000, -7071
 };
+
+#define LOCAL_KEY "wifitalkie-local-1"
+
+static const uint8_t LOCAL_ID[VOIP_STREAM_ID_BYTES] = {'W', 'T', 'L', 'O', 'C', 'A', 'L', '1'};
 
 static int fd = NOT_OPEN;
 static uint8_t id[VOIP_STREAM_ID_BYTES];
@@ -151,10 +167,22 @@ void voip_tone(int is_on) {
 	is_tone = is_on;
 }
 
+// whether packets can go: the stream with my.sbitx.net, or Local
+static int is_linked(void) {
+	return settings.is_local ? local_is_open() : fd != NOT_OPEN;
+}
+
 static void send_packet(int kind, const uint8_t *sound) {
 	uint8_t packet[VOIP_PACKET_BYTES];
 
 	number_sent++;
+	if (settings.is_local) {
+		voip_packet_make_as(packet, LOCAL_ID, LOCAL_KEY, settings.callsign, kind, settings.hz,
+			number_sent, sound);
+		if (local_send(packet))
+			count_sent++;
+		return;
+	}
 	voip_packet_make(packet, id, up_key, kind, settings.hz, number_sent, sound);
 	if (send(fd, packet, sizeof(packet), 0) == (ssize_t)sizeof(packet))
 		count_sent++;
@@ -166,7 +194,7 @@ static void speak(int is_talking) {
 	int i;
 
 	while (microphone_frame(samples)) {
-		if (!is_talking || fd == NOT_OPEN || settings.hz == 0)
+		if (!is_talking || !is_linked() || settings.hz == 0)
 			continue;
 		for (i = 0; i < TELEPHONE_FRAME_SAMPLES; i++) {
 			if (is_tone) {
@@ -182,7 +210,7 @@ static void speak(int is_talking) {
 static void tell_where_tuned(long now) {
 	long channel = voip_channel_of(settings.hz);
 
-	if (fd == NOT_OPEN || settings.hz == 0)
+	if (fd == NOT_OPEN || settings.hz == 0 || settings.is_local)
 		return;
 	if (is_tuned_begun && now - tuned_ms < TUNED_EVERY_MS
 			&& (channel == channel_told || now - tuned_ms < TUNED_SOON_MS))
@@ -220,6 +248,42 @@ static void take(const uint8_t *packet, int length, int is_talking, long now) {
 	heard_ms = now;
 }
 
+// a packet from another talkie in Local: taken as one from the repeater,
+// but the first heard holds the channel, and each sender's numbers are
+// followed from the start of its over
+static void take_local(const uint8_t *packet, int is_talking, long now) {
+	struct voip_heard heard;
+
+	if (voip_packet_open(packet, VOIP_PACKET_BYTES, LOCAL_ID, LOCAL_KEY, &heard) != VOIP_OPENED) {
+		count_refused++;
+		return;
+	}
+	if (voip_channel_of(heard.hz) != voip_channel_of(settings.hz) || is_talking) {
+		count_dropped++;
+		return;
+	}
+	if (is_hearing && strcmp(heard.callsign, speaker_callsign)) {
+		count_dropped++;
+		return;
+	}
+	if (!is_hearing)
+		is_taken_begun = 0;
+	if (!voip_is_ahead(is_taken_begun, number_taken, heard.number)) {
+		count_dropped++;
+		return;
+	}
+	is_taken_begun = 1;
+	number_taken = heard.number;
+	count_heard++;
+	speaker_take(heard.sound, now);
+	if (!is_hearing) {
+		snprintf(speaker_callsign, sizeof(speaker_callsign), "%s", heard.callsign);
+		console_say("HEARD %s", speaker_callsign);
+	}
+	is_hearing = 1;
+	heard_ms = now;
+}
+
 void voip_poll(long now) {
 	uint8_t packet[VOIP_PACKET_BYTES + 1];
 	int is_talking = ptt_is_down();
@@ -229,8 +293,10 @@ void voip_poll(long now) {
 	if (is_talking != was_talking) {
 		was_talking = is_talking;
 		speaker_mute(is_talking);
-		if (is_talking && fd == NOT_OPEN)
+		if (is_talking && !is_linked())
 			console_say("PTT: NOT ONLINE, NOTHING IS SENT");
+		if (is_talking && settings.is_local && settings.callsign[0] == 0)
+			console_say("PTT: LOCAL, BUT NO CALLSIGN SET");
 		if (is_talking && settings.hz == 0)
 			console_say("PTT: SET FREQ FIRST");
 	}
@@ -238,6 +304,8 @@ void voip_poll(long now) {
 	tell_where_tuned(now);
 	while (fd != NOT_OPEN && (got = recv(fd, packet, sizeof(packet), 0)) > 0)
 		take(packet, got, is_talking, now);
+	while (settings.is_local && local_take(packet))
+		take_local(packet, is_talking, now);
 	if (is_hearing && now - heard_ms > OVER_GAP_MS) {
 		is_hearing = 0;
 		console_say("OVER %s", speaker_callsign);
@@ -246,6 +314,13 @@ void voip_poll(long now) {
 }
 
 void voip_describe(char *text, int room_size) {
+	if (settings.is_local) {
+		if (local_is_open())
+			snprintf(text, room_size, "LOCAL ON CHANNEL %d", LOCAL_CHANNEL);
+		else
+			snprintf(text, room_size, "LOCAL, NOT STARTED");
+		return;
+	}
 	if (fd == NOT_OPEN) {
 		snprintf(text, room_size, "NO STREAM");
 		return;
