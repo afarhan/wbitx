@@ -81,6 +81,7 @@ void settings_load(void) {
 	number_get(handle, "white", &settings.is_white);
 	number_get(handle, "local", &settings.is_local);
 	number_get(handle, "wpm", &settings.wpm);
+	number_get(handle, "batt_offset", (uint32_t *)&settings.battery_offset_mv);
 	for (i = 0; i < SETTINGS_KNOWN; i++) {
 		snprintf(key, sizeof(key), "kssid%d", i);
 		text_get(handle, key, settings.known_ssid[i], sizeof(settings.known_ssid[i]));
@@ -119,6 +120,7 @@ void settings_save(void) {
 	nvs_set_u32(handle, "white", settings.is_white);
 	nvs_set_u32(handle, "local", settings.is_local);
 	nvs_set_u32(handle, "wpm", settings.wpm);
+	nvs_set_u32(handle, "batt_offset", (uint32_t)settings.battery_offset_mv);
 	for (i = 0; i < SETTINGS_KNOWN; i++) {
 		snprintf(key, sizeof(key), "kssid%d", i);
 		nvs_set_str(handle, key, settings.known_ssid[i]);

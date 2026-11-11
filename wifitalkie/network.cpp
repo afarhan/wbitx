@@ -32,6 +32,16 @@
 // NOT_HEARD_MS, not JOIN_WAIT_MS, so that ten remembered are gone through
 // quickly. With none set, the remembered are tried all the same.
 //
+// Going from one to the next, the join being tried must be stopped first,
+// and WiFi.disconnect() does not stop it: it stops only a join made, and
+// the library's own reconnecting starts the old one again after each
+// failure. The driver then refuses the next one's name ("sta is
+// connecting, cannot set config") and goes on trying the old, while the
+// console says JOINING the next: on VU2XZ, 2026-11-11, Airtel_71hh was
+// tried over and over and the remembered Sasi never. So begin() turns the
+// reconnecting off, stops the driver itself, esp_wifi_disconnect(), lets
+// it settle, and sets the next, up to BEGIN_TRIES times.
+//
 // network_ap_begin() puts up an access point of the talkie's own beside
 // the one it joins, for the setup portal (portal.cpp), and network_ap_end()
 // takes it down. While it is up the turn of the remembered is held: a
@@ -83,6 +93,8 @@
 #define NOT_HEARD_MS 3000
 #define REASON_NOT_HEARD 201
 #define SCAN_MOST 12
+#define BEGIN_TRIES 5
+#define BEGIN_SETTLE_MS 50
 
 static int was_up;
 static int reason_said;
@@ -157,12 +169,24 @@ void network_local(int is_on) {
 }
 
 static void begin(const char *ssid, const char *password) {
-	WiFi.disconnect();
-	WiFi.setTxPower(TX_POWER);
-	WiFi.begin(ssid, password);
+	int is_set = 0;
+	int i;
+
+	WiFi.setAutoReconnect(false);
+	for (i = 0; i < BEGIN_TRIES && !is_set; i++) {
+		esp_wifi_disconnect();
+		vTaskDelay(pdMS_TO_TICKS(BEGIN_SETTLE_MS));
+		WiFi.STA.begin();
+		WiFi.setTxPower(TX_POWER);
+		is_set = WiFi.STA.connect(ssid, password);
+	}
+	WiFi.setAutoReconnect(true);
 	WiFi.setTxPower(TX_POWER);
 	join_began_ms = (long)millis();
-	console_say("WIFI JOINING %s", ssid);
+	if (is_set)
+		console_say("WIFI JOINING %s", ssid);
+	else
+		console_say("WIFI %s NOT BEGUN: THE DRIVER WOULD NOT LET GO", ssid);
 }
 
 // the network set, from the start of the turn of those remembered

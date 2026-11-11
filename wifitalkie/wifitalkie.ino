@@ -27,6 +27,7 @@
 //     settings.c       what is kept across power-ups
 //     network.cpp      the WiFi access point
 //     portal.cpp       the setup portal: networks and contacts, on a phone
+//     update.cpp       new firmware sent from a browser to the portal
 //     known.c          the networks remembered, contacts.c the callsigns
 //     service.c        the line to my.sbitx.net, the handshake
 //     auth.c           the cookie, the stretch, the proofs and keys
@@ -56,6 +57,7 @@
 #include "sleep.h"
 #include "speaker.h"
 #include "telephone.h"
+#include "update.h"
 #include "verbs.h"
 #include "voip.h"
 
@@ -99,6 +101,7 @@ void loop() {
 	TIMED(verbs_poll(now));
 	TIMED(network_poll(now));
 	TIMED(portal_poll(now));
+	update_poll(now);
 	TIMED(ptt_poll(now));
 	TIMED(microphone_poll(now));
 	TIMED(service_poll(now));

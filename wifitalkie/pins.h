@@ -37,5 +37,7 @@
 
 // 0 on the hand-wired talkie, whose divider is on the 5 V line, the cell
 // through a Schottky; 1 on the wificomms board, whose divider is on the
-// cell itself, and the USB cannot be told from it
-#define BATTERY_DIVIDER_ON_CELL 0
+// cell itself, R11 and R12 made 10k and 10k (battery.c), and the USB
+// cannot be told from it. Every wificomms board has its R11 and R12
+// changed to 10k by hand, the author's of 2026-11-11, so 1 is for all.
+#define BATTERY_DIVIDER_ON_CELL 1

@@ -36,6 +36,15 @@
 //                  for my.sbitx.net, with MAKE A NEW CODE (service.c)
 //     /contacts    the callsigns kept, up to SETTINGS_CONTACTS, each with
 //                  DELETE, and ADD (contacts.c)
+//     /update      new firmware (update.cpp): the update code shown on
+//                  the talkie's Setup page, then, at /update?code=<it>,
+//                  the file to send; sent, a page saying it is done and
+//                  the talkie restarting, or why it failed
+//
+// One portal for all of it: each page is under one of four tabs, a bar at
+// the top, the author's of 2026-11-11: User, the callsign and the
+// activation code with MAKE A NEW CODE; WiFi, the networks (also /wifi);
+// Contacts; and Firmware. A talkie with no callsign opens on User.
 //
 // A talkie new from its box, with no callsign or no network, is taken
 // through the pages as a wizard of three steps, the author's of
@@ -69,6 +78,7 @@
 #include "portal.h"
 #include "service.h"
 #include "settings.h"
+#include "update.h"
 
 #define DNS_PORT 53
 #define WEB_PORT 80
@@ -130,7 +140,31 @@ static String in_address(const char *text) {
 	return out;
 }
 
+// the tab a page is under, for the bar of tabs at its top
+#define TAB_NONE 0
+#define TAB_USER 1
+#define TAB_WIFI 2
+#define TAB_CONTACTS 3
+#define TAB_FIRMWARE 4
+static int tab;
+
+struct tab_link {
+	int tab;
+	const char *name;
+	const char *to;
+};
+
+static const struct tab_link tabs[] = {
+	{TAB_USER, "User", "/callsign"},
+	{TAB_WIFI, "WiFi", "/wifi"},
+	{TAB_CONTACTS, "Contacts", "/contacts"},
+	{TAB_FIRMWARE, "Firmware", "/update"},
+};
+#define TABS ((int)(sizeof(tabs) / sizeof(tabs[0])))
+
 static void begin_page(String &page, const char *heading) {
+	int i;
+
 	page.reserve(PAGE_ROOM);
 	page += "<!doctype html><html><head><meta charset=utf-8>"
 		"<meta name=viewport content='width=device-width,initial-scale=1'>"
@@ -150,7 +184,22 @@ static void begin_page(String &page, const char *heading) {
 		".notice{background:#eef;padding:8px}.back{display:block;margin:8px 0;color:#036}"
 		".key{display:flex;gap:6px;align-items:center}.key input{flex:1}.key button{margin:0}"
 		".edit{font-size:.8em;color:#036;margin-left:8px}.code{font-size:1.3em;font-family:monospace}"
-		"</style></head><body><h1>";
+		"nav{display:flex;border-bottom:2px solid #036;margin:-4px 0 4px}"
+		"nav a{flex:1;text-align:center;padding:10px 2px;color:#036}"
+		"nav a.on{background:#036;color:#fff;border-radius:4px 4px 0 0}"
+		"</style></head><body>";
+	if (tab != TAB_NONE) {
+		page += "<nav>";
+		for (i = 0; i < TABS; i++) {
+			page += "<a href=";
+			page += tabs[i].to;
+			page += tabs[i].tab == tab ? " class=on>" : ">";
+			page += tabs[i].name;
+			page += "</a>";
+		}
+		page += "</nav>";
+	}
+	page += "<h1>";
 	page += heading;
 	page += "</h1>";
 	if (notice.length() > 0)
@@ -230,7 +279,8 @@ static void show_networks(void) {
 	int i;
 
 	console_say("SETUP: THE NETWORKS TO %s", server.client().remoteIP().toString().c_str());
-	begin_page(page, (html(settings.callsign) + "<a class=edit href=/callsign>&#9998; edit</a>").c_str());
+	tab = TAB_WIFI;
+	begin_page(page, "WiFi");
 	network_ssid(joined, sizeof(joined));
 	network_address(address, sizeof(address));
 	page += "<p>";
@@ -262,11 +312,6 @@ static void show_networks(void) {
 	page += "<a class=row href='/network?s='><span class=name>Another network&hellip;</span>"
 		"<span class=chev>&rsaquo;</span></a>"
 		"<p><a href=/scan style='color:#036'>Listen again</a></p>"
-		"<h2>Contacts</h2><a class=row href=/contacts><span class=name>Contacts</span><small>";
-	page += contacts_count(&settings);
-	page += " of ";
-	page += SETTINGS_CONTACTS;
-	page += "</small><span class=chev>&rsaquo;</span></a>"
 		"<p><small>Press MENU on the talkie when done; this access point closes.</small></p>";
 	end_page(page);
 }
@@ -280,6 +325,7 @@ static void show_network(void) {
 	int is_open_one = 0;
 	int at = ssid.length() > 0 ? heard_at(ssid.c_str(), &rssi, &is_open_one) : -1;
 
+	tab = TAB_WIFI;
 	begin_page(page, ssid.length() > 0 ? html(ssid.c_str()).c_str() : "Another network");
 	page += "<a class=back href=/>&lsaquo; All networks</a>";
 	if (at >= 0) {
@@ -324,11 +370,12 @@ static void show_callsign(void) {
 	String page;
 	int is_set = settings.callsign[0] != 0;
 
-	begin_page(page, is_set ? "Callsign" : "Welcome");
-	if (is_set)
-		page += "<a class=back href=/>&lsaquo; Networks</a>";
-	else
+	tab = TAB_USER;
+	begin_page(page, is_set ? "User" : "Welcome");
+	if (!is_set)
 		page += "<p><b>Step 1 of 3.</b> The callsign this talkie goes by.</p>";
+	else
+		page += "<h2>Callsign</h2>";
 	page += "<form method=post action=/callsign>"
 		"<input name=call placeholder=Callsign maxlength=15 autocapitalize=characters autofocus value=\"";
 	page += html(settings.callsign);
@@ -370,6 +417,83 @@ static void code_new(void) {
 }
 
 // the first page: the callsign, if it is not set yet, or the networks
+// the Update page: the code asked first, then the file
+static void update_heading(String &page) {
+	tab = TAB_FIRMWARE;
+	begin_page(page, "Firmware");
+}
+
+static int is_code_right(void) {
+	return update_is_open() && server.hasArg("code") && server.arg("code").toInt() == update_code();
+}
+
+static void show_update(void) {
+	String page;
+
+	update_heading(page);
+	if (!is_code_right()) {
+		if (server.hasArg("code"))
+			page += "<p class=off>That is not the code on the talkie.</p>";
+		page += "<form method=get action='/update'>"
+			"<p>Type the update code shown on the talkie's Setup page, four figures.</p>"
+			"<input name=code inputmode=numeric autocomplete=off maxlength=4>"
+			"<button class=go>NEXT</button></form>";
+		end_page(page);
+		return;
+	}
+	page += "<form method=post enctype='multipart/form-data' action='/update?code=";
+	page += update_code();
+	page += "'><p>Choose the firmware file, <b>wifitalkie.ino.bin</b>, and SEND. "
+		"It takes some seconds; keep this page open until it says it is done.</p>"
+		"<input type=file name=firmware accept='.bin' required>"
+		"<button class=go>SEND</button></form>";
+	end_page(page);
+}
+
+// the file, a piece at a time, as the browser sends it
+static void update_receive(void) {
+	HTTPUpload &upload = server.upload();
+	static int is_refused;
+
+	if (upload.status == UPLOAD_FILE_START) {
+		is_refused = !is_code_right() || !update_begin((size_t)server.clientContentLength());
+	} else if (upload.status == UPLOAD_FILE_WRITE) {
+		if (!is_refused && !update_take(upload.buf, upload.currentSize))
+			is_refused = 1;
+	} else if (upload.status == UPLOAD_FILE_END) {
+		if (!is_refused && !update_end())
+			is_refused = 1;
+	} else if (upload.status == UPLOAD_FILE_ABORTED) {
+		update_abort("THE SENDING STOPPED");
+	}
+}
+
+// the file all sent: whether it was taken
+static void update_sent(void) {
+	String page;
+	char said[UPDATE_TEXT_ROOM];
+
+	update_heading(page);
+	update_said(said, sizeof(said));
+	if (!strncmp(said, "DONE", 4)) {
+		page += "<p>The firmware is in. The talkie is restarting into it; this page "
+			"is finished, and the talkie's own WiFi goes with it.</p>"
+			"<p>If the new firmware does not start properly, the talkie goes back "
+			"to the old one by itself.</p>";
+	} else if (!is_code_right()) {
+		page += "<p class=off>Refused: the code was not right, or Setup was closed "
+			"on the talkie.</p><a class=back href='/update'>&lsaquo; Try again</a>";
+	} else {
+		page += "<p class=off>Not taken: ";
+		page += html(said);
+		page += "</p><p>The talkie still runs the firmware it had.</p>"
+			"<a class=back href='/update?code=";
+		page += update_code();
+		page += "'>&lsaquo; Try again</a>";
+	}
+	end_page(page);
+}
+
 static void show_first(void) {
 	if (settings.callsign[0] == 0)
 		show_callsign();
@@ -382,6 +506,7 @@ static void show_contacts(void) {
 	int count = contacts_count(&settings);
 	int i;
 
+	tab = TAB_CONTACTS;
 	begin_page(page, "Contacts");
 	page += "<a class=back href=/>&lsaquo; Networks</a><p>";
 	page += count;
@@ -438,6 +563,7 @@ static void wifi_join(void) {
 	if (is_first_time)
 		show_activation();
 	else {
+		tab = TAB_WIFI;
 		begin_page(page, "Joining");
 		page += "<p>The talkie is closing this access point and joining <b>" + html(joining) +
 			"</b>. Its screen says whether it joined.</p>"
@@ -455,6 +581,7 @@ static void show_activation(void) {
 	String page;
 
 	service_code(shown);
+	tab = TAB_USER;
 	begin_page(page, "Activate");
 	page += "<p><b>Step 3 of 3.</b> The talkie is joining <b>" + html(joining) +
 		"</b>; its screen says whether it joined.</p>"
@@ -548,6 +675,9 @@ static void begin_server(void) {
 	server.on("/contact/add", HTTP_POST, contact_add);
 	server.on("/contact/forget", HTTP_POST, contact_forget);
 	server.on("/scan", HTTP_GET, scan);
+	server.on("/wifi", HTTP_GET, show_networks);
+	server.on("/update", HTTP_GET, show_update);
+	server.on("/update", HTTP_POST, update_sent, update_receive);
 	server.onNotFound(elsewhere);
 	is_server_begun = 1;
 }
@@ -573,12 +703,14 @@ void portal_open(void) {
 	network_scan_begin();
 	is_join_due = 0;
 	is_first_time = settings.callsign[0] == 0 || known_count(&settings) == 0;
+	update_open();
 	is_open = 1;
 }
 
 void portal_close(void) {
 	if (!is_open)
 		return;
+	update_close();
 	dns.stop();
 	server.stop();
 	network_ap_end();

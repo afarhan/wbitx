@@ -36,6 +36,8 @@
 //     DISPLAY ON|OFF            the OLED, and its I2C, on or off
 //     AUDIO ON|OFF              GPIO1: the preamplifiers and the amplifier
 //     BATTERY                   the cell's volts, or USB
+//     BATTERY <volts>|CLEAR     the cell is this, by a meter: the board's
+//                               offset is set to make it so (battery.c)
 //     STATUS                    all of it
 //     SLEEP                     sleep until a key is pressed (sleep.c)
 //     RESTART                   start the talkie again
@@ -54,6 +56,7 @@
 #include "driver/gpio.h"
 
 #include "auth.h"
+#include "battery.h"
 #include "console.h"
 #include "display.h"
 #include "keys.h"
@@ -138,12 +141,42 @@ static void say_battery(void) {
 
 	microphone_battery_raw(&code, &pin_millivolts);
 	if (what == MICROPHONE_BATTERY)
-		console_say("BATTERY %d.%02d V (CODE %d, PIN %d MV)", millivolts / 1000,
-			millivolts % 1000 / 10, code, pin_millivolts);
+		console_say("BATTERY %d.%02d V (CODE %d, PIN %d MV, OFFSET %d MV)", millivolts / 1000,
+			millivolts % 1000 / 10, code, pin_millivolts, (int)settings.battery_offset_mv);
 	else if (what == MICROPHONE_USB)
 		console_say("BATTERY ON USB");
 	else
 		console_say("BATTERY NOT READ YET");
+}
+
+// BATTERY <volts>, as 3.95, from a meter on the cell: the offset that
+// makes the reading so, kept; BATTERY CLEAR puts it back to 0
+static void battery_set(const char *word) {
+	int millivolts;
+	int code;
+	int pin_millivolts;
+	char *end;
+	double volts;
+
+	if (!strcmp(word, "CLEAR") || !strcmp(word, "clear")) {
+		settings.battery_offset_mv = 0;
+		settings_save();
+		say_battery();
+		return;
+	}
+	volts = strtod(word, &end);
+	if (*end != 0 || volts < 3.0 || volts > 4.5) {
+		console_say("BATTERY: <VOLTS> FROM 3.0 TO 4.5, OR CLEAR");
+		return;
+	}
+	if (microphone_battery(&millivolts) != MICROPHONE_BATTERY) {
+		console_say("BATTERY NOT READ YET");
+		return;
+	}
+	microphone_battery_raw(&code, &pin_millivolts);
+	settings.battery_offset_mv = battery_offset_for(pin_millivolts, (int)(volts * 1000 + 0.5));
+	settings_save();
+	say_battery();
 }
 
 static void say_status(void) {
@@ -397,7 +430,10 @@ void verbs_do(const char *line, long now) {
 		return;
 	}
 	if (!strcmp(verb, "BATTERY")) {
-		say_battery();
+		if (first[0] != 0)
+			battery_set(first);
+		else
+			say_battery();
 		return;
 	}
 	if (!strcmp(verb, "STATUS")) {

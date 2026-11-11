@@ -49,7 +49,9 @@
 //         Callsign       entered a character at a time, below
 //         Setup...       the setup portal (portal.cpp), open while the
 //                        page is shown: what to join on a telephone and
-//                        where to go. It opens by itself at power-up when
+//                        where to go, and the code its Firmware tab asks
+//                        for, or how a firmware being sent goes. It opens
+//                        by itself at power-up when
 //                        the talkie knows no network.
 //         Device key     the talkie's key, to add at my.sbitx.net as one
 //                        of the owner's radios, and whether it is in yet
@@ -114,6 +116,7 @@
 #include "service.h"
 #include "settings.h"
 #include "screen.h"
+#include "update.h"
 #include "speaker.h"
 #include "sleep.h"
 #include "voip.h"
@@ -982,8 +985,12 @@ static void draw_setup(void) {
 	line(0, "On a phone, join");
 	portal_name(text, sizeof(text));
 	line(1, text);
-	line(2, "then open");
-	line(3, "192.168.4.1");
+	line(2, "open 192.168.4.1");
+	update_said(text, sizeof(text));
+	if (text[0] == 0)
+		snprintf(text, sizeof(text), "Update code %d", update_code());
+	fit(text, DISPLAY_WIDE);
+	line(3, text);
 	if (network_ap_clients() > 0) {
 		snprintf(text, sizeof(text), "%d JOINED   MENU: CLOSE", network_ap_clients());
 		help(text);

@@ -50,7 +50,9 @@
 // the diode added back; with the USB in it is the USB's, over the top of
 // the ADC, and reads high, but it is shown all the same, at the author's
 // asking. On the wificomms board, BATTERY_DIVIDER_ON_CELL, it is on the
-// cell, and is the cell's.
+// cell, 10k and 10k against the SuperMini's 4.7k pull-up, and battery.c
+// turns the pin's volts into the cell's, with the board's offset,
+// settings.battery_offset_mv.
 // (The C3 cannot read a pin by itself, one-shot, while ADC1 runs
 // continuously.)
 //
@@ -78,6 +80,7 @@
 #include "esp_adc/adc_continuous.h"
 #include "driver/gpio.h"
 
+#include "battery.h"
 #include "console.h"
 #include "microphone.h"
 #include "pins.h"
@@ -329,7 +332,11 @@ int microphone_battery(int *millivolts) {
 	*millivolts = 0;
 	if (!is_open || !is_battery_read || battery_count < (1 << BATTERY_SHIFT) || !is_cali)
 		return MICROPHONE_UNKNOWN;
+#if BATTERY_DIVIDER_ON_CELL
+	*millivolts = battery_cell_mv(code_millivolts(code), settings.battery_offset_mv);
+#else
 	*millivolts = 2 * code_millivolts(code) + BATTERY_DIODE_MV;
+#endif
 	return MICROPHONE_BATTERY;
 }
 

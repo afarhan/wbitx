@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "../wifitalkie/auth.h"
+#include "../wifitalkie/battery.h"
 #include "../wifitalkie/button.h"
 #include "../wifitalkie/dial.h"
 #include "../wifitalkie/entry.h"
@@ -606,6 +607,35 @@ static void test_local_packet(void) {
 		"a local packet spoilt is refused");
 }
 
+// the pin's volts for a cell, as the divider and the pull-up make them
+static int pin_for(double cell) {
+	double r1 = BATTERY_TOP_OHMS, r2 = BATTERY_BOTTOM_OHMS, rp = BATTERY_PULLUP_OHMS;
+	double rail = (BATTERY_SAG_AT_0_MV + cell * BATTERY_SAG_PER_MILLE) / 1000.0;
+
+	if (rail > BATTERY_RAIL_MV / 1000.0)
+		rail = BATTERY_RAIL_MV / 1000.0;
+
+	return (int)(1000 * (cell / r1 + rail / rp) / (1 / r1 + 1 / r2 + 1 / rp) + 0.5);
+}
+
+static void test_battery(void) {
+	expect(abs(pin_for(3.7) - 2345) <= 2, "the pin at a cell of 3.7 V, the rail sagged, is 2.35 V");
+	expect(pin_for(3.7) * 1000 >= 750 * (BATTERY_SAG_AT_0_MV + 3.7 * BATTERY_SAG_PER_MILLE),
+		"at 3.7 V the pin still reads high on the sagged rail");
+	expect(abs(battery_cell_mv(pin_for(4.0), 0) - 4000) <= 5, "4.0 V, under the knee, reads back");
+	expect(abs(battery_cell_mv(pin_for(5.0), 0) - 5000) <= 5, "5.0 V, over the knee, reads back");
+	expect(abs(battery_cell_mv(2361, 0) - 3740) <= 20, "the bench's 3.7 V point reads 3.74 V");
+	expect(pin_for(4.4) < 2950, "at 4.4 V the pin is under the ADC's top");
+	expect(abs(battery_cell_mv(pin_for(3.7), 0) - 3700) <= 5, "3.7 V reads back");
+	expect(abs(battery_cell_mv(pin_for(4.2), 0) - 4200) <= 5, "4.2 V reads back");
+	expect(abs(battery_cell_mv(pin_for(4.4), 0) - 4400) <= 5, "4.4 V reads back");
+	expect(battery_cell_mv(pin_for(4.0), 120) - battery_cell_mv(pin_for(4.0), 0) == 120,
+		"the offset is added");
+	expect(battery_cell_mv(pin_for(3.9), battery_offset_for(pin_for(3.9), 3950)) == 3950,
+		"the offset found makes the meter's reading");
+	expect(battery_cell_mv(0, 0) == 0, "a pin at 0 V is no cell, not less");
+}
+
 int main(void) {
 	telephone_open();
 	playback_open();
@@ -623,6 +653,7 @@ int main(void) {
 	test_cookie();
 	test_stretch();
 	test_local_packet();
+	test_battery();
 	if (failures == 0)
 		printf("test_units: all passed\n");
 	return failures;
