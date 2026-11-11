@@ -11,7 +11,7 @@ PORT ?= /dev/ttyACM0
 ZBITXRE ?= /home/farhan/Documents/hfsigs/claude_sbitx
 CFLAGS = -O2 -Wall -Wextra -std=c11 -D_DEFAULT_SOURCE
 
-PLAIN = wifitalkie/auth.c wifitalkie/battery.c wifitalkie/button.c wifitalkie/contacts.c wifitalkie/dial.c wifitalkie/entry.c wifitalkie/halves.c wifitalkie/known.c wifitalkie/playback.c wifitalkie/sha256.c wifitalkie/speech.c wifitalkie/telephone.c wifitalkie/voip_packet.c
+PLAIN = wifitalkie/auth.c wifitalkie/battery.c wifitalkie/button.c wifitalkie/contacts.c wifitalkie/dial.c wifitalkie/entry.c wifitalkie/halves.c wifitalkie/known.c wifitalkie/playback.c wifitalkie/sha256.c wifitalkie/speech.c wifitalkie/telephone.c wifitalkie/voip_packet.c wifitalkie/vox.c
 
 all: build/wifitalkie.ino.bin
 

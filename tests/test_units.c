@@ -29,6 +29,7 @@
 #include "../wifitalkie/playback.h"
 #include "../wifitalkie/settings.h"
 #include "../wifitalkie/speech.h"
+#include "../wifitalkie/vox.h"
 #include "../wifitalkie/telephone.h"
 #include "../wifitalkie/voip_packet.h"
 
@@ -636,6 +637,43 @@ static void test_battery(void) {
 	expect(battery_cell_mv(0, 0) == 0, "a pin at 0 V is no cell, not less");
 }
 
+// a second of samples of mean size near size, a square wave of it
+static void vox_feed(struct vox *v, int size, int ms, int level, int is_held_off) {
+	int i;
+
+	for (i = 0; i < ms * 8; i++)
+		vox_take(v, (int16_t)(i % 2 ? size : -size), level, is_held_off, 8000);
+}
+
+static void test_vox(void) {
+	struct vox v;
+
+	vox_begin(&v);
+	vox_feed(&v, 20, 3000, 5, 0);
+	expect(!vox_is_keyed(&v), "the noise alone does not key it");
+	vox_feed(&v, 400, 10, 5, 0);
+	expect(!vox_is_keyed(&v), "a click of 10 ms does not key it");
+	vox_feed(&v, 20, 500, 5, 0);
+	vox_feed(&v, 400, 100, 5, 0);
+	expect(vox_is_keyed(&v), "a voice of 100 ms keys it");
+	vox_feed(&v, 20, 800, 5, 0);
+	expect(vox_is_keyed(&v), "a gap of 800 ms between words holds it");
+	vox_feed(&v, 20, 1500, 5, 0);
+	expect(!vox_is_keyed(&v), "1.5 s quiet lets it go");
+	vox_feed(&v, 400, 200, VOX_OFF, 0);
+	expect(!vox_is_keyed(&v), "off, a voice does not key it");
+	vox_feed(&v, 400, 200, 5, 1);
+	expect(!vox_is_keyed(&v), "held off, a voice does not key it");
+	vox_begin(&v);
+	vox_feed(&v, 20, 3000, 1, 0);
+	vox_feed(&v, 120, 200, 1, 0);
+	expect(!vox_is_keyed(&v), "at 1, a quiet voice does not key it");
+	vox_begin(&v);
+	vox_feed(&v, 20, 3000, 10, 0);
+	vox_feed(&v, 120, 200, 10, 0);
+	expect(vox_is_keyed(&v), "at 10, the same quiet voice keys it");
+}
+
 int main(void) {
 	telephone_open();
 	playback_open();
@@ -654,6 +692,7 @@ int main(void) {
 	test_stretch();
 	test_local_packet();
 	test_battery();
+	test_vox();
 	if (failures == 0)
 		printf("test_units: all passed\n");
 	return failures;

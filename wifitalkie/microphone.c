@@ -26,10 +26,14 @@
 // it was asked for: the packets go at the rate the microphone makes them.
 //
 // What comes out of the 8000 a second goes as it is: speech.c's high-pass
-// was taken out on 6 November 2026. speech.c's gate, the VOX, sends the gaps between words as
-// comfort noise, while settings.is_vox, the verb VOX, has it on; it is on
+// was taken out on 6 November 2026. speech.c's gate sends the gaps between words as
+// comfort noise, while settings.is_gate, the verb GATE, has it on; it is on
 // unless turned off. It was made for a mic element whose voice stood little
 // above the noise, and keeps the gaps quiet with any.
+//
+// Each sample also goes to vox.c, before the gate, which keys the talkie
+// by the voice while settings.vox is on: microphone_vox() says whether it
+// has, and microphone_vox_hold() holds it off while voip.c hears a voice.
 // LEVELS measures before the gate, and RECORD keeps
 // what is sent.
 //
@@ -86,6 +90,7 @@
 #include "pins.h"
 #include "settings.h"
 #include "speech.h"
+#include "vox.h"
 
 #define SAMPLE_HZ DOUBLE_RATE_HZ
 #define STORE_BYTES 4096
@@ -125,6 +130,8 @@ static int is_open;
 static int32_t mean;
 static struct telephone_down down;
 static struct speech speech;
+static struct vox vox;
+static int is_vox_held;
 static int16_t frames[FRAMES_KEPT][TELEPHONE_FRAME_SAMPLES];
 static int frame_in;
 static int frame_out;
@@ -163,6 +170,7 @@ static void open_on(int pin) {
 
 	telephone_down_begin(&down);
 	speech_begin(&speech, TELEPHONE_RATE_HZ);
+	vox_begin(&vox);
 	mean = ADC_MIDDLE << MEAN_FRACTION_SHIFT;
 	if (adc_continuous_io_to_channel(pin, &unit, &channel) != ESP_OK || unit != ADC_UNIT_1) {
 		console_say("MIC: PIN %d IS NOT ON ADC1", pin);
@@ -266,7 +274,8 @@ static void take(int raw) {
 	if (!telephone_down_take(&down, (int16_t)sample, &kept))
 		return;
 	measure(kept);
-	if (settings.is_vox)
+	vox_take(&vox, kept, (int)settings.vox, is_vox_held, TELEPHONE_RATE_HZ);
+	if (settings.is_gate)
 		kept = speech_gate(&speech, kept, TELEPHONE_RATE_HZ);
 	if (is_recording && record_filled < RECORD_SAMPLES)
 		recorded[record_filled++] = kept;
@@ -411,6 +420,22 @@ void microphone_poll(long now) {
 	squares = 0;
 	counted = 0;
 	second_began_ms = now;
+}
+
+// 1 while the voice keys the talkie
+int microphone_vox(void) {
+	return is_open && vox_is_keyed(&vox);
+}
+
+// held off, the voice does not key the talkie, nor is the background learnt
+void microphone_vox_hold(int is_held) {
+	is_vox_held = is_held;
+}
+
+// for the screen's meter: the voice's size now, and the size that keys
+void microphone_vox_meter(int *size, int *threshold) {
+	*size = vox_size(&vox);
+	*threshold = vox_threshold(&vox, (int)settings.vox);
 }
 
 int microphone_frame(int16_t samples[TELEPHONE_FRAME_SAMPLES]) {

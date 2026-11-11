@@ -25,6 +25,11 @@
 // on the right side, speaks on every page, debounced the same way, and is
 // set up here, an input with its pull-up. The verb still speaks.
 //
+// VOX: the voice keys the talkie as the button does (vox.c, by way of
+// microphone.c), with the same minute at most; PTT ON (VOX) says so.
+// ptt_is_vox() says the talkie was keyed by the voice, for voip.c to send
+// what came just before.
+//
 // The lamp is lit while the talkie speaks or hears; voip.c says which. It
 // was the board's LED; that pin is now the UP key, and the lamp is shown on
 // the display.
@@ -32,6 +37,7 @@
 #include "driver/gpio.h"
 
 #include "console.h"
+#include "microphone.h"
 #include "network.h"
 #include "pins.h"
 #include "ptt.h"
@@ -55,6 +61,7 @@ static int is_cut;
 static int is_lit;
 static long cut_ms;
 static int is_lent;
+static int is_by_vox;
 
 void ptt_set(int is_verb) {
 	is_verb_down = is_verb;
@@ -94,6 +101,9 @@ void ptt_poll(long now) {
 	if (now - key_changed_ms >= DEBOUNCE_MS)
 		is_key_down = key_level == 0;
 	is_wanted = is_verb_down || is_key_down || (is_button_down && !is_lent);
+	if (!is_wanted && !is_down)
+		is_by_vox = microphone_vox();
+	is_wanted = is_wanted || microphone_vox();
 	if (ALWAYS_SPEAKING && network_is_up()) {
 		is_wanted = 1;
 		if (is_cut && now - cut_ms >= ALWAYS_GAP_MS)
@@ -113,10 +123,15 @@ void ptt_poll(long now) {
 		console_say("PTT OFF: ONE MINUTE");
 	}
 	if (is_wanted && !is_down)
-		console_say("PTT ON");
+		console_say(is_by_vox ? "PTT ON (VOX)" : "PTT ON");
 	if (!is_wanted && is_down && !is_cut)
 		console_say("PTT OFF");
 	is_down = is_wanted;
+}
+
+// 1 if the over now was begun by the voice, not the button or the verb
+int ptt_is_vox(void) {
+	return is_down && is_by_vox;
 }
 
 int ptt_is_down(void) {

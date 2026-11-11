@@ -25,7 +25,9 @@
 //     TONE ON|OFF               1 kHz in place of the microphone
 //     VOL <0-100>  MIC <0-100>  the speaker's level and the microphone's
 //     LEVELS ON|OFF             the microphone's levels each second
-//     VOX ON|OFF                the gaps between words as comfort noise
+//     VOX <1-10>|OFF            speak by the voice, without the PTT: the
+//                               sensitivity, 10 the most (vox.c)
+//     GATE ON|OFF               the gaps between words as comfort noise
 //     KEYS                      each key's pin as it is now, DOWN or up
 //     PIN <0-21>                how a GPIO is set now: its pulls, input,
 //                               output, function, and the level read
@@ -71,6 +73,7 @@
 #include "speaker.h"
 #include "verbs.h"
 #include "voip.h"
+#include "vox.h"
 
 #define WORD_ROOM 80
 #define SAID_ROOM 200
@@ -207,10 +210,11 @@ static void say_status(void) {
 	speaker_describe(text, sizeof(text));
 	console_say("SPEAKER %s", text);
 	microphone_levels(&levels);
-	if (settings.is_vox)
-		console_say("VOX ON");
-	else
+	if (settings.vox == VOX_OFF)
 		console_say("VOX OFF");
+	else
+		console_say("VOX %u", (unsigned)settings.vox);
+	console_say("GATE %s", settings.is_gate ? "ON" : "OFF");
 	console_say("MIC %u, PEAK %d RMS %d, ADC %d A SECOND (%d READ, %d STRANGE, %u RESTARTS)",
 		(unsigned)settings.mic, levels.peak, levels.rms, levels.samples_a_second,
 		levels.results, levels.strangers, levels.restarts);
@@ -388,13 +392,28 @@ void verbs_do(const char *line, long now) {
 		console_say("LINK %s", settings.is_local ? "LOCAL" : "INTERNET");
 		return;
 	}
-	if (!strcmp(verb, "VOX") && is_on_off(first, &is_on)) {
-		settings.is_vox = (uint32_t)is_on;
+	if (!strcmp(verb, "GATE") && is_on_off(first, &is_on)) {
+		settings.is_gate = (uint32_t)is_on;
 		settings_save();
-		if (is_on)
-			console_say("VOX ON");
-		else
+		console_say("GATE %s", is_on ? "ON" : "OFF");
+		return;
+	}
+	if (!strcmp(verb, "VOX")) {
+		char *end;
+		long level = strtol(first, &end, 10);
+
+		if (!strcasecmp(first, "OFF")) {
+			level = VOX_OFF;
+		} else if (first[0] == 0 || *end != 0 || level < 1 || level > VOX_LEVEL_MOST) {
+			console_say("VOX: 1 TO %d, 10 THE MOST SENSITIVE, OR OFF", VOX_LEVEL_MOST);
+			return;
+		}
+		settings.vox = (uint32_t)level;
+		settings_save();
+		if (level == VOX_OFF)
 			console_say("VOX OFF");
+		else
+			console_say("VOX %ld", level);
 		return;
 	}
 	if (!strcmp(verb, "PIN") && first[0] != 0) {
@@ -449,7 +468,7 @@ void verbs_do(const char *line, long now) {
 		esp_restart();
 		return;
 	}
-	console_say("? %s: WIFI SCAN LINK RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX KEYS PIN SCREEN RECORD MICPIN DISPLAY AUDIO BATTERY STATUS SLEEP RESTART", verb);
+	console_say("? %s: WIFI SCAN LINK RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX GATE KEYS PIN SCREEN RECORD MICPIN DISPLAY AUDIO BATTERY STATUS SLEEP RESTART", verb);
 }
 
 void verbs_poll(long now) {

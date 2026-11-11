@@ -25,6 +25,13 @@
 // steady 1 kHz goes in its place, to try the way up without a microphone.
 // Every packet is numbered, one after another, both kinds together.
 //
+// VOX: while the PTT is up, the last PREROLL_FRAMES of the microphone's are
+// kept, and when the voice keys the talkie (ptt_is_vox()) they go first,
+// so that the word that keyed it is not cut: the voice is some tens of
+// milliseconds old by the time vox.c is sure of it. The voice is held off
+// keying the talkie while a voice is heard and VOX_QUIET_MS after, so that
+// the speaker does not key it through the microphone.
+//
 // WHAT IS HEARD
 //
 // A packet is taken if it is the stream's, its tag is right by the down key,
@@ -70,6 +77,8 @@
 #define TUNED_SOON_MS 1000
 #define BUSY_SHOWN_MS 3000
 #define OVER_GAP_MS 1000
+#define PREROLL_FRAMES 8
+#define VOX_QUIET_MS 600
 #define TEXT_ROOM 48
 #define TONE_STEPS 8
 
@@ -100,6 +109,9 @@ static long polled_ms;
 static int is_tone;
 static int tone_at;
 static int was_talking;
+static int16_t preroll[PREROLL_FRAMES][TELEPHONE_FRAME_SAMPLES];
+static int preroll_at;
+static int preroll_count;
 static int is_hearing;
 static long heard_ms;
 static char speaker_callsign[VOIP_CALLSIGN_ROOM];
@@ -188,23 +200,44 @@ static void send_packet(int kind, const uint8_t *sound) {
 		count_sent++;
 }
 
-static void speak(int is_talking) {
-	int16_t samples[TELEPHONE_FRAME_SAMPLES];
+// one frame of the microphone's sent as speech, or the tone in its place
+static void speak_frame(int16_t samples[TELEPHONE_FRAME_SAMPLES]) {
 	uint8_t sound[TELEPHONE_FRAME_SAMPLES];
 	int i;
 
-	while (microphone_frame(samples)) {
-		if (!is_talking || !is_linked() || settings.hz == 0)
-			continue;
-		for (i = 0; i < TELEPHONE_FRAME_SAMPLES; i++) {
-			if (is_tone) {
-				samples[i] = tone_steps[tone_at];
-				tone_at = (tone_at + 1) % TONE_STEPS;
-			}
-			sound[i] = telephone_ulaw_of(samples[i]);
+	for (i = 0; i < TELEPHONE_FRAME_SAMPLES; i++) {
+		if (is_tone) {
+			samples[i] = tone_steps[tone_at];
+			tone_at = (tone_at + 1) % TONE_STEPS;
 		}
-		send_packet(VOIP_KIND_SPEECH, sound);
+		sound[i] = telephone_ulaw_of(samples[i]);
 	}
+	send_packet(VOIP_KIND_SPEECH, sound);
+}
+
+static void speak(int is_talking) {
+	int16_t samples[TELEPHONE_FRAME_SAMPLES];
+	int i;
+
+	while (microphone_frame(samples)) {
+		if (!is_talking) {
+			memcpy(preroll[preroll_at], samples, sizeof(samples));
+			preroll_at = (preroll_at + 1) % PREROLL_FRAMES;
+			if (preroll_count < PREROLL_FRAMES)
+				preroll_count++;
+			continue;
+		}
+		if (!is_linked() || settings.hz == 0)
+			continue;
+		if (preroll_count > 0 && ptt_is_vox()) {
+			for (i = preroll_count; i > 0; i--)
+				speak_frame(preroll[(preroll_at - i + PREROLL_FRAMES) % PREROLL_FRAMES]);
+		}
+		preroll_count = 0;
+		speak_frame(samples);
+	}
+	if (is_talking)
+		preroll_count = 0;
 }
 
 static void tell_where_tuned(long now) {
@@ -290,6 +323,7 @@ void voip_poll(long now) {
 	int got;
 
 	polled_ms = now;
+	microphone_vox_hold(is_hearing || now - heard_ms < VOX_QUIET_MS);
 	if (is_talking != was_talking) {
 		was_talking = is_talking;
 		speaker_mute(is_talking);

@@ -58,7 +58,7 @@ void settings_load(void) {
 	settings.port = SETTINGS_DEFAULT_PORT;
 	settings.volume = SETTINGS_DEFAULT_VOLUME;
 	settings.mic = SETTINGS_DEFAULT_MIC;
-	settings.is_vox = SETTINGS_DEFAULT_VOX;
+	settings.is_gate = SETTINGS_DEFAULT_GATE;
 	settings.wpm = SETTINGS_DEFAULT_WPM;
 	settings.is_voip_online = 1;
 	if (nvs_open(NAMESPACE, NVS_READONLY, &handle) != ESP_OK)
@@ -76,7 +76,8 @@ void settings_load(void) {
 	number_get(handle, "voip", &settings.is_voip_online);
 	number_get(handle, "volume", &settings.volume);
 	number_get(handle, "mic", &settings.mic);
-	number_get(handle, "vox", &settings.is_vox);
+	number_get(handle, "vox", &settings.is_gate);
+	number_get(handle, "vox_level", &settings.vox);
 	number_get(handle, "headset", &settings.is_headset);
 	number_get(handle, "white", &settings.is_white);
 	number_get(handle, "local", &settings.is_local);
@@ -115,7 +116,8 @@ void settings_save(void) {
 	nvs_set_u32(handle, "voip", settings.is_voip_online);
 	nvs_set_u32(handle, "volume", settings.volume);
 	nvs_set_u32(handle, "mic", settings.mic);
-	nvs_set_u32(handle, "vox", settings.is_vox);
+	nvs_set_u32(handle, "vox", settings.is_gate);
+	nvs_set_u32(handle, "vox_level", settings.vox);
 	nvs_set_u32(handle, "headset", settings.is_headset);
 	nvs_set_u32(handle, "white", settings.is_white);
 	nvs_set_u32(handle, "local", settings.is_local);

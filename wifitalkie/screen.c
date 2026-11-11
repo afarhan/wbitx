@@ -46,6 +46,11 @@
 //         Audio          the in-built mic or the handsfree's
 //         Morse speed    for entering text, large; UP and DOWN step it,
 //                        from HALVES_WPM_LEAST to HALVES_WPM_MOST
+//         VOX            speaking by the voice, without the PTT (vox.c):
+//                        the sensitivity, Off or 1 to 10, large; UP and
+//                        DOWN step it; below, the voice's level now as a
+//                        bar, the level that keys as a mark across it, and
+//                        KEYED while the voice keys the talkie
 //         Callsign       entered a character at a time, below
 //         Setup...       the setup portal (portal.cpp), open while the
 //                        page is shown: what to join on a telephone and
@@ -120,6 +125,7 @@
 #include "speaker.h"
 #include "sleep.h"
 #include "voip.h"
+#include "vox.h"
 
 #define DRAW_EVERY_MS 200
 #define SAVE_AFTER_MS 2000
@@ -171,6 +177,8 @@
 #define PAGE_THEME 16
 #define PAGE_ACTIVATE 18
 #define PAGE_LINK 19
+#define PAGE_VOX 21
+#define VOX_METER_MOST 600
 
 struct item {
 	const char *name;
@@ -191,6 +199,7 @@ static const struct item main_items[] = {
 static const struct item settings_items[] = {
 	{"Audio", PAGE_AUDIO},
 	{"Morse speed", PAGE_WPM},
+	{"VOX", PAGE_VOX},
 	{"Callsign", PAGE_CALLSIGN},
 	{"Setup...", PAGE_SETUP},
 	{"Device key", PAGE_ACTIVATE},
@@ -327,6 +336,17 @@ static void wpm_step(const struct key_press *press, long now) {
 	if (wpm > HALVES_WPM_MOST)
 		wpm = HALVES_WPM_MOST;
 	settings.wpm = (uint32_t)wpm;
+	save_soon(now);
+}
+
+static void vox_step(const struct key_press *press, long now) {
+	int level = (int)settings.vox + (press->key == KEY_UP ? 1 : -1);
+
+	if (level < VOX_OFF)
+		level = VOX_OFF;
+	if (level > VOX_LEVEL_MOST)
+		level = VOX_LEVEL_MOST;
+	settings.vox = (uint32_t)level;
 	save_soon(now);
 }
 
@@ -586,6 +606,10 @@ static void take_page(const struct key_press *press, long now) {
 		wpm_step(press, now);
 		return;
 	}
+	if (page == PAGE_VOX && is_up_or_down(press)) {
+		vox_step(press, now);
+		return;
+	}
 	if (page == PAGE_CONTACTS && is_up_or_down(press)) {
 		contacts_scroll(press->key == KEY_UP);
 		return;
@@ -774,6 +798,8 @@ static void item_value(int of_page, char *text, int room) {
 		snprintf(text, room, "%u", (unsigned)(settings.hz / HZ_A_KHZ));
 	if (of_page == PAGE_WPM)
 		snprintf(text, room, "%u", (unsigned)settings.wpm);
+	if (of_page == PAGE_VOX)
+		snprintf(text, room, settings.vox == VOX_OFF ? "Off" : "%u", (unsigned)settings.vox);
 	if (of_page == PAGE_CALLSIGN)
 		snprintf(text, room, "%s", settings.callsign);
 	if (of_page == PAGE_CONTACTS)
@@ -1034,6 +1060,38 @@ static void draw_contacts(long now) {
 	help(now / HELP_EVERY_MS % 2 ? "ADD THEM AT SETUP" : "UP/DOWN   MENU: BACK");
 }
 
+// the voice's level against the level that keys, on the VOX page
+static void vox_meter(int y) {
+	int size;
+	int threshold;
+	int mark;
+
+	microphone_vox_meter(&size, &threshold);
+	if (size > VOX_METER_MOST)
+		size = VOX_METER_MOST;
+	display_text_at(0, y, 1, "Mic");
+	display_bar(BAR_X, y, BAR_WIDE, size * BAR_WIDE / VOX_METER_MOST);
+	if (settings.vox == VOX_OFF)
+		return;
+	if (threshold > VOX_METER_MOST)
+		threshold = VOX_METER_MOST;
+	mark = BAR_X + threshold * (BAR_WIDE - 1) / VOX_METER_MOST;
+	display_fill(mark, y - 2, 1, FONT_HIGH + 4);
+}
+
+static void draw_vox(void) {
+	char text[TEXT_ROOM];
+
+	title("VOX");
+	if (settings.vox == VOX_OFF)
+		snprintf(text, sizeof(text), "Off");
+	else
+		snprintf(text, sizeof(text), "%u", (unsigned)settings.vox);
+	big(text, PAGE_BIG_Y);
+	vox_meter(line_y(3));
+	help(microphone_vox() ? "KEYED   MENU: BACK" : "UP/DOWN   MENU: BACK");
+}
+
 static void draw(long now) {
 	char text[TEXT_ROOM];
 
@@ -1055,6 +1113,8 @@ static void draw(long now) {
 		big(text, PAGE_BIG_Y);
 		help("UP/DOWN   MENU: BACK");
 	}
+	if (page == PAGE_VOX)
+		draw_vox();
 	if (page == PAGE_CALLSIGN)
 		draw_entry("Callsign", now);
 	if (page == PAGE_WIFI)

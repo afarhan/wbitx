@@ -25,7 +25,7 @@ extern "C" {
 #define SETTINGS_DEFAULT_PORT 8081
 #define SETTINGS_DEFAULT_VOLUME 50
 #define SETTINGS_DEFAULT_MIC 50
-#define SETTINGS_DEFAULT_VOX 1
+#define SETTINGS_DEFAULT_GATE 1
 #define SETTINGS_DEFAULT_WPM 12
 #define SETTINGS_LEVEL_MOST 100
 
@@ -43,7 +43,8 @@ struct settings {
 	uint32_t is_voip_online;
 	uint32_t volume;
 	uint32_t mic;
-	uint32_t is_vox;
+	uint32_t is_gate;            // speech.c's gate: the gaps as comfort noise, GATE
+	uint32_t vox;                // VOX sensitivity, 0 off or 1 to VOX_LEVEL_MOST (vox.c)
 	uint32_t wpm;                // the Morse keyer's words a minute, for text
 	uint32_t is_headset;         // the mic of the handsfree, not the in-built one
 	uint32_t is_white;           // the display's theme: dark dots on white
