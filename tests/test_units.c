@@ -23,7 +23,7 @@
 #include "../wifitalkie/button.h"
 #include "../wifitalkie/dial.h"
 #include "../wifitalkie/entry.h"
-#include "../wifitalkie/halves.h"
+#include "../wifitalkie/morse.h"
 #include "../wifitalkie/contacts.h"
 #include "../wifitalkie/known.h"
 #include "../wifitalkie/playback.h"
@@ -389,90 +389,153 @@ static void test_entry(void) {
 	printf("entry: scrolled round, added, taken off, kept to its length\n");
 }
 
+static void test_keyboard(void) {
+	struct entry e;
+
+	expect((int)strlen(ENTRY_KEYBOARD) == ENTRY_KEYS, "the keyboard has all its keys");
+	entry_begin(&e, ENTRY_CALLSIGN, "", SETTINGS_CALLSIGN_ROOM - 1);
+	expect(entry_key(&e) == 'Q', "the keyboard starts at Q");
+	entry_key_move(&e, -1);
+	expect(entry_key(&e) == '0', "back from a row's start goes to the row above's end");
+	entry_key_move(&e, 1);
+	entry_key_row(&e, 1);
+	entry_key_row(&e, 1);
+	expect(entry_key(&e) == 'Z', "a row down, and down again");
+	entry_key_row(&e, 1);
+	expect(entry_key(&e) == '1', "down from the bottom goes round to the top");
+	entry_key_take(&e);
+	expect(!strcmp(e.text, "1"), "the chosen key is typed");
+	e.key_at = 19;	/* P */
+	entry_key_row(&e, 1);
+	expect(entry_key(&e) == '0', "keys not of the set, the comma and question mark, are passed over going down");
+	e.key_at = 36;	/* M */
+	entry_key_move(&e, 1);
+	expect(entry_key(&e) == '/', "the stop is passed over along, the stroke is of a callsign's set");
+	entry_key_move(&e, 1);
+	expect(entry_key(&e) == '1', "on from the last open key goes round to the first");
+	expect(entry_key_take(&e) && !strcmp(e.text, "11"), "typed again");
+	e.key_at = 37;	/* . */
+	expect(!entry_key_take(&e) && !strcmp(e.text, "11"), "a key not of the set types nothing");
+	e.key_at = ENTRY_KEY_FIRST;
+	entry_key_row(&e, -1);
+	expect(entry_key(&e) == '1', "a row up");
+	entry_key_row(&e, -1);
+	expect(entry_key(&e) == 'Z', "up from the top goes round to the bottom");
+	entry_begin(&e, ENTRY_CALLSIGN, "", 8);
+	entry_key_move(&e, 1);
+	entry_key_moved(&e, 1000);
+	expect(!entry_key_settle(&e, 1000 + ENTRY_KEY_SETTLE_MS - 1, 0) && e.length == 0,
+		"a key moved to is not typed while it is still being moved");
+	expect(entry_key_settle(&e, 1000 + ENTRY_KEY_SETTLE_MS, 0) && !strcmp(e.text, "W"),
+		"a key moved to is typed once it is left");
+	expect(!entry_key_settle(&e, 9000, 0) && !strcmp(e.text, "W"), "and only once");
+	entry_key_moved(&e, 9000);
+	expect(entry_key_settle(&e, 9000, 1) && !strcmp(e.text, "WW"), "or at once, when asked");
+	entry_key_moved(&e, 9000);
+	entry_key_cancel(&e);
+	expect(!entry_key_settle(&e, 99000, 0) && !strcmp(e.text, "WW"), "a key moved to, cancelled, is not typed");
+	entry_begin(&e, ENTRY_ANY, "", 8);
+	e.key_at = 29;
+	expect(entry_key_take(&e) && !strcmp(e.text, ","), "the comma is of the whole set");
+	printf("keyboard: along, down and up, round, passed over, typed when left\n");
+}
+
 #define KEYED_WPM 12
-#define KEYED_UNIT_MS (HALVES_MS_A_WPM / KEYED_WPM)
+#define KEYED_UNIT_MS (MORSE_MS_A_WPM / KEYED_WPM)
 #define KEYED_TURN_MS 5
 
-// the paddles held as they are from *now for ms, a turn at a time; the
-// letter taken, if one is, in *letter
-static int keyed_for(struct halves *h, int is_up, int is_down, long *now, long ms, char *letter) {
+// the paddles held as they are from *now for ms, a turn at a time; what
+// the keyer said last that was not MORSE_NOTHING, the code keyed so far
+// in *code if it is given, the letter in *letter
+static int keyed_for(struct morse *m, int is_dit, int is_dah, long *now, long ms, char *letter) {
 	long until = *now + ms;
-	int taken = 0;
+	int said = MORSE_NOTHING;
+	int got;
 
 	for (; *now < until; *now += KEYED_TURN_MS) {
-		if (halves_keys(h, is_up, is_down, *now, letter))
-			taken = 1;
+		got = morse_keys(m, is_dit, is_dah, *now, letter);
+		if (got != MORSE_NOTHING)
+			said = got;
 	}
-	return taken;
+	return said;
 }
 
-// the letter keyed, '.' a dit and '-' a dah, each key pressed a turn and
-// let go for a unit, then the gap between letters; 0 if nothing was taken
-static char halved(const char *code) {
-	struct halves h;
-	long now = 0;
+// code tapped an element at a time, each let go of at once; the letter
+// taken at the gap after, 0 for none
+static char tapped(const char *code) {
+	struct morse m;
+	long now = 1000;
 	char letter = 0;
 
-	halves_begin(&h, KEYED_WPM);
-	for (; *code != 0; code++) {
-		keyed_for(&h, *code == '.', *code == '-', &now, KEYED_TURN_MS, &letter);
-		keyed_for(&h, 0, 0, &now, KEYED_UNIT_MS, &letter);
+	morse_begin(&m, KEYED_WPM);
+	for (; *code; code++) {
+		keyed_for(&m, *code == '.', *code == '-', &now, KEYED_TURN_MS, &letter);
+		keyed_for(&m, 0, 0, &now, ((*code == '.' ? MORSE_DIT_UNITS : MORSE_DAH_UNITS) + 1) * KEYED_UNIT_MS, &letter);
 	}
-	if (!keyed_for(&h, 0, 0, &now, KEYED_UNIT_MS * HALVES_LETTER_UNITS, &letter))
+	if (keyed_for(&m, 0, 0, &now, KEYED_UNIT_MS * MORSE_LETTER_UNITS, &letter) != MORSE_LETTER)
 		return 0;
 	return letter;
 }
 
-// the letter keyed with a key held for ms, then let go
-static char held(int is_up, int is_down, long ms) {
-	struct halves h;
-	long now = 0;
-	char letter = 0;
+// the paddles held for tenths of a unit and let go; the elements keyed,
+// in code
+static void held(struct morse *m, int is_dit, int is_dah, int tenths, char *code, int room) {
+	long now = 1000;
+	long until = now + (long)tenths * KEYED_UNIT_MS / 10 + 6 * KEYED_UNIT_MS;
+	char letter;
+	int n = 0;
+	int said;
 
-	halves_begin(&h, KEYED_WPM);
-	keyed_for(&h, is_up, is_down, &now, ms, &letter);
-	if (!keyed_for(&h, 0, 0, &now, KEYED_UNIT_MS * HALVES_LETTER_UNITS + KEYED_TURN_MS, &letter))
-		return 0;
-	return letter;
+	morse_begin(m, KEYED_WPM);
+	for (; now < until; now += KEYED_TURN_MS) {
+		int is_down = now < 1000 + (long)tenths * KEYED_UNIT_MS / 10;
+
+		said = morse_keys(m, is_down && is_dit, is_down && is_dah, now, &letter);
+		if ((said == MORSE_DIT || said == MORSE_DAH) && n < room - 1)
+			code[n++] = said == MORSE_DIT ? '.' : '-';
+	}
+	code[n] = 0;
 }
 
-static void test_halves(void) {
-	static const char *codes[] = {
-		"E.", "T-", "I..", "A.-", "N-.", "M--", "S...", "U..-",
-		"R.-.", "W.--", "D-..", "K-.-", "O---", "H....", "V...-",
-		"F..-.", "L.-..", "P.--.", "J.---", "B-...", "X-..-", "C-.-.",
-		"Y-.--", "Z--..", "Q--.-", "?..--", "0-----", "1-----.", ")------",
-	};
-	struct halves h;
+static void test_morse(void) {
+	const char *every = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/?.,-=+@";
+	struct morse m;
+	char code[MORSE_MOST + 1];
+	long now = 1000;
 	char letter = 0;
-	long now;
-	int i;
+	const char *c;
+	int ok = 1;
 
-	for (i = 0; i < (int)(sizeof(codes) / sizeof(codes[0])); i++)
-		expect(halved(codes[i] + 1) == codes[i][0], "each character is its Morse code, UP a dit");
-	expect(held(1, 0, 3 * HALVES_FIGURES_HELD_MS) == 'E' && held(0, 1, HALVES_FIGURES_HELD_MS / 2) == 'T',
-		"a key held is one element, and does not repeat");
-	expect(held(0, 1, HALVES_FIGURES_HELD_MS + KEYED_TURN_MS) == '0', "DOWN held brings the figures, at 0");
-	expect(halved("-----.....") == '5' && halved("------------") == ',', "and along them, kept to their ends");
-	halves_begin(&h, KEYED_WPM);
-	expect(halves_offered(&h, 0, 7) && halves_offered(&h, 1, 7) && !halves_offered(&h, 0, 3),
-		"E and T are offered first");
-	now = 0;
-	keyed_for(&h, 1, 0, &now, KEYED_TURN_MS, &letter);
-	expect(halves_offered(&h, 0, 3) && halves_offered(&h, 0, 11) && !halves_offered(&h, 1, 7),
-		"after E, I and A");
-	expect(!keyed_for(&h, 0, 0, &now, KEYED_UNIT_MS * HALVES_LETTER_UNITS - KEYED_TURN_MS, &letter),
-		"nothing is taken before the gap");
-	expect(keyed_for(&h, 0, 0, &now, 2 * KEYED_TURN_MS, &letter) && letter == 'E' && h.at < 0,
-		"taken after the gap, then nothing is chosen");
-	keyed_for(&h, 0, 1, &now, KEYED_TURN_MS, &letter);
-	halves_abort(&h);
-	expect(h.at < 0 && !keyed_for(&h, 0, 0, &now, 10 * HALVES_FIGURES_HELD_MS, &letter), "dropped, nothing is taken");
-	halves_begin(&h, 1);
-	expect(h.unit_ms == HALVES_MS_A_WPM / HALVES_WPM_LEAST, "the speed is kept to its least");
-	halves_begin(&h, KEYED_WPM);
-	expect(h.unit_ms == 100, "12 WPM is a unit of 100 ms");
-	printf("halves: thirty letters and sixteen figures, a press an element\n");
+	for (c = every; *c; c++)
+		if (tapped(morse_code_of(*c)) != *c)
+			ok = 0;
+	expect(ok, "every character, tapped, is taken");
+	expect(morse_letter_of("......") == 0, "a code that is none is no character");
+	held(&m, 1, 0, 65, code, sizeof(code));
+	expect(!strcmp(code, "...."), "the dit paddle held keys dits, a space between each");
+	held(&m, 0, 1, 45, code, sizeof(code));
+	expect(!strcmp(code, "--"), "the dah paddle held keys dahs");
+	held(&m, 1, 1, 25, code, sizeof(code));
+	expect(!strcmp(code, ".-"), "squeezed, dit and dah in turn; let go, no more than the one keying");
+	held(&m, 1, 1, 85, code, sizeof(code));
+	expect(!strcmp(code, ".-.-"), "squeezed longer, they go on in turn");
+	morse_begin(&m, KEYED_WPM);
+	keyed_for(&m, 0, 1, &now, KEYED_TURN_MS, &letter);
+	keyed_for(&m, 1, 0, &now, KEYED_TURN_MS, &letter);
+	keyed_for(&m, 0, 0, &now, 6 * KEYED_UNIT_MS, &letter);
+	expect(!strcmp(m.code, "-."), "a dit pressed during a dah is kept and keyed after it");
+	morse_begin(&m, KEYED_WPM);
+	expect(keyed_for(&m, 1, 0, &now, KEYED_TURN_MS, &letter) == MORSE_DIT, "an element is said as it begins");
+	expect(keyed_for(&m, 0, 0, &now, KEYED_UNIT_MS * 3, &letter) == MORSE_NOTHING,
+		"not taken before the gap between letters");
+	expect(keyed_for(&m, 0, 0, &now, KEYED_UNIT_MS, &letter) == MORSE_LETTER && letter == 'E',
+		"taken at the gap");
+	keyed_for(&m, 0, 1, &now, KEYED_TURN_MS, &letter);
+	morse_abort(&m);
+	expect(keyed_for(&m, 0, 0, &now, 10 * KEYED_UNIT_MS, &letter) == MORSE_NOTHING, "dropped, nothing is taken");
+	morse_begin(&m, 1);
+	expect(m.unit_ms == MORSE_MS_A_WPM / MORSE_WPM_LEAST, "the speed is kept within its range");
+	printf("morse: iambic, every character, held, squeezed, kept, taken at the gap\n");
 }
 
 static void test_known(void) {
@@ -684,7 +747,8 @@ int main(void) {
 	test_buttons();
 	test_dial();
 	test_entry();
-	test_halves();
+	test_keyboard();
+	test_morse();
 	test_known();
 	test_contacts();
 	test_speech();

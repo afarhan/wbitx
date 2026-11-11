@@ -48,6 +48,7 @@ struct settings {
 	uint32_t wpm;                // the Morse keyer's words a minute, for text
 	uint32_t is_headset;         // the mic of the handsfree, not the in-built one
 	uint32_t is_white;           // the display's theme: dark dots on white
+	uint32_t is_morse_typing;    // text keyed as Morse, not chosen on the keyboard
 	uint32_t is_local;           // talkie to talkie by ESP-NOW, off the internet
 	int32_t battery_offset_mv;   // added to the cell's reading, set by BATTERY <volts>
 	char known_ssid[SETTINGS_KNOWN][SETTINGS_SSID_ROOM];

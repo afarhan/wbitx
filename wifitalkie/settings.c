@@ -80,6 +80,7 @@ void settings_load(void) {
 	number_get(handle, "vox_level", &settings.vox);
 	number_get(handle, "headset", &settings.is_headset);
 	number_get(handle, "white", &settings.is_white);
+	number_get(handle, "morse_typing", &settings.is_morse_typing);
 	number_get(handle, "local", &settings.is_local);
 	number_get(handle, "wpm", &settings.wpm);
 	number_get(handle, "batt_offset", (uint32_t *)&settings.battery_offset_mv);
@@ -120,6 +121,7 @@ void settings_save(void) {
 	nvs_set_u32(handle, "vox_level", settings.vox);
 	nvs_set_u32(handle, "headset", settings.is_headset);
 	nvs_set_u32(handle, "white", settings.is_white);
+	nvs_set_u32(handle, "morse_typing", settings.is_morse_typing);
 	nvs_set_u32(handle, "local", settings.is_local);
 	nvs_set_u32(handle, "wpm", settings.wpm);
 	nvs_set_u32(handle, "batt_offset", (uint32_t)settings.battery_offset_mv);

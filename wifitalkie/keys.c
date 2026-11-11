@@ -42,6 +42,15 @@ void keys_open(void) {
 	gpio_config(&config);
 }
 
+// a key's kind changed, for a page that wants it pressed otherwise: taken
+// up only while the key is up, so a press is not cut in two
+void keys_set_kind(int key, int kind) {
+	struct button *b = &buttons[key];
+
+	if (b->kind != kind && !b->is_down)
+		b->kind = kind;
+}
+
 int keys_poll(long now, struct key_press *press) {
 	int found = 0;
 	int what;

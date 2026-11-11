@@ -45,7 +45,7 @@
 //     Settings...    a list of its own, MENU back to the menu:
 //         Audio          the in-built mic or the handsfree's
 //         Morse speed    for entering text, large; UP and DOWN step it,
-//                        from HALVES_WPM_LEAST to HALVES_WPM_MOST
+//                        from MORSE_WPM_LEAST to MORSE_WPM_MOST
 //         VOX            speaking by the voice, without the PTT (vox.c):
 //                        the sensitivity, Off or 1 to 10, large; UP and
 //                        DOWN step it; below, the voice's level now as a
@@ -69,24 +69,23 @@
 //
 // Info, Setup and Device key stay up; the others go home when idle.
 //
-// The callsign is entered on a page of its own:
+// The callsign is entered on a page of its own, on the keyboard (entry.c,
+// draw_keyboard()) or, with settings.is_morse_typing, keyed as Morse:
 //
 //            CALLSIGN               the title
 //     -------------------------
 //     VU2ES_                    the text so far, up to ENTRY_ROOM - 1,
 //                               its end if it is long, and a cursor
-//     HSVIFU?ELR.APWJ           halves.c's two lines of letters, LINE_GAP
-//                               dots apart, the two offered in reverse
-//     BDXNCKYTZGQM/O-           video, the chosen framed; or its line of
-//                               figures in their place
-//     PAUSE: TAKE LETTER        the help, changing every HELP_EVERY_MS
+//        .-.                    the elements keyed of the next, large
+//     UP: DIT  DOWN: DAH        the help, changing every HELP_EVERY_MS
 //
-// UP and DOWN key a letter as its Morse, UP a dit and DOWN a dah, one
-// element a press (halves.c); DOWN held brings the figures. The gap between
-// letters, at settings.wpm, adds the chosen to the text. ENTER pressed while a letter is being
-// chosen drops it; with none, it keeps the text and goes back. ENTER held
-// takes the last character off, and the one before it, while it is held.
-// MENU goes back and leaves the text as it was.
+// UP and DOWN are an iambic keyer's paddles, UP the dits and DOWN the dahs
+// (morse.c), at settings.wpm, each element heard as a sidetone; the gap
+// between letters adds the character to the text, if it is of the set.
+// ENTER pressed while a character is being keyed drops it; with none, it
+// keeps the text and goes back. ENTER held takes the last character off,
+// and the one before it, while it is held. MENU goes back and leaves the
+// text as it was.
 //
 // A WiFi key is not entered on the talkie: at SETUP, on a telephone.
 //
@@ -109,8 +108,8 @@
 #include "display.h"
 #include "entry.h"
 #include "font.h"
-#include "halves.h"
 #include "keys.h"
+#include "morse.h"
 #include "known.h"
 #include "local.h"
 #include "microphone.h"
@@ -152,10 +151,12 @@
 #define ITEM_X 8
 #define VALUE_GAP 4
 #define HZ_A_KHZ 1000
-#define LETTERS_Y 25
-#define LINE_GAP 13
-#define FIGURES_Y (LETTERS_Y + LINE_GAP / 2)
-#define LETTER_PITCH 8
+#define CODE_Y 30
+// the keyboard's: a key's width, its rows' tops and pitch, the last row's
+// foot clear of the help
+#define KEY_PITCH 12
+#define KEYS_Y 14
+#define KEY_ROW_PITCH 11
 #define LETTER_EDGE 2
 #define WPM_STEP 1
 #define HELP_EVERY_MS 2000
@@ -178,6 +179,7 @@
 #define PAGE_ACTIVATE 18
 #define PAGE_LINK 19
 #define PAGE_VOX 21
+#define PAGE_TYPING 22
 #define VOX_METER_MOST 600
 
 struct item {
@@ -198,6 +200,7 @@ static const struct item main_items[] = {
 
 static const struct item settings_items[] = {
 	{"Audio", PAGE_AUDIO},
+	{"Typing", PAGE_TYPING},
 	{"Morse speed", PAGE_WPM},
 	{"VOX", PAGE_VOX},
 	{"Callsign", PAGE_CALLSIGN},
@@ -248,11 +251,10 @@ static int level;
 static int chosen[MENUS];
 static int menu_top[MENUS];
 static struct entry entry;
-static struct halves halves;
+static struct morse morse;
 
 static const char *entry_help[] = {
 	"UP: DIT  DOWN: DAH",
-	"HOLD DOWN: FIGURES",
 	"PAUSE: TAKE LETTER",
 	"ENTER: DONE",
 	"HOLD ENTER: DELETE",
@@ -260,6 +262,17 @@ static const char *entry_help[] = {
 };
 
 #define ENTRY_HELPS ((int)(sizeof(entry_help) / sizeof(entry_help[0])))
+
+static const char *keyboard_help[] = {
+	"UP/DOWN: ALONG",
+	"ENTER/MENU: ROW UP/DN",
+	"STOP: IT IS TYPED",
+	"HOLD DOWN: DELETE",
+	"HOLD ENTER: DONE",
+	"HOLD MENU: CANCEL",
+};
+
+#define KEYBOARD_HELPS ((int)(sizeof(keyboard_help) / sizeof(keyboard_help[0])))
 
 static const char *wifi_help[] = {
 	"ENTER: JOIN",
@@ -309,7 +322,7 @@ static int is_entering(int on_page) {
 static void go(int to) {
 	if (to == PAGE_CALLSIGN) {
 		entry_begin(&entry, ENTRY_CALLSIGN, settings.callsign, SETTINGS_CALLSIGN_ROOM - 1);
-		halves_begin(&halves, (int)settings.wpm);
+		morse_begin(&morse, (int)settings.wpm);
 	}
 	if (page == PAGE_SETUP && to != PAGE_SETUP)
 		portal_close();
@@ -331,10 +344,10 @@ static void go(int to) {
 static void wpm_step(const struct key_press *press, long now) {
 	int wpm = (int)settings.wpm + (press->key == KEY_UP ? WPM_STEP : -WPM_STEP);
 
-	if (wpm < HALVES_WPM_LEAST)
-		wpm = HALVES_WPM_LEAST;
-	if (wpm > HALVES_WPM_MOST)
-		wpm = HALVES_WPM_MOST;
+	if (wpm < MORSE_WPM_LEAST)
+		wpm = MORSE_WPM_LEAST;
+	if (wpm > MORSE_WPM_MOST)
+		wpm = MORSE_WPM_MOST;
 	settings.wpm = (uint32_t)wpm;
 	save_soon(now);
 }
@@ -412,10 +425,25 @@ static void link_take(int chosen_one) {
 	network_local(chosen_one);
 }
 
+// TYPING: text chosen on the keyboard, or keyed as Morse
+static const char *const typing_names[] = {"Keyboard", "Morse"};
+
+static int typing_in_use(void) {
+	return settings.is_morse_typing ? 1 : 0;
+}
+
+static void typing_take(int chosen_one) {
+	if ((uint32_t)chosen_one == settings.is_morse_typing)
+		return;
+	settings.is_morse_typing = (uint32_t)chosen_one;
+	settings_save();
+}
+
 static const struct choices all_choices[] = {
 	{PAGE_LINK, "Link", link_names, 2, link_in_use, link_take},
 	{PAGE_AUDIO, "Audio", audio_names, 2, audio_in_use, audio_take},
 	{PAGE_THEME, "Theme", theme_names, 2, theme_in_use, theme_take},
+	{PAGE_TYPING, "Typing", typing_names, 2, typing_in_use, typing_take},
 };
 
 #define ALL_CHOICES ((int)(sizeof(all_choices) / sizeof(all_choices[0])))
@@ -566,16 +594,52 @@ static void accept(long now) {
 	go(PAGE_MENU);
 }
 
-// UP and DOWN are keyed in screen_poll(); ENTER drops the letter, or keeps the
-// text, and held takes characters off
-static void take_entry(const struct key_press *press, long now) {
+// the keyboard: UP and DOWN go along it, ENTER a row up and MENU a row
+// down, and the key moved to is typed once it is left (screen_poll()).
+// DOWN held takes characters off, one and then one more each
+// BUTTON_HELD_EVERY_MS; ENTER held types the key moved to, if it is not
+// yet, and keeps the text; MENU held (in take()) leaves it unkept. DOWN,
+// ENTER and MENU are holding keys while the keyboard is up, so each moves
+// as it comes up, and DOWN does not repeat (screen_poll())
+static void take_keyboard(const struct key_press *press, long now) {
+	if (press->key == KEY_UP) {
+		entry_key_move(&entry, -1);
+		entry_key_moved(&entry, now);
+	}
+	if (press->key == KEY_DOWN && press->what == BUTTON_PRESSED) {
+		entry_key_move(&entry, 1);
+		entry_key_moved(&entry, now);
+	}
+	if (press->key == KEY_DOWN && press->what != BUTTON_PRESSED) {
+		entry_key_cancel(&entry);
+		entry_delete(&entry);
+	}
+	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED) {
+		entry_key_row(&entry, 1);
+		entry_key_moved(&entry, now);
+	}
 	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED) {
-		if (halves.at >= 0)
-			halves_abort(&halves);
+		entry_key_row(&entry, -1);
+		entry_key_moved(&entry, now);
+	}
+	if (press->key == KEY_ENTER && press->what == BUTTON_HELD) {
+		entry_key_settle(&entry, now, 1);
+		accept(now);
+	}
+}
+
+static void take_entry(const struct key_press *press, long now) {
+	if (!settings.is_morse_typing) {
+		take_keyboard(press, now);
+		return;
+	}
+	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED) {
+		if (morse.length > 0)
+			morse_abort(&morse);
 		else
 			accept(now);
 	} else if (press->key == KEY_ENTER) {
-		halves_abort(&halves);
+		morse_abort(&morse);
 		entry_delete(&entry);
 	}
 	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
@@ -911,45 +975,51 @@ static void frame(int x, int y, int wide, int high) {
 	display_fill(x + wide - 1, y, 1, high);
 }
 
-// one of halves.c's characters at x, y: in reverse video if it is
-// offered, framed if it is the chosen
-static void letter_at(int x, int y, char c, int is_chosen, int is_offered) {
-	display_letter_at(x + 1, y, 1, c);
-	if (is_offered)
-		display_invert(x, y - LETTER_EDGE, LETTER_PITCH - 1, FONT_HIGH + 2 * LETTER_EDGE);
-	else if (is_chosen)
-		frame(x, y - LETTER_EDGE, LETTER_PITCH - 1, FONT_HIGH + 2 * LETTER_EDGE);
+// the text's end and a cursor, or the key moved to and not yet typed, and
+// under it the keyboard, the chosen key in reverse video and those not of
+// the set left out; no title, for room
+static void draw_keyboard(long now) {
+	char text[TEXT_ROOM];
+	int shown = entry.length;
+	int left = (DISPLAY_WIDE - ENTRY_KEYBOARD_ACROSS * KEY_PITCH) / 2;
+	int at;
+
+	snprintf(text, sizeof(text), "%s%c", entry.text,
+		entry.is_key_pending && entry.length < entry.most ? entry_key(&entry) : '_');
+	while (shown > 0 && display_text_wide(text + entry.length - shown, 1) > DISPLAY_WIDE)
+		shown--;
+	display_text_at(0, 0, 1, text + entry.length - shown);
+	rule(RULE_Y);
+	for (at = 0; at < ENTRY_KEYS; at++) {
+		int x = left + at % ENTRY_KEYBOARD_ACROSS * KEY_PITCH;
+		int y = KEYS_Y + at / ENTRY_KEYBOARD_ACROSS * KEY_ROW_PITCH;
+
+		if (!entry_key_is_open(&entry, at))
+			continue;
+		display_letter_at(x + (KEY_PITCH - FONT_WIDE) / 2, y, 1, ENTRY_KEYBOARD[at]);
+		if (at == entry.key_at)
+			display_invert(x, y - LETTER_EDGE, KEY_PITCH - 1, FONT_HIGH + 2 * LETTER_EDGE);
+	}
+	help(keyboard_help[now / HELP_EVERY_MS % KEYBOARD_HELPS]);
 }
 
-// the title, the text's end and a cursor, and halves.c's letters, or its
-// figures
+// the title, the text's end and a cursor, and the elements keyed of the
+// next character, large
 static void draw_entry(const char *heading, long now) {
 	char text[TEXT_ROOM];
 	int shown = entry.length;
-	int left;
-	int which;
-	int at;
 
+	if (!settings.is_morse_typing) {
+		draw_keyboard(now);
+		return;
+	}
 	title(heading);
 	snprintf(text, sizeof(text), "%s_", entry.text);
 	// its end, if it is too long to show whole
 	while (shown > 0 && display_text_wide(text + entry.length - shown, 1) > DISPLAY_WIDE)
 		shown--;
 	line(0, text + entry.length - shown);
-	if (halves.is_figures) {
-		left = (DISPLAY_WIDE - HALVES_FIGURES_ACROSS * LETTER_PITCH) / 2;
-		for (at = 0; at < HALVES_FIGURES_ACROSS; at++)
-			letter_at(left + at * LETTER_PITCH, FIGURES_Y, HALVES_FIGURES[at],
-				halves.at == at, halves_offered(&halves, 0, at));
-	} else {
-		left = (DISPLAY_WIDE - HALVES_ACROSS * LETTER_PITCH) / 2;
-		for (which = 0; which < 2; which++) {
-			for (at = 0; at < HALVES_ACROSS; at++)
-				letter_at(left + at * LETTER_PITCH, LETTERS_Y + which * LINE_GAP,
-					halves.lines[which][at], halves.at == at && halves.line == which,
-					halves_offered(&halves, which, at));
-		}
-	}
+	big(morse.code, CODE_Y);
 	help(entry_help[now / HELP_EVERY_MS % ENTRY_HELPS]);
 }
 
@@ -1135,6 +1205,8 @@ void screen_poll(long now) {
 	struct key_press press;
 	char letter;
 
+	keys_set_kind(KEY_DOWN, is_entering(page) && !settings.is_morse_typing
+		? BUTTON_HOLDING_REPEATING : BUTTON_REPEATING);
 	if (keys_poll(now, &press))
 		take(&press, now);
 	if (portal_joined(wifi_ssid, sizeof(wifi_ssid))) {
@@ -1142,9 +1214,28 @@ void screen_poll(long now) {
 		touched_ms = now;
 		go(PAGE_WIFI_JOINING);
 	}
-	if (page == PAGE_CALLSIGN
-			&& halves_keys(&halves, keys_is_down(KEY_UP), keys_is_down(KEY_DOWN), now, &letter))
-		entry_put(&entry, letter);
+	// the keyboard's key moved to typed once it is left, and not while a
+	// key is down, DOWN perhaps held to delete
+	if (page == PAGE_CALLSIGN && !settings.is_morse_typing
+			&& !keys_is_down(KEY_UP) && !keys_is_down(KEY_DOWN)
+			&& !keys_is_down(KEY_MENU) && !keys_is_down(KEY_ENTER))
+		entry_key_settle(&entry, now, 0);
+	// the paddles, each element heard as it begins
+	speaker_ready(page == PAGE_CALLSIGN && settings.is_morse_typing);
+	if (page == PAGE_CALLSIGN && settings.is_morse_typing) {
+		switch (morse_keys(&morse, keys_is_down(KEY_UP), keys_is_down(KEY_DOWN), now, &letter)) {
+		case MORSE_DIT:
+			speaker_tone((int)(MORSE_DIT_UNITS * morse.unit_ms));
+			break;
+		case MORSE_DAH:
+			speaker_tone((int)(MORSE_DAH_UNITS * morse.unit_ms));
+			break;
+		case MORSE_LETTER:
+			if (strchr(entry.set, letter))
+				entry_put(&entry, letter);
+			break;
+		}
+	}
 	if (!is_begun) {
 		is_begun = 1;
 		touched_ms = now;

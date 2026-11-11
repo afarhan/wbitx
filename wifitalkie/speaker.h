@@ -15,6 +15,8 @@ void speaker_open(void);
 void speaker_take(const uint8_t *ulaw, long now);
 void speaker_poll(long now);
 void speaker_mute(int is_muted);
+void speaker_tone(int ms);
+void speaker_ready(int is_readying);
 void speaker_brief(char *text, int room);
 void speaker_describe(char *text, int room);
 

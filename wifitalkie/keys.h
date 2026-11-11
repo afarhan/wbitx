@@ -25,6 +25,7 @@ struct key_press {
 
 void keys_open(void);
 int keys_poll(long now, struct key_press *press);
+void keys_set_kind(int key, int kind);
 const char *keys_name(int key);
 int keys_is_down(int key);
 void keys_describe(char *text, int room);

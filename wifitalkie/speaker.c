@@ -55,7 +55,17 @@
 // VOL is put on each sample made, and playback.c makes it a duty for the
 // ring. While the PTT is down the queue is emptied and kept empty: the
 // talkie is one way at a time.
+//
+// THE SIDETONE
+//
+// Morse keyed on the keys is heard, speaker_tone(), a SIDETONE_HZ tone
+// made straight into the ring, not through the queue, so that it is not
+// held START_MS; its ends are ramped over SIDETONE_RAMP_MS, or they click.
+// Speech playing comes first, and the tone is not made. speaker_ready()
+// holds the rest at the middle while the keying page is up, so that a tone
+// starts at once and not REST_UP_MS later.
 
+#include <math.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -98,6 +108,11 @@
 #define FILL_FRACTION_SHIFT 8
 #define REST_UP_MS 100
 #define REST_DOWN_MS 250
+#define SIDETONE_HZ 700
+#define SIDETONE_LEVEL 6000
+#define SIDETONE_RAMP_MS 5
+#define SIDETONE_RAMP (PLAYBACK_RATE_HZ / 1000 * SIDETONE_RAMP_MS)
+#define SINE_STEPS 64
 
 static uint8_t ring[RING_SAMPLES];
 static volatile uint32_t ring_in;
@@ -121,6 +136,11 @@ _Static_assert(TIMER_HZ % PLAYBACK_RATE_HZ == 0, "the timer counts a whole numbe
 _Static_assert(RING_FILLED_MOST < RING_SAMPLES, "the ring holds what the loop keeps ahead");
 static uint32_t count_gap_samples;
 static uint32_t count_cut;
+static int is_ready;
+static int32_t tone_left;
+static int32_t tone_made;
+static uint32_t tone_phase;
+static int16_t sine[SINE_STEPS];
 
 static inline void IRAM_ATTR duty_set(ledc_channel_t channel, uint32_t duty) {
 	ledc_ll_set_duty_int_part(&LEDC, PWM_MODE, channel, duty);
@@ -187,6 +207,10 @@ void speaker_open(void) {
 		.on_alarm = next_duty,
 	};
 
+	int i;
+
+	for (i = 0; i < SINE_STEPS; i++)
+		sine[i] = (int16_t)(SIDETONE_LEVEL * sin(2 * M_PI * i / SINE_STEPS));
 	playback_open();
 	playback_begin(&play);
 	ledc_timer_config(&pwm_timer);
@@ -288,13 +312,49 @@ static int rest_toward(int is_up, long now) {
 	return at == want;
 }
 
+// the sidetone into the ring, as far as it is kept ahead
+static void tone_make(void) {
+	const uint32_t step = (uint32_t)((uint64_t)SIDETONE_HZ * 4294967296ULL / PLAYBACK_RATE_HZ);
+	int32_t ramp;
+	int32_t level;
+
+	while (tone_left > 0 && ring_in - ring_out < RING_FILLED_MOST) {
+		ramp = tone_made < tone_left ? tone_made : tone_left;
+		if (ramp > SIDETONE_RAMP)
+			ramp = SIDETONE_RAMP;
+		level = sine[tone_phase >> 26] * ramp / SIDETONE_RAMP;
+		level = level * (int32_t)settings.volume / SETTINGS_LEVEL_MOST;
+		ring_put(playback_duty(&play, level));
+		tone_phase += step;
+		tone_made++;
+		tone_left--;
+	}
+}
+
+// a sidetone of ms, cutting short one that sounds
+void speaker_tone(int ms) {
+	tone_made = 0;
+	tone_left = (int32_t)ms * (PLAYBACK_RATE_HZ / 1000);
+}
+
+// the rest held at the middle, so that a tone starts at once
+void speaker_ready(int is_readying) {
+	is_ready = is_readying;
+}
+
 void speaker_poll(long now) {
 	int32_t level;
 	uint32_t step;
-	int is_wanted = !is_muted && (is_playing || queue_fill() > 0);
+	int is_wanted = !is_muted && (is_playing || queue_fill() > 0 || is_ready || tone_left > 0);
 
 	if (!rest_toward(is_wanted, now) && !is_playing)
 		return;
+	if (!is_playing && queue_fill() == 0 && tone_left > 0 && is_wanted) {
+		tone_make();
+		return;
+	}
+	if (is_muted)
+		tone_left = 0;
 	if (!is_playing && queue_fill() >= START_MS * SAMPLES_A_MS) {
 		is_playing = 1;
 		fill_smoothed = (int32_t)queue_fill() << FILL_FRACTION_SHIFT;
