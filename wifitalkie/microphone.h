@@ -21,6 +21,10 @@ struct microphone_levels {
 	int results;
 	int strangers;
 	unsigned restarts;
+	// VOX's: its envelope's most in the second, the background, the threshold
+	int vox_peak;
+	int vox_background;
+	int vox_threshold;
 };
 
 void microphone_open(void);

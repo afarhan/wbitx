@@ -15,7 +15,7 @@ PLAIN = wifitalkie/auth.c wifitalkie/battery.c wifitalkie/button.c wifitalkie/co
 
 all: build/wifitalkie.ino.bin
 
-build/wifitalkie.ino.bin: wifitalkie/*.c wifitalkie/*.cpp wifitalkie/*.h wifitalkie/*.ino
+build/wifitalkie.ino.bin: wifitalkie/build_opt.h wifitalkie/*.c wifitalkie/*.cpp wifitalkie/*.h wifitalkie/*.ino
 	arduino-cli compile --fqbn $(FQBN) --warnings default --output-dir build wifitalkie
 
 upload: build/wifitalkie.ino.bin

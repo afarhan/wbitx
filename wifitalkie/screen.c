@@ -402,6 +402,21 @@ static void wpm_step(const struct key_press *press, long now) {
 	save_soon(now);
 }
 
+// the level VOX goes back to when ENTER turns it on again
+#define VOX_LEVEL_FIRST 5
+static int vox_last = VOX_LEVEL_FIRST;
+
+// ENTER: VOX off, or on again at the level it had
+static void vox_toggle(long now) {
+	if (settings.vox != VOX_OFF) {
+		vox_last = (int)settings.vox;
+		settings.vox = VOX_OFF;
+	} else {
+		settings.vox = (uint32_t)vox_last;
+	}
+	save_soon(now);
+}
+
 static void vox_step(const struct key_press *press, long now) {
 	int level = (int)settings.vox + (press->key == KEY_UP ? 1 : -1);
 
@@ -410,6 +425,8 @@ static void vox_step(const struct key_press *press, long now) {
 	if (level > VOX_LEVEL_MOST)
 		level = VOX_LEVEL_MOST;
 	settings.vox = (uint32_t)level;
+	if (level != VOX_OFF)
+		vox_last = level;
 	save_soon(now);
 }
 
@@ -837,6 +854,10 @@ static void take_page(const struct key_press *press, long now) {
 		vox_step(press, now);
 		return;
 	}
+	if (page == PAGE_VOX && press->key == KEY_ENTER) {
+		vox_toggle(now);
+		return;
+	}
 	if (press->key == KEY_MENU || press->key == KEY_ENTER)
 		go(PAGE_MENU);
 }
@@ -1044,8 +1065,15 @@ static void item_value(int of_page, char *text, int room) {
 		snprintf(text, room, "%s", settings.callsign);
 	if (of_page == PAGE_CONTACTS)
 		snprintf(text, room, "%d", contacts_count(&settings));
-	if (of_page == PAGE_WIFI)
-		snprintf(text, room, "%s", settings.ssid);
+	// the network joined, or the one being tried, which may be a
+	// remembered one and not the one set
+	if (of_page == PAGE_WIFI) {
+		network_ssid(text, room);
+		if (text[0] == 0)
+			network_trying(text, room);
+		if (text[0] == 0)
+			snprintf(text, room, "%s", settings.ssid);
+	}
 	if (of_page == PAGE_CONTACTS && contacts_count(&settings) == 0)
 		text[0] = 0;
 	// a value too long for the line, a network's name, is cut
@@ -1124,9 +1152,18 @@ static void draw_info(void) {
 	char address[TEXT_ROOM];
 
 	title("Info");
-	snprintf(text, sizeof(text), "Wifi %s", settings.ssid);
+	network_ssid(address, sizeof(address));
+	if (address[0] == 0)
+		network_trying(address, sizeof(address));
+	if (address[0] == 0)
+		snprintf(address, sizeof(address), "%s", settings.ssid);
+	snprintf(text, sizeof(text), "Wifi %s", address);
 	line(0, text);
-	network_address(address, sizeof(address));
+	network_trying(address, sizeof(address));
+	if (address[0] != 0)
+		snprintf(address, sizeof(address), "Joining...");
+	else
+		network_address(address, sizeof(address));
 	if (address[0] == 0)
 		snprintf(address, sizeof(address), "Not joined");
 	line(1, address);
@@ -1373,7 +1410,12 @@ static void draw_vox(void) {
 		snprintf(text, sizeof(text), "%u", (unsigned)settings.vox);
 	big(text, PAGE_BIG_Y);
 	vox_meter(line_y(3));
-	help(microphone_vox() ? "KEYED   MENU: BACK" : "UP/DOWN   MENU: BACK");
+	if (settings.vox == VOX_OFF)
+		help("ENTER: ON   MENU: BACK");
+	else if (microphone_vox())
+		help("KEYED");
+	else
+		help("ENTER: OFF  UP/DN: LEVEL");
 }
 
 static void draw(long now) {

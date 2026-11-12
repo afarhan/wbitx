@@ -123,7 +123,16 @@ void ptt_poll(long now) {
 		console_say("PTT OFF: ONE MINUTE");
 	}
 	if (is_wanted && !is_down)
-		console_say(is_by_vox ? "PTT ON (VOX)" : "PTT ON");
+		if (is_by_vox) {
+			// what keyed it, for setting the level: the mic over the threshold
+			int size;
+			int threshold;
+
+			microphone_vox_meter(&size, &threshold);
+			console_say("PTT ON (VOX) MIC %d OVER %d", size, threshold);
+		} else {
+			console_say("PTT ON");
+		}
 	if (!is_wanted && is_down && !is_cut)
 		console_say("PTT OFF");
 	is_down = is_wanted;

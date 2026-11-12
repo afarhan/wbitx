@@ -485,12 +485,16 @@ void verbs_do(const char *line, long now) {
 
 void verbs_poll(long now) {
 	struct microphone_levels levels;
+	char heard[16];
+	int is_hearing;
 
 	if (!is_levels_shown || now - levels_shown_ms < MS_A_SECOND)
 		return;
 	levels_shown_ms = now;
 	microphone_levels(&levels);
-	console_say("LEVELS PEAK %d RMS %d ADC %d A SECOND (%d READ, %d STRANGE, %u RESTARTS)",
+	is_hearing = voip_hearing(heard, sizeof(heard));
+	console_say("LEVELS PEAK %d RMS %d ADC %d A SECOND (%d READ, %d STRANGE, %u RESTARTS) VOX %d OVER %d BACKGROUND %d%s%s",
 		levels.peak, levels.rms, levels.samples_a_second, levels.results, levels.strangers,
-		levels.restarts);
+		levels.restarts, levels.vox_peak, levels.vox_threshold, levels.vox_background,
+		microphone_vox() ? " KEYED" : "", is_hearing ? " HEARING" : "");
 }

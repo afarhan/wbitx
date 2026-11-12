@@ -109,6 +109,9 @@ static char scanned_ssid[SCAN_MOST][SETTINGS_SSID_ROOM];
 static int scanned_rssi[SCAN_MOST];
 static int scanned_open[SCAN_MOST];
 static int scanned_count;
+// the network begin() was last given, for the screen: while not up, the
+// one being tried, which may be a remembered one, not the one set
+static char trying[SETTINGS_SSID_ROOM];
 
 // why a join failed, as the WiFi driver says it (esp_wifi_types.h's
 // wifi_err_reason_t: 201 no access point of that name heard, 15 and 204 the
@@ -183,6 +186,7 @@ static void begin(const char *ssid, const char *password) {
 	WiFi.setAutoReconnect(true);
 	WiFi.setTxPower(TX_POWER);
 	join_began_ms = (long)millis();
+	snprintf(trying, sizeof(trying), "%s", ssid);
 	if (is_set)
 		console_say("WIFI JOINING %s", ssid);
 	else
@@ -408,6 +412,14 @@ void network_scan(void) {
 	network_join();
 }
 
+// the network being tried while none is joined, for the screen; nothing
+// while one is up, in Local, with the radio off, or with none to try
+void network_trying(char *text, int room) {
+	text[0] = 0;
+	if (!network_is_up() && !is_off && !settings.is_local && !is_held)
+		snprintf(text, room, "%s", trying);
+}
+
 // the address and the signal, for the screen; nothing while not up
 void network_address(char *text, int room) {
 	text[0] = 0;
@@ -435,10 +447,10 @@ void network_describe(char *text, int room) {
 		return;
 	}
 	if (!network_is_up()) {
-		snprintf(text, room, "JOINING %s (STATUS %d)", settings.ssid, (int)WiFi.status());
+		snprintf(text, room, "JOINING %s (STATUS %d)", trying[0] ? trying : settings.ssid, (int)WiFi.status());
 		return;
 	}
-	snprintf(text, room, "UP %s %s RSSI %d", settings.ssid,
+	snprintf(text, room, "UP %s %s RSSI %d", WiFi.SSID().c_str(),
 		WiFi.localIP().toString().c_str(), (int)WiFi.RSSI());
 }
 

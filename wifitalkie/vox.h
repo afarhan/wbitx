@@ -15,7 +15,7 @@ extern "C" {
 #define VOX_LEVEL_MOST 10
 #define VOX_ATTACK_MS 30
 #define VOX_HANG_MS 1200
-#define VOX_LEAST 40
+#define VOX_LEAST 100
 
 struct vox {
 	int32_t envelope;
@@ -30,6 +30,7 @@ void vox_take(struct vox *v, int16_t sample, int level, int is_held_off, int rat
 int vox_is_keyed(const struct vox *v);
 int vox_threshold(const struct vox *v, int level);
 int vox_size(const struct vox *v);
+int vox_background(const struct vox *v);
 
 #ifdef __cplusplus
 }

@@ -15,8 +15,8 @@
 // for VOX_ATTACK_MS on end, so that a knock or a click does not; and it
 // lets go VOX_HANG_MS after the envelope was last over it, so that the
 // gaps between words and a breath do not cut the over. The threshold is
-// the background times the level's own figure, from twelve times at 1 to
-// under twice at 10, and never under VOX_LEAST, in 16-bit samples' size:
+// the background times the level's own figure, from twenty times at 1 to
+// two and a half at 10, and never under VOX_LEAST, in 16-bit samples' size:
 // the microphone's noise was 13 to 25 at MIC 50, the author's measure of
 // 1 November 2026, and speech at 5 cm some hundreds.
 //
@@ -39,7 +39,9 @@
 
 // the threshold over the background, in tenths, for each level, 1 to
 // VOX_LEVEL_MOST
-static const int times[VOX_LEVEL_MOST] = {120, 96, 76, 60, 48, 38, 30, 25, 21, 18};
+// at first {120, ..., 18}; too sensitive at the author's trial of
+// 2026-11-11, so made about half as sensitive at each level
+static const int times[VOX_LEVEL_MOST] = {200, 160, 128, 100, 80, 64, 50, 40, 32, 25};
 
 void vox_begin(struct vox *v) {
 	v->envelope = 0;
@@ -57,13 +59,18 @@ int vox_threshold(const struct vox *v, int level) {
 		return 0;
 	if (level > VOX_LEVEL_MOST)
 		level = VOX_LEVEL_MOST;
-	threshold = (v->background >> (ENVELOPE_BITS + BACKGROUND_EXTRA_BITS)) * times[level - 1] / TIMES_PART;
+	threshold = (int32_t)vox_background(v) * times[level - 1] / TIMES_PART;
 	return threshold < VOX_LEAST ? VOX_LEAST : (int)threshold;
 }
 
 // the envelope, in samples' size, for the screen's meter
 int vox_size(const struct vox *v) {
 	return (int)(v->envelope >> ENVELOPE_BITS);
+}
+
+// the background, in samples' size
+int vox_background(const struct vox *v) {
+	return (int)(v->background >> (ENVELOPE_BITS + BACKGROUND_EXTRA_BITS));
 }
 
 void vox_take(struct vox *v, int16_t sample, int level, int is_held_off, int rate_hz) {

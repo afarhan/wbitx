@@ -138,6 +138,7 @@ static int frame_out;
 static int frame_count;
 static int filled;
 static int peak;
+static int vox_peak;
 static int64_t squares;
 static int counted;
 static int results_a_second;
@@ -275,6 +276,8 @@ static void take(int raw) {
 		return;
 	measure(kept);
 	vox_take(&vox, kept, (int)settings.vox, is_vox_held, TELEPHONE_RATE_HZ);
+	if (vox_size(&vox) > vox_peak)
+		vox_peak = vox_size(&vox);
 	if (settings.is_gate)
 		kept = speech_gate(&speech, kept, TELEPHONE_RATE_HZ);
 	if (is_recording && record_filled < RECORD_SAMPLES)
@@ -416,6 +419,10 @@ void microphone_poll(long now) {
 	if (counted > 0)
 		last_second.rms = square_root(squares / counted);
 	last_second.samples_a_second = (int)((int64_t)counted * 2 * MS_A_SECOND / (now - second_began_ms));
+	last_second.vox_peak = vox_peak;
+	last_second.vox_background = vox_background(&vox);
+	last_second.vox_threshold = vox_threshold(&vox, (int)settings.vox);
+	vox_peak = 0;
 	peak = 0;
 	squares = 0;
 	counted = 0;
