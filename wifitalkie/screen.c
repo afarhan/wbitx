@@ -1161,8 +1161,8 @@ static void entry_help_now(const char *const *helps, int count, long now) {
 
 // the text's end and a cursor, or the key moved to and not yet typed, and
 // under it the keyboard, the chosen key in reverse video and those not of
-// the set left out; no title, for room
-static void draw_keyboard(long now) {
+// the set left out; no title, for room, but the heading in the text's place while it is empty
+static void draw_keyboard(const char *heading, long now) {
 	char text[TEXT_ROOM];
 	int shown = entry.length;
 	int left = (DISPLAY_WIDE - ENTRY_KEYBOARD_ACROSS * KEY_PITCH) / 2;
@@ -1172,7 +1172,11 @@ static void draw_keyboard(long now) {
 		entry.is_key_pending && entry.length < entry.most ? entry_key(&entry) : '_');
 	while (shown > 0 && display_text_wide(text + entry.length - shown, 1) > DISPLAY_WIDE)
 		shown--;
-	display_text_at(0, 0, 1, text + entry.length - shown);
+	// the heading in the text's place, while there is none
+	if (entry.length == 0 && !entry.is_key_pending)
+		display_text_at(0, 0, 1, heading);
+	else
+		display_text_at(0, 0, 1, text + entry.length - shown);
 	rule(RULE_Y);
 	for (at = 0; at < ENTRY_KEYS; at++) {
 		int x = left + at % ENTRY_KEYBOARD_ACROSS * KEY_PITCH;
@@ -1194,7 +1198,7 @@ static void draw_entry(const char *heading, long now) {
 	int shown = entry.length;
 
 	if (!settings.is_morse_typing) {
-		draw_keyboard(now);
+		draw_keyboard(heading, now);
 		return;
 	}
 	title(heading);
@@ -1408,8 +1412,10 @@ static void draw(long now) {
 		draw_contact_delete();
 	if (page == PAGE_CONTACT_MENU)
 		draw_contact_menu();
-	if (page == PAGE_MESSAGE)
-		draw_entry("Message", now);
+	if (page == PAGE_MESSAGE) {
+		snprintf(text, sizeof(text), "Message to %s", settings.contacts[contacts_chosen]);
+		draw_entry(text, now);
+	}
 	if (page == PAGE_WIFI)
 		draw_wifi(now);
 	if (page == PAGE_WIFI_JOINING)
