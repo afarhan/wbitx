@@ -27,6 +27,8 @@ extern "C" {
 #define SETTINGS_DEFAULT_MIC 50
 #define SETTINGS_DEFAULT_GATE 1
 #define SETTINGS_DEFAULT_WPM 12
+#define SETTINGS_SIDETONE_MOST 10
+#define SETTINGS_DEFAULT_SIDETONE 5
 #define SETTINGS_LEVEL_MOST 100
 
 struct settings {
@@ -46,6 +48,7 @@ struct settings {
 	uint32_t is_gate;            // speech.c's gate: the gaps as comfort noise, GATE
 	uint32_t vox;                // VOX sensitivity, 0 off or 1 to VOX_LEVEL_MOST (vox.c)
 	uint32_t wpm;                // the Morse keyer's words a minute, for text
+	uint32_t sidetone;           // the Morse keyer's sidetone, 0 (off) to SETTINGS_SIDETONE_MOST
 	uint32_t is_headset;         // the mic of the handsfree, not the in-built one
 	uint32_t is_white;           // the display's theme: dark dots on white
 	uint32_t is_morse_typing;    // text keyed as Morse, not chosen on the keyboard

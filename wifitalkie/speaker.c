@@ -61,6 +61,8 @@
 // Morse keyed on the keys is heard, speaker_tone(), a SIDETONE_HZ tone
 // made straight into the ring, not through the queue, so that it is not
 // held START_MS; its ends are ramped over SIDETONE_RAMP_MS, or they click.
+// Its level is settings.sidetone's tenths of full scale, not VOL's, and
+// at 0 it is not heard.
 // Speech playing comes first, and the tone is not made. speaker_ready()
 // holds the rest at the middle while the keying page is up, so that a tone
 // starts at once and not REST_UP_MS later.
@@ -109,7 +111,7 @@
 #define REST_UP_MS 100
 #define REST_DOWN_MS 250
 #define SIDETONE_HZ 700
-#define SIDETONE_LEVEL 6000
+#define SIDETONE_FULL 32000
 #define SIDETONE_RAMP_MS 5
 #define SIDETONE_RAMP (PLAYBACK_RATE_HZ / 1000 * SIDETONE_RAMP_MS)
 #define SINE_STEPS 64
@@ -141,6 +143,7 @@ static int32_t tone_left;
 static int32_t tone_made;
 static uint32_t tone_phase;
 static int16_t sine[SINE_STEPS];
+static uint32_t count_tone_samples;
 
 static inline void IRAM_ATTR duty_set(ledc_channel_t channel, uint32_t duty) {
 	ledc_ll_set_duty_int_part(&LEDC, PWM_MODE, channel, duty);
@@ -210,7 +213,7 @@ void speaker_open(void) {
 	int i;
 
 	for (i = 0; i < SINE_STEPS; i++)
-		sine[i] = (int16_t)(SIDETONE_LEVEL * sin(2 * M_PI * i / SINE_STEPS));
+		sine[i] = (int16_t)(SIDETONE_FULL * sin(2 * M_PI * i / SINE_STEPS));
 	playback_open();
 	playback_begin(&play);
 	ledc_timer_config(&pwm_timer);
@@ -323,18 +326,26 @@ static void tone_make(void) {
 		if (ramp > SIDETONE_RAMP)
 			ramp = SIDETONE_RAMP;
 		level = sine[tone_phase >> 26] * ramp / SIDETONE_RAMP;
-		level = level * (int32_t)settings.volume / SETTINGS_LEVEL_MOST;
+		level = level * (int32_t)settings.sidetone / SETTINGS_SIDETONE_MOST;
 		ring_put(playback_duty(&play, level));
 		tone_phase += step;
 		tone_made++;
 		tone_left--;
+		count_tone_samples++;
 	}
 }
 
 // a sidetone of ms, cutting short one that sounds
 void speaker_tone(int ms) {
+	if (settings.sidetone == 0 || is_muted)
+		return;
 	tone_made = 0;
 	tone_left = (int32_t)ms * (PLAYBACK_RATE_HZ / 1000);
+}
+
+// 1 while a sidetone is being made
+int speaker_is_toning(void) {
+	return tone_left > 0;
 }
 
 // the rest held at the middle, so that a tone starts at once
@@ -407,7 +418,8 @@ void speaker_describe(char *text, int room) {
 
 	if (is_playing)
 		doing = "PLAYING";
-	snprintf(text, room, "%s QUEUE %u MS, SILENCE IN GAPS %u MS, CUT %u, VOL %u", doing,
-		(unsigned)(queue_fill() / SAMPLES_A_MS), (unsigned)(count_gap_samples / SAMPLES_A_MS),
-		(unsigned)count_cut, (unsigned)settings.volume);
+	snprintf(text, room, "%s QUEUE %u MS, SILENCE IN GAPS %u MS, CUT %u, VOL %u, SIDETONE %u MS",
+		doing, (unsigned)(queue_fill() / SAMPLES_A_MS), (unsigned)(count_gap_samples / SAMPLES_A_MS),
+		(unsigned)count_cut, (unsigned)settings.volume,
+		(unsigned)(count_tone_samples / (PLAYBACK_RATE_HZ / 1000)));
 }

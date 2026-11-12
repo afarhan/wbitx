@@ -23,6 +23,7 @@
 //                               ESP-NOW off the internet (local.c)
 //     PTT ON|OFF                speak, as ENTER held on the home page does
 //     TONE ON|OFF               1 kHz in place of the microphone
+//     SIDETONE [0-10]           the Morse sidetone's level, and heard for 500 ms
 //     VOL <0-100>  MIC <0-100>  the speaker's level and the microphone's
 //     LEVELS ON|OFF             the microphone's levels each second
 //     VOX <1-10>|OFF            speak by the voice, without the PTT: the
@@ -74,6 +75,8 @@
 #include "verbs.h"
 #include "voip.h"
 #include "vox.h"
+
+#define SIDETONE_HEARD_MS 500
 
 #define WORD_ROOM 80
 #define SAID_ROOM 200
@@ -357,6 +360,15 @@ void verbs_do(const char *line, long now) {
 			console_say("TONE ON");
 		else
 			console_say("TONE OFF");
+		return;
+	}
+	if (!strcmp(verb, "SIDETONE")) {
+		if (first[0] != 0 && isdigit((unsigned char)first[0]) && atoi(first) <= SETTINGS_SIDETONE_MOST) {
+			settings.sidetone = (uint32_t)atoi(first);
+			settings_save();
+		}
+		speaker_tone(SIDETONE_HEARD_MS);
+		console_say("SIDETONE %u", (unsigned)settings.sidetone);
 		return;
 	}
 	if (!strcmp(verb, "VOL")) {

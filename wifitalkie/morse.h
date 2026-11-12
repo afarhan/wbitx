@@ -13,7 +13,9 @@ extern "C" {
 #define MORSE_MS_A_WPM 1200
 #define MORSE_WPM_LEAST 5
 #define MORSE_WPM_MOST 40
-#define MORSE_LETTER_UNITS 3
+// the silence that ends a letter, between a letter's space and its gap
+#define MORSE_LETTER_UNITS 2
+#define MORSE_WORD_UNITS 7
 #define MORSE_DIT_UNITS 1
 #define MORSE_DAH_UNITS 3
 #define MORSE_MOST 7
@@ -23,6 +25,7 @@ extern "C" {
 #define MORSE_DAH 2
 #define MORSE_LETTER 3
 #define MORSE_UNKNOWN 4
+#define MORSE_WORD 5
 
 #define MORSE_IDLE 0
 #define MORSE_SENDING 1
@@ -40,6 +43,7 @@ struct morse {
 	int was_dah;
 	long until_ms;
 	long ended_ms;
+	int is_word_due;
 };
 
 void morse_begin(struct morse *m, int wpm);

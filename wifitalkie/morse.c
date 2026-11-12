@@ -3,10 +3,13 @@
 //
 // morse.c — an iambic keyer on two keys, and the characters it keys.
 //
-// The screen gives UP as the dit paddle and DOWN as the dah. Held, a
-// paddle keys its element again and again, each followed by a space of one
-// unit; both held, squeezed, key dits and dahs in turn, starting with the
-// one pressed first. A paddle pressed while the other's element is keyed,
+// The screen gives UP as the dit paddle and DOWN as the dah. A press keys
+// its element at once. Held, a paddle keys it again and again, each
+// followed by a space of one unit, as a paddle keyer does: the rhythm is
+// even, and a paddle must be let go within its element and the space to
+// key one. A wait before repeating, tried on 12 November 2026, made the
+// first space longer than the rest. Both held, squeezed, key dits and
+// dahs in turn, starting with the one pressed first. A paddle pressed while the other's element is keyed,
 // or down in the space after it, is kept and its element keyed next:
 // iambic A, with element memory, so a squeeze let go of keys no element
 // more than the one keying. The
@@ -14,10 +17,13 @@
 // of it and a dah MORSE_DAH_UNITS.
 //
 // The elements keyed are kept in code, up to MORSE_MOST, and those past it
-// are let go. MORSE_LETTER_UNITS after the last element ended with no
-// paddle down, the gap between letters, ends the character: morse_keys()
+// are let go. MORSE_LETTER_UNITS of silence after the last element
+// ended, half way between the space in a letter, one unit, and the gap
+// between letters, three (SE came out as H at three, 13 November 2026),
+// ends the character: morse_keys()
 // gives MORSE_LETTER and the character, or MORSE_UNKNOWN for a code that
-// is none, and code is empty again. Each element is given too, MORSE_DIT
+// is none, and code is empty again. MORSE_WORD_UNITS after it, with no
+// element keyed, the gap between words gives MORSE_WORD, once. Each element is given too, MORSE_DIT
 // or MORSE_DAH, as it begins, for the sidetone. morse_abort() empties code,
 // nothing taken.
 //
@@ -69,6 +75,7 @@ void morse_begin(struct morse *m, int wpm) {
 	m->was_dah = 0;
 	m->until_ms = 0;
 	m->ended_ms = 0;
+	m->is_word_due = 0;
 	morse_abort(m);
 }
 
@@ -100,6 +107,7 @@ static int element(struct morse *m, int is_dit, long now) {
 	}
 	m->state = MORSE_SENDING;
 	m->is_last_dit = is_dit;
+	m->is_word_due = 0;
 	// what was kept is keyed now, or passed over for the other
 	m->is_dit_kept = 0;
 	m->is_dah_kept = 0;
@@ -112,25 +120,34 @@ static int element(struct morse *m, int is_dit, long now) {
 // after one, MORSE_UNKNOWN for a code that is none, and MORSE_NOTHING the
 // rest
 int morse_keys(struct morse *m, int is_dit, int is_dah, long now, char *letter) {
-	// a paddle pressed while the other's element is keyed is kept, and one
-	// down in the space after an element
-	if (m->state == MORSE_SENDING && !m->is_last_dit && is_dit && !m->was_dit)
-		m->is_dit_kept = 1;
-	if (m->state == MORSE_SENDING && m->is_last_dit && is_dah && !m->was_dah)
-		m->is_dah_kept = 1;
-	if (m->state == MORSE_SPACING) {
-		m->is_dit_kept |= is_dit;
-		m->is_dah_kept |= is_dah;
-	}
+	int is_dit_pressed = is_dit && !m->was_dit;
+	int is_dah_pressed = is_dah && !m->was_dah;
+
+	// the gap between letters runs from the last element's end, the
+	// silence heard; a paddle held past the space keys again anyway
 	m->was_dit = is_dit;
 	m->was_dah = is_dah;
+	// a paddle pressed while the other's element is keyed is kept, and one
+	// that wants keying in the space after an element
+	if (m->state == MORSE_SENDING && !m->is_last_dit && is_dit_pressed)
+		m->is_dit_kept = 1;
+	if (m->state == MORSE_SENDING && m->is_last_dit && is_dah_pressed)
+		m->is_dah_kept = 1;
+	if (m->state == MORSE_SPACING) {
+		m->is_dit_kept |= is_dit_pressed;
+		m->is_dah_kept |= is_dah_pressed;
+	}
 	if (m->state == MORSE_SENDING && now >= m->until_ms) {
 		m->state = MORSE_SPACING;
-		m->ended_ms = m->until_ms;
+		if (m->until_ms > m->ended_ms)
+			m->ended_ms = m->until_ms;
 		m->until_ms += m->unit_ms;
 	}
 	if (m->state == MORSE_SPACING && now >= m->until_ms) {
 		m->state = MORSE_IDLE;
+		// a paddle still held at the end of the space keys again
+		m->is_dit_kept |= is_dit;
+		m->is_dah_kept |= is_dah;
 		// the other one first, for a squeeze; then the same again
 		if (m->is_last_dit && m->is_dah_kept)
 			return element(m, 0, now);
@@ -143,13 +160,22 @@ int morse_keys(struct morse *m, int is_dit, int is_dah, long now, char *letter) 
 	}
 	if (m->state != MORSE_IDLE)
 		return MORSE_NOTHING;
-	if (is_dit)
-		return element(m, 1, now);
+	if (is_dit) {
+		element(m, 1, now);
+		// both pressed at once, a squeeze: the dah after
+		m->is_dah_kept = is_dah_pressed;
+		return MORSE_DIT;
+	}
 	if (is_dah)
 		return element(m, 0, now);
+	if (m->length == 0 && m->is_word_due && now - m->ended_ms >= MORSE_WORD_UNITS * m->unit_ms) {
+		m->is_word_due = 0;
+		return MORSE_WORD;
+	}
 	if (m->length == 0 || now - m->ended_ms < MORSE_LETTER_UNITS * m->unit_ms)
 		return MORSE_NOTHING;
 	*letter = morse_letter_of(m->code);
 	morse_abort(m);
+	m->is_word_due = *letter != 0;
 	return *letter ? MORSE_LETTER : MORSE_UNKNOWN;
 }

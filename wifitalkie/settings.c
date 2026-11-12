@@ -60,6 +60,7 @@ void settings_load(void) {
 	settings.mic = SETTINGS_DEFAULT_MIC;
 	settings.is_gate = SETTINGS_DEFAULT_GATE;
 	settings.wpm = SETTINGS_DEFAULT_WPM;
+	settings.sidetone = SETTINGS_DEFAULT_SIDETONE;
 	settings.is_voip_online = 1;
 	if (nvs_open(NAMESPACE, NVS_READONLY, &handle) != ESP_OK)
 		return;
@@ -83,6 +84,9 @@ void settings_load(void) {
 	number_get(handle, "morse_typing", &settings.is_morse_typing);
 	number_get(handle, "local", &settings.is_local);
 	number_get(handle, "wpm", &settings.wpm);
+	number_get(handle, "sidetone", &settings.sidetone);
+	if (settings.sidetone > SETTINGS_SIDETONE_MOST)
+		settings.sidetone = SETTINGS_SIDETONE_MOST;
 	number_get(handle, "batt_offset", (uint32_t *)&settings.battery_offset_mv);
 	for (i = 0; i < SETTINGS_KNOWN; i++) {
 		snprintf(key, sizeof(key), "kssid%d", i);
@@ -124,6 +128,7 @@ void settings_save(void) {
 	nvs_set_u32(handle, "morse_typing", settings.is_morse_typing);
 	nvs_set_u32(handle, "local", settings.is_local);
 	nvs_set_u32(handle, "wpm", settings.wpm);
+	nvs_set_u32(handle, "sidetone", settings.sidetone);
 	nvs_set_u32(handle, "batt_offset", (uint32_t)settings.battery_offset_mv);
 	for (i = 0; i < SETTINGS_KNOWN; i++) {
 		snprintf(key, sizeof(key), "kssid%d", i);

@@ -40,12 +40,23 @@
 //                    scans again. Then a page says whether it joined.
 //     Link           Internet, by my.sbitx.net, or Local, talkie to talkie
 //                    by ESP-NOW off the internet (local.c); set by hand
-//     Contacts       the callsigns kept, added and deleted at Setup
+//     Contacts       the callsigns kept, and Add after them: UP and DOWN
+//                    choose, ENTER on Add adds one as the callsign is
+//                    entered; on a contact, it opens two items:
+//                    Send Msg..., a longer text entered as the callsign
+//                    is, the gap between words a space in Morse, not yet
+//                    sent anywhere but said on the console; and Edit
+//                    callsign, one edited to nothing deleted. ENTER held
+//                    on one asks to delete it. They are added and
+//                    deleted at Setup too
 //     Sleep          the talkie asleep, until any key wakes it (sleep.c)
 //     Settings...    a list of its own, MENU back to the menu:
 //         Audio          the in-built mic or the handsfree's
 //         Morse speed    for entering text, large; UP and DOWN step it,
 //                        from MORSE_WPM_LEAST to MORSE_WPM_MOST
+//         Sidetone       the Morse keyer's tone, 0 (off) to 10, on a bar as
+//                        the volume is (struct level); UP and DOWN step
+//                        it, and it is heard at each step
 //         VOX            speaking by the voice, without the PTT (vox.c):
 //                        the sensitivity, Off or 1 to 10, large; UP and
 //                        DOWN step it; below, the voice's level now as a
@@ -180,7 +191,19 @@
 #define PAGE_LINK 19
 #define PAGE_VOX 21
 #define PAGE_TYPING 22
+#define PAGE_CONTACT 23
+#define PAGE_CONTACT_DELETE 24
+#define PAGE_SIDETONE 25
+#define PAGE_CONTACT_MENU 26
+#define PAGE_MESSAGE 27
+// the sidetone heard at each step of its level
+#define SIDETONE_STEP_MS 250
+// a word on the entry page, why the text was not kept, shown this long
+#define ENTRY_SAID_MS 2000
 #define VOX_METER_MOST 600
+#define CONTACT_SEND 0
+#define CONTACT_EDIT 1
+#define CONTACT_ACTIONS 2
 
 struct item {
 	const char *name;
@@ -202,6 +225,7 @@ static const struct item settings_items[] = {
 	{"Audio", PAGE_AUDIO},
 	{"Typing", PAGE_TYPING},
 	{"Morse speed", PAGE_WPM},
+	{"Sidetone", PAGE_SIDETONE},
 	{"VOX", PAGE_VOX},
 	{"Callsign", PAGE_CALLSIGN},
 	{"Setup...", PAGE_SETUP},
@@ -289,6 +313,13 @@ static int wifi_top;
 static char wifi_ssid[SETTINGS_SSID_ROOM];
 static long joining_since_ms;
 static int contacts_top;
+static int contacts_chosen;
+// the contact being edited on PAGE_CONTACT, -1 for one being added
+static int contact_editing;
+// the item chosen on PAGE_CONTACT_MENU: CONTACT_SEND or CONTACT_EDIT
+static int contact_action;
+static const char *entry_said;
+static long entry_said_ms;
 static int is_begun;
 
 void screen_open(void) {
@@ -314,22 +345,41 @@ static void save_soon(long now) {
 }
 
 static int is_entering(int on_page) {
-	return on_page == PAGE_CALLSIGN;
+	return on_page == PAGE_CALLSIGN || on_page == PAGE_CONTACT || on_page == PAGE_MESSAGE;
+}
+
+// where a page of text entry goes back to
+static int entered_from(int on_page) {
+	if (on_page == PAGE_CONTACT)
+		return PAGE_CONTACTS;
+	if (on_page == PAGE_MESSAGE)
+		return PAGE_CONTACT_MENU;
+	return PAGE_MENU;
 }
 
 // to another page; ENTER is the PTT on the home page, the screen's on the
 // rest
 static void go(int to) {
-	if (to == PAGE_CALLSIGN) {
-		entry_begin(&entry, ENTRY_CALLSIGN, settings.callsign, SETTINGS_CALLSIGN_ROOM - 1);
+	if (to == PAGE_CALLSIGN || to == PAGE_CONTACT) {
+		entry_begin(&entry, ENTRY_CALLSIGN,
+			to == PAGE_CALLSIGN ? settings.callsign
+			: contact_editing >= 0 ? settings.contacts[contact_editing] : "",
+			SETTINGS_CALLSIGN_ROOM - 1);
+	}
+	if (to == PAGE_MESSAGE)
+		entry_begin(&entry, ENTRY_ANY, "", ENTRY_ROOM - 1);
+	if (is_entering(to)) {
 		morse_begin(&morse, (int)settings.wpm);
+		entry_said = NULL;
 	}
 	if (page == PAGE_SETUP && to != PAGE_SETUP)
 		portal_close();
 	if (to == PAGE_SETUP)
 		portal_open();
-	if (to == PAGE_CONTACTS)
+	if (to == PAGE_CONTACTS && page == PAGE_MENU) {
 		contacts_top = 0;
+		contacts_chosen = 0;
+	}
 	if (to == PAGE_WIFI && page == PAGE_MENU) {
 		network_scan_begin();
 		wifi_chosen = 0;
@@ -363,18 +413,39 @@ static void vox_step(const struct key_press *press, long now) {
 	save_soon(now);
 }
 
-static void volume_step(const struct key_press *press, long now) {
-	int volume = (int)settings.volume;
+// a level set with a bar: its label, the setting, its least and most and
+// a press's step, and what is done once it has stepped, if anything. The
+// volume on the home page and the sidetone on its page are each one.
+struct level {
+	const char *label;
+	uint32_t *value;
+	int least;
+	int most;
+	int step;
+	void (*stepped)(void);
+};
 
-	if (press->key == KEY_UP)
-		volume += VOLUME_STEP;
-	else
-		volume -= VOLUME_STEP;
-	if (volume < 0)
-		volume = 0;
-	if (volume > SETTINGS_LEVEL_MOST)
-		volume = SETTINGS_LEVEL_MOST;
-	settings.volume = (uint32_t)volume;
+// the sidetone heard at its new level
+static void sidetone_heard(void) {
+	speaker_tone(SIDETONE_STEP_MS);
+}
+
+static const struct level volume_level = {"Vol", &settings.volume, 0, SETTINGS_LEVEL_MOST,
+	VOLUME_STEP, NULL};
+static const struct level sidetone_level = {"Tone", &settings.sidetone, 0, SETTINGS_SIDETONE_MOST,
+	1, sidetone_heard};
+
+// UP a step up, DOWN a step down, within the level's least and most
+static void level_step(const struct level *l, const struct key_press *press, long now) {
+	int value = (int)*l->value + (press->key == KEY_UP ? l->step : -l->step);
+
+	if (value < l->least)
+		value = l->least;
+	if (value > l->most)
+		value = l->most;
+	*l->value = (uint32_t)value;
+	if (l->stepped != NULL)
+		l->stepped();
 	save_soon(now);
 }
 
@@ -486,7 +557,7 @@ static void take_home(const struct key_press *press, long now) {
 		return;
 	}
 	if (is_up_or_down(press))
-		volume_step(press, now);
+		level_step(&volume_level, press, now);
 }
 
 // UP and DOWN choose, ENTER opens, MENU goes up a level, or home
@@ -580,18 +651,54 @@ static void take_wifi(const struct key_press *press, long now) {
 	pick(wifi_chosen, press->what == BUTTON_HELD, now);
 }
 
+// a contact entered: added, or the one edited changed, or deleted if it
+// was edited to nothing; 0 with entry_said why not
+static int contact_keep(long now) {
+	char call[SETTINGS_CALLSIGN_ROOM];
+	int is_kept;
+
+	if (entry.length == 0 && contact_editing < 0)
+		return 1;
+	if (entry.length == 0) {
+		console_say("CONTACT %s DELETED", settings.contacts[contact_editing]);
+		contacts_forget(&settings, contact_editing);
+		settings_save();
+		return 1;
+	}
+	entry_said_ms = now;
+	if (!contacts_callsign(entry.text, call)) {
+		entry_said = "NOT A CALLSIGN";
+		return 0;
+	}
+	is_kept = contact_editing < 0 ? contacts_add(&settings, call)
+		: contacts_replace(&settings, contact_editing, call);
+	if (!is_kept) {
+		entry_said = "ALREADY THERE";
+		return 0;
+	}
+	if (contact_editing < 0)
+		contacts_chosen = contacts_count(&settings) - 1;
+	settings_save();
+	console_say("CONTACT %s", call);
+	return 1;
+}
+
 // ENTER pressed on a page of text entry, no letter being chosen: the text
 // is kept
 static void accept(long now) {
-	while (page == PAGE_CALLSIGN && entry.length > 0 && entry.text[entry.length - 1] == ' ')
+	while (entry.length > 0 && entry.text[entry.length - 1] == ' ')
 		entry_delete(&entry);
+	if (page == PAGE_CONTACT && !contact_keep(now))
+		return;
+	if (page == PAGE_MESSAGE && entry.length > 0)
+		console_say("MESSAGE TO %s: %s", settings.contacts[contacts_chosen], entry.text);
 	if (page == PAGE_CALLSIGN && entry.length > 0) {
 		snprintf(settings.callsign, sizeof(settings.callsign), "%s", entry.text);
 		settings_save();
 		service_restart();
 		console_say("CALL %s", settings.callsign);
 	}
-	go(PAGE_MENU);
+	go(entered_from(page));
 }
 
 // the keyboard: UP and DOWN go along it, ENTER a row up and MENU a row
@@ -643,18 +750,70 @@ static void take_entry(const struct key_press *press, long now) {
 		entry_delete(&entry);
 	}
 	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
-		go(PAGE_MENU);
+		go(entered_from(page));
 }
 
-// the list of contacts moved a line, kept within it
-static void contacts_scroll(int is_up) {
-	int most = contacts_count(&settings) - LIST_ROWS;
+// the contacts' rows: each of them, and Add after them while there is room
+static int contacts_rows(void) {
+	int count = contacts_count(&settings);
 
-	contacts_top += is_up ? -1 : 1;
-	if (contacts_top > most)
-		contacts_top = most;
-	if (contacts_top < 0)
-		contacts_top = 0;
+	return count < SETTINGS_CONTACTS ? count + 1 : count;
+}
+
+// CONTACTS: UP and DOWN choose, round the ends; ENTER opens the chosen or
+// adds one; ENTER held asks to delete the chosen; MENU goes back
+static void take_contacts(const struct key_press *press) {
+	int rows = contacts_rows();
+
+	if (press->key == KEY_UP)
+		contacts_chosen = (contacts_chosen + rows - 1) % rows;
+	if (press->key == KEY_DOWN)
+		contacts_chosen = (contacts_chosen + 1) % rows;
+	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
+		go(PAGE_MENU);
+	if (press->key != KEY_ENTER)
+		return;
+	if (press->what == BUTTON_PRESSED && contacts_chosen < contacts_count(&settings)) {
+		contact_action = CONTACT_SEND;
+		go(PAGE_CONTACT_MENU);
+	} else if (press->what == BUTTON_PRESSED) {
+		contact_editing = -1;
+		go(PAGE_CONTACT);
+	}
+	if (press->what == BUTTON_HELD && contacts_chosen < contacts_count(&settings))
+		go(PAGE_CONTACT_DELETE);
+}
+
+// a contact opened: UP and DOWN choose Send Msg... or Edit callsign,
+// ENTER takes it, MENU goes back
+static void take_contact_menu(const struct key_press *press) {
+	if (press->what != BUTTON_PRESSED)
+		return;
+	if (press->key == KEY_UP || press->key == KEY_DOWN)
+		contact_action = (contact_action + 1) % CONTACT_ACTIONS;
+	if (press->key == KEY_MENU)
+		go(PAGE_CONTACTS);
+	if (press->key != KEY_ENTER)
+		return;
+	if (contact_action == CONTACT_EDIT) {
+		contact_editing = contacts_chosen;
+		go(PAGE_CONTACT);
+	} else {
+		go(PAGE_MESSAGE);
+	}
+}
+
+// DELETE?: ENTER deletes the chosen contact, MENU keeps it
+static void take_contact_delete(const struct key_press *press) {
+	if (press->what != BUTTON_PRESSED)
+		return;
+	if (press->key == KEY_ENTER && contacts_chosen < contacts_count(&settings)) {
+		console_say("CONTACT %s DELETED", settings.contacts[contacts_chosen]);
+		contacts_forget(&settings, contacts_chosen);
+		settings_save();
+	}
+	if (press->key == KEY_ENTER || press->key == KEY_MENU)
+		go(PAGE_CONTACTS);
 }
 
 static void take_page(const struct key_press *press, long now) {
@@ -666,16 +825,16 @@ static void take_page(const struct key_press *press, long now) {
 		take_choices(choices_of(page), press);
 		return;
 	}
+	if (page == PAGE_SIDETONE && is_up_or_down(press)) {
+		level_step(&sidetone_level, press, now);
+		return;
+	}
 	if (page == PAGE_WPM && is_up_or_down(press)) {
 		wpm_step(press, now);
 		return;
 	}
 	if (page == PAGE_VOX && is_up_or_down(press)) {
 		vox_step(press, now);
-		return;
-	}
-	if (page == PAGE_CONTACTS && is_up_or_down(press)) {
-		contacts_scroll(press->key == KEY_UP);
 		return;
 	}
 	if (press->key == KEY_MENU || press->key == KEY_ENTER)
@@ -695,6 +854,18 @@ static void take(const struct key_press *press, long now) {
 	}
 	if (page == PAGE_WIFI) {
 		take_wifi(press, now);
+		return;
+	}
+	if (page == PAGE_CONTACTS) {
+		take_contacts(press);
+		return;
+	}
+	if (page == PAGE_CONTACT_DELETE) {
+		take_contact_delete(press);
+		return;
+	}
+	if (page == PAGE_CONTACT_MENU) {
+		take_contact_menu(press);
 		return;
 	}
 	if (press->key == KEY_ENTER && press->what != BUTTON_PRESSED)
@@ -768,12 +939,15 @@ static void big_frequency(int y) {
 	big(text, y);
 }
 
-static void volume_bar(int y) {
+// the level's label, its bar, filled from its least to its most, and its
+// value at the right
+static void level_bar(const struct level *l, int y) {
 	char text[TEXT_ROOM];
+	int value = (int)*l->value;
 
-	display_text_at(0, y, 1, "Vol");
-	display_bar(BAR_X, y, BAR_WIDE, (int)settings.volume * BAR_WIDE / SETTINGS_LEVEL_MOST);
-	snprintf(text, sizeof(text), "%u", (unsigned)settings.volume);
+	display_text_at(0, y, 1, l->label);
+	display_bar(BAR_X, y, BAR_WIDE, (value - l->least) * BAR_WIDE / (l->most - l->least));
+	snprintf(text, sizeof(text), "%d", value);
 	display_text_at(DISPLAY_WIDE - display_text_wide(text, 1), y, 1, text);
 }
 
@@ -838,7 +1012,7 @@ static void draw_home(void) {
 		big_frequency(HOME_BIG_Y);
 		state_line(HOME_STATE_Y);
 	}
-	volume_bar(HOME_VOLUME_Y);
+	level_bar(&volume_level, HOME_VOLUME_Y);
 }
 
 static void draw_choices(const struct choices *these) {
@@ -862,6 +1036,8 @@ static void item_value(int of_page, char *text, int room) {
 		snprintf(text, room, "%u", (unsigned)(settings.hz / HZ_A_KHZ));
 	if (of_page == PAGE_WPM)
 		snprintf(text, room, "%u", (unsigned)settings.wpm);
+	if (of_page == PAGE_SIDETONE)
+		snprintf(text, room, settings.sidetone == 0 ? "Off" : "%u", (unsigned)settings.sidetone);
 	if (of_page == PAGE_VOX)
 		snprintf(text, room, settings.vox == VOX_OFF ? "Off" : "%u", (unsigned)settings.vox);
 	if (of_page == PAGE_CALLSIGN)
@@ -975,6 +1151,14 @@ static void frame(int x, int y, int wide, int high) {
 	display_fill(x + wide - 1, y, 1, high);
 }
 
+// the help of a page of text entry, or for a while why its text was not kept
+static void entry_help_now(const char *const *helps, int count, long now) {
+	if (entry_said != NULL && now - entry_said_ms < ENTRY_SAID_MS)
+		help(entry_said);
+	else
+		help(helps[now / HELP_EVERY_MS % count]);
+}
+
 // the text's end and a cursor, or the key moved to and not yet typed, and
 // under it the keyboard, the chosen key in reverse video and those not of
 // the set left out; no title, for room
@@ -1000,7 +1184,7 @@ static void draw_keyboard(long now) {
 		if (at == entry.key_at)
 			display_invert(x, y - LETTER_EDGE, KEY_PITCH - 1, FONT_HIGH + 2 * LETTER_EDGE);
 	}
-	help(keyboard_help[now / HELP_EVERY_MS % KEYBOARD_HELPS]);
+	entry_help_now(keyboard_help, KEYBOARD_HELPS, now);
 }
 
 // the title, the text's end and a cursor, and the elements keyed of the
@@ -1020,7 +1204,7 @@ static void draw_entry(const char *heading, long now) {
 		shown--;
 	line(0, text + entry.length - shown);
 	big(morse.code, CODE_Y);
-	help(entry_help[now / HELP_EVERY_MS % ENTRY_HELPS]);
+	entry_help_now(entry_help, ENTRY_HELPS, now);
 }
 
 static void draw_wifi(long now) {
@@ -1114,20 +1298,46 @@ static void draw_activate(void) {
 	help("MENU: BACK");
 }
 
+static const char *contacts_help[] = {
+	"ENTER: OPEN OR ADD",
+	"HOLD ENTER: DELETE",
+	"MENU: BACK",
+};
+
+#define CONTACTS_HELPS ((int)(sizeof(contacts_help) / sizeof(contacts_help[0])))
+
+// the contacts and Add after them, the chosen in reverse video, the list
+// scrolled to keep it shown
 static void draw_contacts(long now) {
 	int count = contacts_count(&settings);
+	int rows = contacts_rows();
 	int i;
 
+	if (contacts_chosen >= rows)
+		contacts_chosen = rows - 1;
+	if (contacts_chosen < contacts_top)
+		contacts_top = contacts_chosen;
+	if (contacts_chosen >= contacts_top + LIST_ROWS)
+		contacts_top = contacts_chosen - LIST_ROWS + 1;
 	title("Contacts");
-	if (count == 0) {
-		line(0, "None yet.");
-		line(1, "Add them at Setup.");
-		help("MENU: BACK");
-		return;
-	}
-	for (i = 0; i < LIST_ROWS && contacts_top + i < count; i++)
-		line(i, settings.contacts[contacts_top + i]);
-	help(now / HELP_EVERY_MS % 2 ? "ADD THEM AT SETUP" : "UP/DOWN   MENU: BACK");
+	for (i = 0; i < LIST_ROWS && contacts_top + i < rows; i++)
+		item(i, contacts_top + i == contacts_chosen,
+			contacts_top + i < count ? settings.contacts[contacts_top + i] : "Add", "");
+	help(contacts_help[now / HELP_EVERY_MS % CONTACTS_HELPS]);
+}
+
+static void draw_contact_menu(void) {
+	title(contacts_chosen < contacts_count(&settings) ? settings.contacts[contacts_chosen] : "");
+	item(0, contact_action == CONTACT_SEND, "Send Msg...", "");
+	item(1, contact_action == CONTACT_EDIT, "Edit callsign", "");
+	help("ENTER: TAKE   MENU: BACK");
+}
+
+static void draw_contact_delete(void) {
+	title("Delete?");
+	if (contacts_chosen < contacts_count(&settings))
+		big(settings.contacts[contacts_chosen], PAGE_BIG_Y);
+	help("ENTER: DELETE  MENU: NO");
 }
 
 // the voice's level against the level that keys, on the VOX page
@@ -1183,10 +1393,23 @@ static void draw(long now) {
 		big(text, PAGE_BIG_Y);
 		help("UP/DOWN   MENU: BACK");
 	}
+	if (page == PAGE_SIDETONE) {
+		title("Sidetone");
+		level_bar(&sidetone_level, line_y(1));
+		help("UP/DOWN   MENU: BACK");
+	}
 	if (page == PAGE_VOX)
 		draw_vox();
 	if (page == PAGE_CALLSIGN)
 		draw_entry("Callsign", now);
+	if (page == PAGE_CONTACT)
+		draw_entry(contact_editing < 0 ? "New contact" : "Contact", now);
+	if (page == PAGE_CONTACT_DELETE)
+		draw_contact_delete();
+	if (page == PAGE_CONTACT_MENU)
+		draw_contact_menu();
+	if (page == PAGE_MESSAGE)
+		draw_entry("Message", now);
 	if (page == PAGE_WIFI)
 		draw_wifi(now);
 	if (page == PAGE_WIFI_JOINING)
@@ -1216,23 +1439,34 @@ void screen_poll(long now) {
 	}
 	// the keyboard's key moved to typed once it is left, and not while a
 	// key is down, DOWN perhaps held to delete
-	if (page == PAGE_CALLSIGN && !settings.is_morse_typing
+	if (is_entering(page) && !settings.is_morse_typing
 			&& !keys_is_down(KEY_UP) && !keys_is_down(KEY_DOWN)
 			&& !keys_is_down(KEY_MENU) && !keys_is_down(KEY_ENTER))
 		entry_key_settle(&entry, now, 0);
 	// the paddles, each element heard as it begins
-	speaker_ready(page == PAGE_CALLSIGN && settings.is_morse_typing);
-	if (page == PAGE_CALLSIGN && settings.is_morse_typing) {
+	speaker_ready((is_entering(page) && settings.is_morse_typing) || page == PAGE_SIDETONE);
+	if (is_entering(page) && settings.is_morse_typing) {
 		switch (morse_keys(&morse, keys_is_down(KEY_UP), keys_is_down(KEY_DOWN), now, &letter)) {
 		case MORSE_DIT:
 			speaker_tone((int)(MORSE_DIT_UNITS * morse.unit_ms));
+			drawn_ms = now - DRAW_EVERY_MS;
 			break;
 		case MORSE_DAH:
 			speaker_tone((int)(MORSE_DAH_UNITS * morse.unit_ms));
+			drawn_ms = now - DRAW_EVERY_MS;
 			break;
 		case MORSE_LETTER:
 			if (strchr(entry.set, letter))
 				entry_put(&entry, letter);
+			drawn_ms = now - DRAW_EVERY_MS;
+			break;
+		case MORSE_WORD:
+			if (page == PAGE_MESSAGE && entry.length > 0 && entry.text[entry.length - 1] != ' ')
+				entry_put(&entry, ' ');
+			drawn_ms = now - DRAW_EVERY_MS;
+			break;
+		case MORSE_UNKNOWN:
+			drawn_ms = now - DRAW_EVERY_MS;
 			break;
 		}
 	}

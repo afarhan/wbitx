@@ -16,6 +16,7 @@ int contacts_count(const struct settings *s);
 int contacts_find(const struct settings *s, const char *callsign);
 int contacts_add(struct settings *s, const char *callsign);
 int contacts_forget(struct settings *s, int i);
+int contacts_replace(struct settings *s, int i, const char *callsign);
 
 #ifdef __cplusplus
 }

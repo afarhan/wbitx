@@ -513,6 +513,38 @@ static void test_morse(void) {
 	expect(morse_letter_of("......") == 0, "a code that is none is no character");
 	held(&m, 1, 0, 65, code, sizeof(code));
 	expect(!strcmp(code, "...."), "the dit paddle held keys dits, a space between each");
+	{
+		morse_begin(&m, 12);
+		now = 1000;
+		keyed_for(&m, 1, 0, &now, 150, &letter);
+		expect(keyed_for(&m, 0, 0, &now, 400, &letter) == MORSE_LETTER && letter == 'E',
+			"a press let go within the dit and its space is E");
+		expect(keyed_for(&m, 0, 0, &now, 500, &letter) == MORSE_WORD,
+			"the gap between words after it");
+		expect(keyed_for(&m, 0, 0, &now, 2000, &letter) == MORSE_NOTHING, "and only once");
+		{
+			long began[3];
+			int n = 0;
+
+			morse_begin(&m, 12);
+			for (now = 1000; now < 1550; now += KEYED_TURN_MS)
+				if (morse_keys(&m, 1, 0, now, &letter) == MORSE_DIT && n < 3)
+					began[n++] = now;
+			expect(n == 3 && began[1] - began[0] == 200 && began[2] - began[1] == 200,
+				"dits held come evenly, a unit's space between each");
+		}
+		// 2, ..---, each key let go 50 ms after the next is pressed
+		morse_begin(&m, 12);
+		now = 1000;
+		keyed_for(&m, 1, 0, &now, 200, &letter);
+		keyed_for(&m, 0, 0, &now, 50, &letter);
+		keyed_for(&m, 1, 0, &now, 150, &letter);
+		keyed_for(&m, 1, 1, &now, 50, &letter);
+		keyed_for(&m, 0, 1, &now, 1050, &letter);
+		expect(keyed_for(&m, 0, 0, &now, 500, &letter) == MORSE_LETTER && letter == '2',
+			"..--- rolled from one key to the other, held, is 2");
+		now = 1000;
+	}
 	held(&m, 0, 1, 45, code, sizeof(code));
 	expect(!strcmp(code, "--"), "the dah paddle held keys dahs");
 	held(&m, 1, 1, 25, code, sizeof(code));
@@ -526,10 +558,30 @@ static void test_morse(void) {
 	expect(!strcmp(m.code, "-."), "a dit pressed during a dah is kept and keyed after it");
 	morse_begin(&m, KEYED_WPM);
 	expect(keyed_for(&m, 1, 0, &now, KEYED_TURN_MS, &letter) == MORSE_DIT, "an element is said as it begins");
-	expect(keyed_for(&m, 0, 0, &now, KEYED_UNIT_MS * 3, &letter) == MORSE_NOTHING,
+	expect(keyed_for(&m, 0, 0, &now, KEYED_UNIT_MS * 2, &letter) == MORSE_NOTHING,
 		"not taken before the gap between letters");
-	expect(keyed_for(&m, 0, 0, &now, KEYED_UNIT_MS, &letter) == MORSE_LETTER && letter == 'E',
+	expect(keyed_for(&m, 0, 0, &now, KEYED_UNIT_MS * 2, &letter) == MORSE_LETTER && letter == 'E',
 		"taken at the gap");
+	{
+		char got[4] = {0};
+		int n = 0;
+		long at;
+		long pressed[] = {0, 2, 4, 8};
+		int i;
+
+		// SE: three dits, a unit's space each, three units' silence, a dit
+		morse_begin(&m, KEYED_WPM);
+		for (at = 0; at < 14 * KEYED_UNIT_MS; at += KEYED_TURN_MS) {
+			int down = 0;
+
+			for (i = 0; i < 4; i++)
+				if (at >= pressed[i] * KEYED_UNIT_MS && at < pressed[i] * KEYED_UNIT_MS + KEYED_UNIT_MS / 2)
+					down = 1;
+			if (morse_keys(&m, down, 0, 1000 + at, &letter) == MORSE_LETTER && n < 3)
+				got[n++] = letter;
+		}
+		expect(!strcmp(got, "SE"), "three units' silence ends a letter: SE, not H");
+	}
 	keyed_for(&m, 0, 1, &now, KEYED_TURN_MS, &letter);
 	morse_abort(&m);
 	expect(keyed_for(&m, 0, 0, &now, 10 * KEYED_UNIT_MS, &letter) == MORSE_NOTHING, "dropped, nothing is taken");
@@ -581,12 +633,18 @@ static void test_contacts(void) {
 	expect(contacts_add(&s, "VU3XYZ/P") && contacts_find(&s, "VU3XYZ/P") == 1, "a stroke is kept");
 	expect(contacts_forget(&s, 0) && !strcmp(s.contacts[0], "VU3XYZ/P") && contacts_count(&s) == 1,
 		"one taken out, those after it move up");
+	contacts_add(&s, "W1AW");
+	expect(contacts_replace(&s, 0, "vu3xyz") && !strcmp(s.contacts[0], "VU3XYZ"), "edited in its place, in capitals");
+	expect(contacts_replace(&s, 0, "VU3XYZ"), "edited to itself");
+	expect(!contacts_replace(&s, 0, "W1AW") && !strcmp(s.contacts[0], "VU3XYZ"), "not edited to another already there");
+	expect(!contacts_replace(&s, 0, "VU 3") && !contacts_replace(&s, 2, "K1ABC"), "not a callsign, or no such contact");
+	contacts_forget(&s, 1);
 	for (i = 1; i < SETTINGS_CONTACTS; i++) {
 		snprintf(call, sizeof(call), "VU%d", i);
 		contacts_add(&s, call);
 	}
 	expect(contacts_count(&s) == SETTINGS_CONTACTS && !contacts_add(&s, "W1AW"), "full, no more added");
-	printf("contacts: added in capitals, once, taken out\n");
+	printf("contacts: added in capitals, once, edited, taken out\n");
 }
 
 static void test_speech(void) {

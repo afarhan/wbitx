@@ -30,7 +30,9 @@
 // so that the word that keyed it is not cut: the voice is some tens of
 // milliseconds old by the time vox.c is sure of it. The voice is held off
 // keying the talkie while a voice is heard and VOX_QUIET_MS after, so that
-// the speaker does not key it through the microphone.
+// the speaker does not key it through the microphone; and so while the
+// Morse sidetone sounds and VOX_QUIET_MS after, or it keys the talkie,
+// whose PTT mutes the speaker and cuts the tone short.
 //
 // WHAT IS HEARD
 //
@@ -114,6 +116,7 @@ static int preroll_at;
 static int preroll_count;
 static int is_hearing;
 static long heard_ms;
+static long toned_ms;
 static char speaker_callsign[VOIP_CALLSIGN_ROOM];
 static uint32_t count_sent;
 static uint32_t count_heard;
@@ -323,7 +326,9 @@ void voip_poll(long now) {
 	int got;
 
 	polled_ms = now;
-	microphone_vox_hold(is_hearing || now - heard_ms < VOX_QUIET_MS);
+	if (speaker_is_toning())
+		toned_ms = now;
+	microphone_vox_hold(is_hearing || now - heard_ms < VOX_QUIET_MS || now - toned_ms < VOX_QUIET_MS);
 	if (is_talking != was_talking) {
 		was_talking = is_talking;
 		speaker_mute(is_talking);

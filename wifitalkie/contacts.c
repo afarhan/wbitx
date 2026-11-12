@@ -3,8 +3,9 @@
 //
 // contacts.c — the callsigns the talkie keeps, up to SETTINGS_CONTACTS.
 //
-// They are entered and deleted at the setup portal (portal.cpp) and listed
-// on the screen's CONTACTS page, in the order they were added. A callsign
+// They are entered and deleted at the setup portal (portal.cpp), and
+// listed, entered, edited and deleted on the screen's CONTACTS page, in the
+// order they were added. A callsign
 // is kept in capitals, letters, figures and the stroke only, as typed on a
 // telephone it may come in small letters or with spaces round it; one
 // already there is not added twice. It knows nothing of the ESP32, so
@@ -77,5 +78,20 @@ int contacts_forget(struct settings *s, int i) {
 	for (; i < SETTINGS_CONTACTS - 1; i++)
 		memcpy(s->contacts[i], s->contacts[i + 1], sizeof(s->contacts[i]));
 	s->contacts[i][0] = 0;
+	return 1;
+}
+
+// the i'th made callsign, in its place; 1 if it was, 0 if there is no
+// i'th, callsign is not a callsign, or another is it already
+int contacts_replace(struct settings *s, int i, const char *callsign) {
+	char call[SETTINGS_CALLSIGN_ROOM];
+	int found;
+
+	if (i < 0 || i >= contacts_count(s) || !contacts_callsign(callsign, call))
+		return 0;
+	found = contacts_find(s, call);
+	if (found >= 0 && found != i)
+		return 0;
+	snprintf(s->contacts[i], sizeof(s->contacts[i]), "%s", call);
 	return 1;
 }
