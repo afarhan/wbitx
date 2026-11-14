@@ -15,24 +15,53 @@
 //     3.9V    VU2ESE    o 90%       the supply, as on the menu; the
 //     -------------------------      callsign; a dot, filled when online
 //                                    at my.sbitx.net; the WiFi's signal
-//          21080                     the channel, in kHz, large
+//          21080                     the target: a slot's kHz, or a
+//                                    contact's callsign, large
 //     2 here                  TX     who speaks, or how many are in the
 //                                    room, or, not online, a few words on
 //                                    why (service_brief()); TX or RX
 //     Vol [#########     ] 50        the volume
 //
-// On it ENTER is the PTT: the talkie speaks while it is held (ptt.c). UP
-// and DOWN set the volume, VOLUME_STEP a press, repeating while held. MENU
-// opens the menu.
+// The PTT key speaks to the target (ptt.c); ENTER is the screen's on every
+// page. On the home page ENTER opens the target's menu, UP and DOWN set the
+// volume, VOLUME_STEP a press, repeating while held, and MENU opens the
+// menu. Until calls by callsign are made, a contact as the target speaks
+// in the room of the slot last chosen.
 //
-// The menu is a list, UP and DOWN to choose, ENTER to open; each page it
-// opens goes back to it with MENU, and the menu to the home page. MENU
-// held goes home from anywhere, and so does MENU_IDLE_MS untouched. Its
-// title shows the supply at the left, 3.9V, or USB, and the WiFi's signal
-// at the right, 90%. A name ending in "..." opens what is beyond:
+// The menu is a list, UP and DOWN to choose, round the ends, ENTER to open;
+// each page it opens goes back to it with MENU, and the menu to the home
+// page. MENU held goes home from anywhere, and so does MENU_IDLE_MS
+// untouched. Its title shows the supply at the left, 3.9V, or USB, and the
+// WiFi's signal at the right, 90%. A name ending in "..." opens what is
+// beyond. It opens on Settings..., and UP from there is Add Callsign...:
 //
-//     Frequency      the channel, large; UP and DOWN step it in dial.c's
-//                    kilohertz steps, faster the longer they are held
+//     Settings...    a list of its own, MENU back to the menu, below
+//     F1  21090      the three frequency slots, with their kHz
+//     F2   7074
+//     F3  14200
+//     VU2XZ          the contacts, in the order they were added; the
+//     ...            target has a * after its name, a blocked one Blocked
+//     Add Callsign...  a callsign entered, as the callsign is, below
+//
+// ENTER on a slot or a contact opens its menu, its name as the title:
+//
+//     Frequency      a slot's only: its kHz, large; UP and DOWN step it
+//                    in dial.c's kilohertz steps, faster the longer they
+//                    are held, and the room with it if it is the target
+//     PTT            makes it the target, and goes home
+//     Text...        a text entered as the callsign is, the gap between
+//                    words a space in Morse, not yet sent anywhere but
+//                    said on the console
+//     Volume         the volume on its bar, UP and DOWN to step it
+//     Read text      On or Off: whether its text is to be heard as Morse
+//     Block          a contact's only, On or Off: not heard at all
+//     Edit callsign  a contact's only: entered again; to nothing deletes it
+//     Delete...      a contact's only: asks, and ENTER deletes it
+//
+// Read text and Block are kept in the settings, for each slot and contact
+// (contacts.c moves a contact's with it). Contacts are added and deleted
+// at Setup too. The settings:
+//
 //     WiFi           the networks heard, strongest first, with their
 //                    signal, * by those remembered; ENTER joins one that
 //                    is open or remembered; one with a key not known, or
@@ -40,43 +69,33 @@
 //                    scans again. Then a page says whether it joined.
 //     Link           Internet, by my.sbitx.net, or Local, talkie to talkie
 //                    by ESP-NOW off the internet (local.c); set by hand
-//     Contacts       the callsigns kept, and Add after them: UP and DOWN
-//                    choose, ENTER on Add adds one as the callsign is
-//                    entered; on a contact, it opens two items:
-//                    Send Msg..., a longer text entered as the callsign
-//                    is, the gap between words a space in Morse, not yet
-//                    sent anywhere but said on the console; and Edit
-//                    callsign, one edited to nothing deleted. ENTER held
-//                    on one asks to delete it. They are added and
-//                    deleted at Setup too
 //     Sleep          the talkie asleep, until any key wakes it (sleep.c)
-//     Settings...    a list of its own, MENU back to the menu:
-//         Audio          the in-built mic or the handsfree's
-//         Morse speed    for entering text, large; UP and DOWN step it,
-//                        from MORSE_WPM_LEAST to MORSE_WPM_MOST
-//         Sidetone       the Morse keyer's tone, 0 (off) to 10, on a bar as
-//                        the volume is (struct level); UP and DOWN step
-//                        it, and it is heard at each step
-//         VOX            speaking by the voice, without the PTT (vox.c):
-//                        the sensitivity, Off or 1 to 10, large; UP and
-//                        DOWN step it; below, the voice's level now as a
-//                        bar, the level that keys as a mark across it, and
-//                        KEYED while the voice keys the talkie
-//         Callsign       entered a character at a time, below
-//         Setup...       the setup portal (portal.cpp), open while the
-//                        page is shown: what to join on a telephone and
-//                        where to go, and the code its Firmware tab asks
-//                        for, or how a firmware being sent goes. It opens
-//                        by itself at power-up when
-//                        the talkie knows no network.
-//         Device key     the talkie's key, to add at my.sbitx.net as one
-//                        of the owner's radios, and whether it is in yet
-//         Theme          Black, lit dots on black, or White, the display
-//                        turned over
-//         Info           the network, the address, the signal, the
-//                        callsign, the battery
-//
-// The volume is UP and DOWN on the home page.
+//     Audio          the in-built mic or the handsfree's
+//     Typing         text on the keyboard, or keyed as Morse
+//     Morse speed    for entering text, large; UP and DOWN step it,
+//                    from MORSE_WPM_LEAST to MORSE_WPM_MOST
+//     Sidetone       the Morse keyer's tone, 0 (off) to 10, on a bar as
+//                    the volume is (struct level); UP and DOWN step
+//                    it, and it is heard at each step
+//     VOX            speaking by the voice, without the PTT (vox.c):
+//                    the sensitivity, Off or 1 to 10, large; UP and
+//                    DOWN step it; ENTER turns it off, or on again; below,
+//                    the voice's level now as a bar, the level that keys
+//                    as a mark across it, and KEYED while the voice keys
+//                    the talkie
+//     Callsign       entered a character at a time, below
+//     Setup...       the setup portal (portal.cpp), open while the
+//                    page is shown: what to join on a telephone and
+//                    where to go, and the code its Firmware tab asks
+//                    for, or how a firmware being sent goes. It opens
+//                    by itself at power-up when
+//                    the talkie knows no network.
+//     Device key     the talkie's key, to add at my.sbitx.net as one
+//                    of the owner's radios, and whether it is in yet
+//     Theme          Black, lit dots on black, or White, the display
+//                    turned over
+//     Info           the network, the address, the signal, the
+//                    callsign, the battery
 //
 // Info, Setup and Device key stay up; the others go home when idle.
 //
@@ -184,7 +203,6 @@
 #define PAGE_AUDIO 11
 #define PAGE_WPM 12
 #define PAGE_SLEEP 13
-#define PAGE_CONTACTS 14
 #define PAGE_SETTINGS 15
 #define PAGE_THEME 16
 #define PAGE_ACTIVATE 18
@@ -194,16 +212,29 @@
 #define PAGE_CONTACT 23
 #define PAGE_CONTACT_DELETE 24
 #define PAGE_SIDETONE 25
-#define PAGE_CONTACT_MENU 26
+#define PAGE_TARGET 26
 #define PAGE_MESSAGE 27
+#define PAGE_VOLUME 28
 // the sidetone heard at each step of its level
 #define SIDETONE_STEP_MS 250
 // a word on the entry page, why the text was not kept, shown this long
 #define ENTRY_SAID_MS 2000
 #define VOX_METER_MOST 600
-#define CONTACT_SEND 0
-#define CONTACT_EDIT 1
-#define CONTACT_ACTIONS 2
+// what a target's menu holds: a slot all but the last three, a contact
+// all but the first
+#define TARGET_FREQUENCY 0
+#define TARGET_PTT 1
+#define TARGET_TEXT 2
+#define TARGET_VOLUME 3
+#define TARGET_READ 4
+#define TARGET_BLOCK 5
+#define TARGET_EDIT 6
+#define TARGET_DELETE 7
+#define TARGET_ITEMS 8
+// the main menu's rows: Settings..., the slots, the contacts, Add Callsign...
+#define ROW_SETTINGS 0
+#define ROW_SLOTS 1
+#define ROW_CONTACTS (ROW_SLOTS + SETTINGS_SLOTS)
 
 struct item {
 	const char *name;
@@ -211,17 +242,16 @@ struct item {
 };
 
 // The menu and, a level below it, the settings; a name ending in an
-// ellipsis opens a list or a page of its own beyond
+// ellipsis opens a list or a page of its own beyond. The main menu's rows
+// are made as it is drawn (main_rows()); this is only its title.
 static const struct item main_items[] = {
-	{"Frequency", PAGE_DIAL},
-	{"WiFi", PAGE_WIFI},
-	{"Link", PAGE_LINK},
-	{"Contacts", PAGE_CONTACTS},
-	{"Sleep", PAGE_SLEEP},
 	{"Settings...", PAGE_SETTINGS},
 };
 
 static const struct item settings_items[] = {
+	{"WiFi", PAGE_WIFI},
+	{"Link", PAGE_LINK},
+	{"Sleep", PAGE_SLEEP},
 	{"Audio", PAGE_AUDIO},
 	{"Typing", PAGE_TYPING},
 	{"Morse speed", PAGE_WPM},
@@ -312,17 +342,24 @@ static int wifi_chosen;
 static int wifi_top;
 static char wifi_ssid[SETTINGS_SSID_ROOM];
 static long joining_since_ms;
-static int contacts_top;
-static int contacts_chosen;
+// the target opened, a slot or SETTINGS_TARGET_CONTACT + a contact's
+// place, for its menu and the pages it opens; and where its menu was
+// opened from, the menu or the home page
+static uint32_t opened;
+static int opened_from;
+static int target_chosen;
+static int target_top;
 // the contact being edited on PAGE_CONTACT, -1 for one being added
 static int contact_editing;
-// the item chosen on PAGE_CONTACT_MENU: CONTACT_SEND or CONTACT_EDIT
-static int contact_action;
+// a contact edited to nothing, and so deleted
+static int is_contact_gone;
 static const char *entry_said;
 static long entry_said_ms;
 static int is_begun;
 
 void screen_open(void) {
+	// ENTER is the screen's everywhere; the PTT key speaks
+	ptt_lend(1);
 	keys_open();
 	display_open();
 	display_white(settings.is_white != 0);
@@ -350,15 +387,83 @@ static int is_entering(int on_page) {
 
 // where a page of text entry goes back to
 static int entered_from(int on_page) {
-	if (on_page == PAGE_CONTACT)
-		return PAGE_CONTACTS;
+	if (on_page == PAGE_CONTACT && contact_editing >= 0 && !is_contact_gone)
+		return PAGE_TARGET;
 	if (on_page == PAGE_MESSAGE)
-		return PAGE_CONTACT_MENU;
+		return PAGE_TARGET;
 	return PAGE_MENU;
 }
 
-// to another page; ENTER is the PTT on the home page, the screen's on the
-// rest
+static int is_contact(uint32_t target) {
+	return target >= SETTINGS_TARGET_CONTACT;
+}
+
+static int contact_of(uint32_t target) {
+	return (int)(target - SETTINGS_TARGET_CONTACT);
+}
+
+// a target's name: F2 for a slot, the callsign for a contact
+static void target_name(uint32_t target, char *text, int room) {
+	if (is_contact(target))
+		snprintf(text, room, "%s", settings.contacts[contact_of(target)]);
+	else
+		snprintf(text, room, "F%u", (unsigned)target + 1);
+}
+
+// 1 if the target's text is not read out as Morse
+static int is_quiet(uint32_t target) {
+	if (is_contact(target))
+		return (settings.contacts_quiet >> contact_of(target)) & 1;
+	return (settings.slots_quiet >> target) & 1;
+}
+
+static void quiet_toggle(uint32_t target) {
+	if (is_contact(target))
+		settings.contacts_quiet ^= 1u << contact_of(target);
+	else
+		settings.slots_quiet ^= 1u << target;
+}
+
+static int is_blocked(uint32_t target) {
+	return is_contact(target) && ((settings.contacts_blocked >> contact_of(target)) & 1);
+}
+
+// the items of the opened target's menu, in items; how many
+static int target_items(int *items) {
+	int n = 0;
+
+	if (!is_contact(opened))
+		items[n++] = TARGET_FREQUENCY;
+	items[n++] = TARGET_PTT;
+	items[n++] = TARGET_TEXT;
+	items[n++] = TARGET_VOLUME;
+	items[n++] = TARGET_READ;
+	if (is_contact(opened)) {
+		items[n++] = TARGET_BLOCK;
+		items[n++] = TARGET_EDIT;
+		items[n++] = TARGET_DELETE;
+	}
+	return n;
+}
+
+// the main menu's rows, and what a row is: ROW_SETTINGS, a target, or
+// -1 for Add Callsign...
+static int main_rows(void) {
+	int count = contacts_count(&settings);
+
+	return ROW_CONTACTS + count + (count < SETTINGS_CONTACTS ? 1 : 0);
+}
+
+static int row_target(int row) {
+	if (row >= ROW_SLOTS && row < ROW_CONTACTS)
+		return row - ROW_SLOTS;
+	if (row >= ROW_CONTACTS && row < ROW_CONTACTS + contacts_count(&settings))
+		return SETTINGS_TARGET_CONTACT + row - ROW_CONTACTS;
+	return -1;
+}
+
+// to another page; ENTER is the screen's on every page, the PTT key the
+// talkie's
 static void go(int to) {
 	if (to == PAGE_CALLSIGN || to == PAGE_CONTACT) {
 		entry_begin(&entry, ENTRY_CALLSIGN,
@@ -376,10 +481,8 @@ static void go(int to) {
 		portal_close();
 	if (to == PAGE_SETUP)
 		portal_open();
-	if (to == PAGE_CONTACTS && page == PAGE_MENU) {
-		contacts_top = 0;
-		contacts_chosen = 0;
-	}
+	if (to == PAGE_CONTACT)
+		is_contact_gone = 0;
 	if (to == PAGE_WIFI && page == PAGE_MENU) {
 		network_scan_begin();
 		wifi_chosen = 0;
@@ -387,7 +490,6 @@ static void go(int to) {
 	}
 	if (choices_of(to) != NULL)
 		marked = choices_of(to)->in_use();
-	ptt_lend(to != PAGE_HOME);
 	page = to;
 }
 
@@ -557,8 +659,14 @@ static void take_choices(const struct choices *these, const struct key_press *pr
 		go(PAGE_MENU);
 }
 
+// the opened slot's frequency stepped, and the room with it if the slot
+// is the target
 static void dial_turn(const struct key_press *press, long now) {
-	settings.hz = dial_step(settings.hz, press->key == KEY_UP, press->held_ms);
+	if (is_contact(opened))
+		return;
+	settings.slot_hz[opened] = dial_step(settings.slot_hz[opened], press->key == KEY_UP, press->held_ms);
+	if (settings.target == opened)
+		settings.hz = settings.slot_hz[opened];
 	save_soon(now);
 }
 
@@ -566,22 +674,75 @@ static int is_up_or_down(const struct key_press *press) {
 	return press->key == KEY_UP || press->key == KEY_DOWN;
 }
 
+// the target's menu opened, from the menu or the home page
+static void open_target(uint32_t target, int from) {
+	opened = target;
+	opened_from = from;
+	target_chosen = 0;
+	target_top = 0;
+	go(PAGE_TARGET);
+}
+
 static void take_home(const struct key_press *press, long now) {
 	if (press->key == KEY_MENU) {
 		level = MAIN_MENU;
 		chosen[MAIN_MENU] = 0;
+		menu_top[MAIN_MENU] = 0;
 		go(PAGE_MENU);
+		return;
+	}
+	if (press->key == KEY_ENTER) {
+		open_target(settings.target, PAGE_HOME);
 		return;
 	}
 	if (is_up_or_down(press))
 		level_step(&volume_level, press, now);
 }
 
+// the main menu: UP and DOWN choose, round the ends, so that UP from the
+// first is Add Callsign...; ENTER opens Settings..., a target's menu, or
+// a callsign to be entered; MENU goes home
+static void take_main(const struct key_press *press) {
+	int rows = main_rows();
+	int *at = &chosen[MAIN_MENU];
+	int target;
+
+	if (*at >= rows)
+		*at = rows - 1;
+	if (press->key == KEY_MENU)
+		go(PAGE_HOME);
+	if (press->key == KEY_UP)
+		*at = (*at + rows - 1) % rows;
+	if (press->key == KEY_DOWN)
+		*at = (*at + 1) % rows;
+	if (press->key != KEY_ENTER)
+		return;
+	if (*at == ROW_SETTINGS) {
+		level = SETTINGS_MENU;
+		chosen[SETTINGS_MENU] = 0;
+		menu_top[SETTINGS_MENU] = 0;
+		return;
+	}
+	target = row_target(*at);
+	if (target >= 0) {
+		open_target((uint32_t)target, PAGE_MENU);
+		return;
+	}
+	contact_editing = -1;
+	go(PAGE_CONTACT);
+}
+
 // UP and DOWN choose, ENTER opens, MENU goes up a level, or home
 static void take_menu(const struct key_press *press) {
 	const struct menu *in = &menus[level];
 	int *at = &chosen[level];
-	int to = in->items[*at].page;
+	int to;
+
+	if (level == MAIN_MENU) {
+		take_main(press);
+		return;
+	}
+	to = in->items[*at].page;
 
 	if (press->key == KEY_MENU && level == SETTINGS_MENU) {
 		level = MAIN_MENU;
@@ -679,7 +840,10 @@ static int contact_keep(long now) {
 	if (entry.length == 0) {
 		console_say("CONTACT %s DELETED", settings.contacts[contact_editing]);
 		contacts_forget(&settings, contact_editing);
+		settings_targets();
 		settings_save();
+		is_contact_gone = 1;
+		chosen[MAIN_MENU] = ROW_SETTINGS;
 		return 1;
 	}
 	entry_said_ms = now;
@@ -694,7 +858,7 @@ static int contact_keep(long now) {
 		return 0;
 	}
 	if (contact_editing < 0)
-		contacts_chosen = contacts_count(&settings) - 1;
+		chosen[MAIN_MENU] = ROW_CONTACTS + contacts_count(&settings) - 1;
 	settings_save();
 	console_say("CONTACT %s", call);
 	return 1;
@@ -707,8 +871,12 @@ static void accept(long now) {
 		entry_delete(&entry);
 	if (page == PAGE_CONTACT && !contact_keep(now))
 		return;
-	if (page == PAGE_MESSAGE && entry.length > 0)
-		console_say("MESSAGE TO %s: %s", settings.contacts[contacts_chosen], entry.text);
+	if (page == PAGE_MESSAGE && entry.length > 0) {
+		char name[TEXT_ROOM];
+
+		target_name(opened, name, sizeof(name));
+		console_say("MESSAGE TO %s: %s", name, entry.text);
+	}
 	if (page == PAGE_CALLSIGN && entry.length > 0) {
 		snprintf(settings.callsign, sizeof(settings.callsign), "%s", entry.text);
 		settings_save();
@@ -770,72 +938,91 @@ static void take_entry(const struct key_press *press, long now) {
 		go(entered_from(page));
 }
 
-// the contacts' rows: each of them, and Add after them while there is room
-static int contacts_rows(void) {
-	int count = contacts_count(&settings);
+// a target's menu: UP and DOWN choose, round the ends; ENTER takes the
+// item: Frequency opens the dial, PTT makes it the target and goes home,
+// Text opens the text, Volume its bar, Read text and Block turn over, Edit
+// enters the callsign again, Delete asks; MENU goes back
+static void take_target(const struct key_press *press, long now) {
+	int items[TARGET_ITEMS];
+	int count = target_items(items);
 
-	return count < SETTINGS_CONTACTS ? count + 1 : count;
-}
-
-// CONTACTS: UP and DOWN choose, round the ends; ENTER opens the chosen or
-// adds one; ENTER held asks to delete the chosen; MENU goes back
-static void take_contacts(const struct key_press *press) {
-	int rows = contacts_rows();
-
-	if (press->key == KEY_UP)
-		contacts_chosen = (contacts_chosen + rows - 1) % rows;
-	if (press->key == KEY_DOWN)
-		contacts_chosen = (contacts_chosen + 1) % rows;
-	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
-		go(PAGE_MENU);
-	if (press->key != KEY_ENTER)
-		return;
-	if (press->what == BUTTON_PRESSED && contacts_chosen < contacts_count(&settings)) {
-		contact_action = CONTACT_SEND;
-		go(PAGE_CONTACT_MENU);
-	} else if (press->what == BUTTON_PRESSED) {
-		contact_editing = -1;
-		go(PAGE_CONTACT);
-	}
-	if (press->what == BUTTON_HELD && contacts_chosen < contacts_count(&settings))
-		go(PAGE_CONTACT_DELETE);
-}
-
-// a contact opened: UP and DOWN choose Send Msg... or Edit callsign,
-// ENTER takes it, MENU goes back
-static void take_contact_menu(const struct key_press *press) {
 	if (press->what != BUTTON_PRESSED)
 		return;
-	if (press->key == KEY_UP || press->key == KEY_DOWN)
-		contact_action = (contact_action + 1) % CONTACT_ACTIONS;
-	if (press->key == KEY_MENU)
-		go(PAGE_CONTACTS);
+	if (press->key == KEY_MENU) {
+		go(opened_from);
+		return;
+	}
+	if (press->key == KEY_UP)
+		target_chosen = (target_chosen + count - 1) % count;
+	if (press->key == KEY_DOWN)
+		target_chosen = (target_chosen + 1) % count;
 	if (press->key != KEY_ENTER)
 		return;
-	if (contact_action == CONTACT_EDIT) {
-		contact_editing = contacts_chosen;
-		go(PAGE_CONTACT);
-	} else {
+	switch (items[target_chosen]) {
+	case TARGET_FREQUENCY:
+		go(PAGE_DIAL);
+		break;
+	case TARGET_PTT:
+		settings.target = opened;
+		settings_targets();
+		settings_save();
+		go(PAGE_HOME);
+		break;
+	case TARGET_TEXT:
 		go(PAGE_MESSAGE);
+		break;
+	case TARGET_VOLUME:
+		go(PAGE_VOLUME);
+		break;
+	case TARGET_READ:
+		quiet_toggle(opened);
+		save_soon(now);
+		break;
+	case TARGET_BLOCK:
+		settings.contacts_blocked ^= 1u << contact_of(opened);
+		save_soon(now);
+		break;
+	case TARGET_EDIT:
+		contact_editing = contact_of(opened);
+		go(PAGE_CONTACT);
+		break;
+	case TARGET_DELETE:
+		go(PAGE_CONTACT_DELETE);
+		break;
 	}
 }
 
-// DELETE?: ENTER deletes the chosen contact, MENU keeps it
+// DELETE?: ENTER deletes the opened contact and goes back to the menu,
+// MENU keeps it
 static void take_contact_delete(const struct key_press *press) {
 	if (press->what != BUTTON_PRESSED)
 		return;
-	if (press->key == KEY_ENTER && contacts_chosen < contacts_count(&settings)) {
-		console_say("CONTACT %s DELETED", settings.contacts[contacts_chosen]);
-		contacts_forget(&settings, contacts_chosen);
+	if (press->key == KEY_ENTER && is_contact(opened)) {
+		console_say("CONTACT %s DELETED", settings.contacts[contact_of(opened)]);
+		contacts_forget(&settings, contact_of(opened));
+		settings_targets();
 		settings_save();
+		level = MAIN_MENU;
+		chosen[MAIN_MENU] = ROW_SETTINGS;
+		go(PAGE_MENU);
 	}
-	if (press->key == KEY_ENTER || press->key == KEY_MENU)
-		go(PAGE_CONTACTS);
+	if (press->key == KEY_MENU)
+		go(PAGE_TARGET);
 }
 
 static void take_page(const struct key_press *press, long now) {
 	if (page == PAGE_DIAL && is_up_or_down(press)) {
 		dial_turn(press, now);
+		return;
+	}
+	if (page == PAGE_VOLUME && is_up_or_down(press)) {
+		level_step(&volume_level, press, now);
+		return;
+	}
+	// a target's pages go back to its menu
+	if ((page == PAGE_DIAL || page == PAGE_VOLUME)
+			&& (press->key == KEY_MENU || press->key == KEY_ENTER)) {
+		go(PAGE_TARGET);
 		return;
 	}
 	if (choices_of(page) != NULL) {
@@ -877,16 +1064,12 @@ static void take(const struct key_press *press, long now) {
 		take_wifi(press, now);
 		return;
 	}
-	if (page == PAGE_CONTACTS) {
-		take_contacts(press);
-		return;
-	}
 	if (page == PAGE_CONTACT_DELETE) {
 		take_contact_delete(press);
 		return;
 	}
-	if (page == PAGE_CONTACT_MENU) {
-		take_contact_menu(press);
+	if (page == PAGE_TARGET) {
+		take_target(press, now);
 		return;
 	}
 	if (press->key == KEY_ENTER && press->what != BUTTON_PRESSED)
@@ -953,6 +1136,16 @@ static void big(const char *text, int y) {
 	display_text_at((DISPLAY_WIDE - display_text_wide(text, BIG_SCALE)) / 2, y, BIG_SCALE, text);
 }
 
+// a callsign large, as the frequency is, or smaller if it is too wide
+static void big_callsign(const char *call, int y) {
+	int scale = BIG_SCALE;
+
+	while (scale > 1 && display_text_wide(call, scale) > DISPLAY_WIDE)
+		scale--;
+	display_text_at((DISPLAY_WIDE - display_text_wide(call, scale)) / 2,
+		y + (BIG_SCALE - scale) * FONT_HIGH / 2, scale, call);
+}
+
 static void big_frequency(int y) {
 	char text[TEXT_ROOM];
 
@@ -973,6 +1166,7 @@ static void level_bar(const struct level *l, int y) {
 }
 
 static void status_row(const char *middle, int is_online_shown);
+static void draw_main(void);
 
 // a dot at x, filled when online at my.sbitx.net, a ring when not
 static void online_mark(int x) {
@@ -1029,6 +1223,9 @@ static void draw_home(void) {
 		line(0, "Register on");
 		line(1, "my.sbitx.net with");
 		line(2, shown);
+	} else if (is_contact(settings.target)) {
+		big_callsign(settings.contacts[contact_of(settings.target)], HOME_BIG_Y);
+		state_line(HOME_STATE_Y);
 	} else {
 		big_frequency(HOME_BIG_Y);
 		state_line(HOME_STATE_Y);
@@ -1053,8 +1250,6 @@ static void item_value(int of_page, char *text, int room) {
 	text[0] = 0;
 	if (these != NULL)
 		snprintf(text, room, "%s", these->names[these->in_use()]);
-	if (of_page == PAGE_DIAL)
-		snprintf(text, room, "%u", (unsigned)(settings.hz / HZ_A_KHZ));
 	if (of_page == PAGE_WPM)
 		snprintf(text, room, "%u", (unsigned)settings.wpm);
 	if (of_page == PAGE_SIDETONE)
@@ -1063,8 +1258,6 @@ static void item_value(int of_page, char *text, int room) {
 		snprintf(text, room, settings.vox == VOX_OFF ? "Off" : "%u", (unsigned)settings.vox);
 	if (of_page == PAGE_CALLSIGN)
 		snprintf(text, room, "%s", settings.callsign);
-	if (of_page == PAGE_CONTACTS)
-		snprintf(text, room, "%d", contacts_count(&settings));
 	// the network joined, or the one being tried, which may be a
 	// remembered one and not the one set
 	if (of_page == PAGE_WIFI) {
@@ -1074,8 +1267,6 @@ static void item_value(int of_page, char *text, int room) {
 		if (text[0] == 0)
 			snprintf(text, room, "%s", settings.ssid);
 	}
-	if (of_page == PAGE_CONTACTS && contacts_count(&settings) == 0)
-		text[0] = 0;
 	// a value too long for the line, a network's name, is cut
 	fit(text, DISPLAY_WIDE / 2);
 }
@@ -1134,6 +1325,10 @@ static void draw_menu(void) {
 	int at = chosen[level];
 	int i;
 
+	if (level == MAIN_MENU) {
+		draw_main();
+		return;
+	}
 	// the list scrolls to keep the chosen shown
 	if (at < *top)
 		*top = at;
@@ -1339,45 +1534,82 @@ static void draw_activate(void) {
 	help("MENU: BACK");
 }
 
-static const char *contacts_help[] = {
-	"ENTER: OPEN OR ADD",
-	"HOLD ENTER: DELETE",
-	"MENU: BACK",
-};
-
-#define CONTACTS_HELPS ((int)(sizeof(contacts_help) / sizeof(contacts_help[0])))
-
-// the contacts and Add after them, the chosen in reverse video, the list
-// scrolled to keep it shown
-static void draw_contacts(long now) {
-	int count = contacts_count(&settings);
-	int rows = contacts_rows();
+// the main menu: Settings..., the slots with their kHz, the contacts,
+// and Add Callsign... while there is room; the target marked with a dot
+// after its name. Each contact's time of its last PTT or text is to come
+static void draw_main(void) {
+	char name[TEXT_ROOM];
+	char value[TEXT_ROOM];
+	int rows = main_rows();
+	int *top = &menu_top[MAIN_MENU];
+	int at = chosen[MAIN_MENU];
+	int target;
 	int i;
 
-	if (contacts_chosen >= rows)
-		contacts_chosen = rows - 1;
-	if (contacts_chosen < contacts_top)
-		contacts_top = contacts_chosen;
-	if (contacts_chosen >= contacts_top + LIST_ROWS)
-		contacts_top = contacts_chosen - LIST_ROWS + 1;
-	title("Contacts");
-	for (i = 0; i < LIST_ROWS && contacts_top + i < rows; i++)
-		item(i, contacts_top + i == contacts_chosen,
-			contacts_top + i < count ? settings.contacts[contacts_top + i] : "Add", "");
-	help(contacts_help[now / HELP_EVERY_MS % CONTACTS_HELPS]);
+	if (at >= rows)
+		at = chosen[MAIN_MENU] = rows - 1;
+	if (at < *top)
+		*top = at;
+	if (at >= *top + MENU_ROWS)
+		*top = at - MENU_ROWS + 1;
+	status_row("Menu", 0);
+	for (i = *top; i < rows && i < *top + MENU_ROWS; i++) {
+		target = row_target(i);
+		value[0] = 0;
+		if (i == ROW_SETTINGS) {
+			snprintf(name, sizeof(name), "Settings...");
+		} else if (target < 0) {
+			snprintf(name, sizeof(name), "Add Callsign...");
+		} else {
+			target_name((uint32_t)target, name, sizeof(name));
+			if ((uint32_t)target == settings.target)
+				snprintf(name + strlen(name), sizeof(name) - strlen(name), " *");
+			if (!is_contact((uint32_t)target))
+				snprintf(value, sizeof(value), "%u", (unsigned)(settings.slot_hz[target] / HZ_A_KHZ));
+			else if (is_blocked((uint32_t)target))
+				snprintf(value, sizeof(value), "Blocked");
+		}
+		item(i - *top, i == at, name, value);
+	}
 }
 
-static void draw_contact_menu(void) {
-	title(contacts_chosen < contacts_count(&settings) ? settings.contacts[contacts_chosen] : "");
-	item(0, contact_action == CONTACT_SEND, "Send Msg...", "");
-	item(1, contact_action == CONTACT_EDIT, "Edit callsign", "");
-	help("ENTER: TAKE   MENU: BACK");
+// a target's menu, its name as the title, five rows, scrolled to keep the
+// chosen shown
+static void draw_target(void) {
+	static const char *const names[TARGET_ITEMS] = {
+		"Frequency", "PTT", "Text...", "Volume", "Read text", "Block", "Edit callsign", "Delete...",
+	};
+	int items[TARGET_ITEMS];
+	int count = target_items(items);
+	char text[TEXT_ROOM];
+	int i;
+
+	if (target_chosen >= count)
+		target_chosen = count - 1;
+	if (target_chosen < target_top)
+		target_top = target_chosen;
+	if (target_chosen >= target_top + MENU_ROWS)
+		target_top = target_chosen - MENU_ROWS + 1;
+	target_name(opened, text, sizeof(text));
+	status_row(text, 0);
+	for (i = target_top; i < count && i < target_top + MENU_ROWS; i++) {
+		text[0] = 0;
+		if (items[i] == TARGET_FREQUENCY)
+			snprintf(text, sizeof(text), "%u", (unsigned)(settings.slot_hz[opened] / HZ_A_KHZ));
+		if (items[i] == TARGET_VOLUME)
+			snprintf(text, sizeof(text), "%u", (unsigned)settings.volume);
+		if (items[i] == TARGET_READ)
+			snprintf(text, sizeof(text), is_quiet(opened) ? "Off" : "On");
+		if (items[i] == TARGET_BLOCK)
+			snprintf(text, sizeof(text), is_blocked(opened) ? "On" : "Off");
+		item(i - target_top, i == target_chosen, names[items[i]], text);
+	}
 }
 
 static void draw_contact_delete(void) {
 	title("Delete?");
-	if (contacts_chosen < contacts_count(&settings))
-		big(settings.contacts[contacts_chosen], PAGE_BIG_Y);
+	if (is_contact(opened))
+		big(settings.contacts[contact_of(opened)], PAGE_BIG_Y);
 	help("ENTER: DELETE  MENU: NO");
 }
 
@@ -1426,11 +1658,20 @@ static void draw(long now) {
 		draw_home();
 	if (page == PAGE_MENU)
 		draw_menu();
-	if (page == PAGE_DIAL) {
-		title("Frequency, kHz");
-		big_frequency(PAGE_BIG_Y);
+	if (page == PAGE_DIAL && !is_contact(opened)) {
+		snprintf(text, sizeof(text), "F%u, kHz", (unsigned)opened + 1);
+		title(text);
+		snprintf(text, sizeof(text), "%u", (unsigned)(settings.slot_hz[opened] / HZ_A_KHZ));
+		big(text, PAGE_BIG_Y);
 		help("UP/DOWN   MENU: BACK");
 	}
+	if (page == PAGE_VOLUME) {
+		title("Volume");
+		level_bar(&volume_level, line_y(1));
+		help("UP/DOWN   MENU: BACK");
+	}
+	if (page == PAGE_TARGET)
+		draw_target();
 	if (choices_of(page) != NULL)
 		draw_choices(choices_of(page));
 	if (page == PAGE_WPM) {
@@ -1452,10 +1693,14 @@ static void draw(long now) {
 		draw_entry(contact_editing < 0 ? "New contact" : "Contact", now);
 	if (page == PAGE_CONTACT_DELETE)
 		draw_contact_delete();
-	if (page == PAGE_CONTACT_MENU)
-		draw_contact_menu();
 	if (page == PAGE_MESSAGE) {
-		snprintf(text, sizeof(text), "Message to %s", settings.contacts[contacts_chosen]);
+		char name[TEXT_ROOM];
+
+		target_name(opened, name, sizeof(name));
+		if (!is_contact(opened))
+			snprintf(name + strlen(name), sizeof(name) - strlen(name), " %u",
+				(unsigned)(settings.slot_hz[opened] / HZ_A_KHZ));
+		snprintf(text, sizeof(text), "Message to %s", name);
 		draw_entry(text, now);
 	}
 	if (page == PAGE_WIFI)
@@ -1464,8 +1709,6 @@ static void draw(long now) {
 		draw_joining(now);
 	if (page == PAGE_SETUP)
 		draw_setup();
-	if (page == PAGE_CONTACTS)
-		draw_contacts(now);
 	if (page == PAGE_INFO)
 		draw_info();
 	if (page == PAGE_ACTIVATE)

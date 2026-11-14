@@ -644,7 +644,24 @@ static void test_contacts(void) {
 		contacts_add(&s, call);
 	}
 	expect(contacts_count(&s) == SETTINGS_CONTACTS && !contacts_add(&s, "W1AW"), "full, no more added");
-	printf("contacts: added in capitals, once, edited, taken out\n");
+	memset(&s, 0, sizeof(s));
+	contacts_add(&s, "A1A");
+	contacts_add(&s, "B1B");
+	contacts_add(&s, "C1C");
+	s.contacts_quiet = 1u << 2;
+	s.contacts_blocked = 1u << 0 | 1u << 2;
+	s.target = SETTINGS_TARGET_CONTACT + 2;
+	contacts_forget(&s, 1);
+	expect(s.contacts_quiet == 1u << 1 && s.contacts_blocked == (1u << 0 | 1u << 1),
+		"a contact's flags move up with it");
+	expect(s.target == SETTINGS_TARGET_CONTACT + 1, "the target follows its contact up");
+	contacts_forget(&s, 1);
+	expect(s.target == 0 && s.contacts_quiet == 0 && s.contacts_blocked == 1u << 0,
+		"its contact deleted, the target is F1, and the flags go with it");
+	s.contacts_quiet = 1u << 1;
+	contacts_add(&s, "D1D");
+	expect(s.contacts_quiet == 0, "one added starts read out and not blocked");
+	printf("contacts: added in capitals, once, edited, taken out, flags moving with them\n");
 }
 
 static void test_speech(void) {

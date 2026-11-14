@@ -54,6 +54,7 @@ void settings_load(void) {
 	int i;
 
 	memset(&settings, 0, sizeof(settings));
+	settings_targets();
 	snprintf(settings.host, sizeof(settings.host), "%s", SETTINGS_DEFAULT_HOST);
 	settings.port = SETTINGS_DEFAULT_PORT;
 	settings.volume = SETTINGS_DEFAULT_VOLUME;
@@ -98,7 +99,38 @@ void settings_load(void) {
 		snprintf(key, sizeof(key), "contact%d", i);
 		text_get(handle, key, settings.contacts[i], sizeof(settings.contacts[i]));
 	}
+	for (i = 0; i < SETTINGS_SLOTS; i++) {
+		snprintf(key, sizeof(key), "slot%d", i);
+		number_get(handle, key, &settings.slot_hz[i]);
+	}
+	number_get(handle, "target", &settings.target);
+	number_get(handle, "slots_quiet", &settings.slots_quiet);
+	number_get(handle, "calls_quiet", &settings.contacts_quiet);
+	number_get(handle, "calls_blocked", &settings.contacts_blocked);
 	nvs_close(handle);
+	settings_targets();
+}
+
+// the slots and the target made sense of: a slot never set takes its
+// default, the first the frequency set before there were slots; a target
+// that is not a slot or a contact is F1; and settings.hz, the room, is the
+// target's slot's
+void settings_targets(void) {
+	static const uint32_t slot_default[SETTINGS_SLOTS] = SETTINGS_DEFAULT_SLOT_HZ;
+	int count = 0;
+	int i;
+
+	for (i = 0; i < SETTINGS_SLOTS; i++) {
+		if (settings.slot_hz[i] == 0)
+			settings.slot_hz[i] = i == 0 && settings.hz != 0 ? settings.hz : slot_default[i];
+	}
+	while (count < SETTINGS_CONTACTS && settings.contacts[count][0] != 0)
+		count++;
+	if (settings.target >= SETTINGS_SLOTS
+			&& (settings.target < SETTINGS_TARGET_CONTACT || settings.target >= SETTINGS_TARGET_CONTACT + (uint32_t)count))
+		settings.target = 0;
+	if (settings.target < SETTINGS_SLOTS)
+		settings.hz = settings.slot_hz[settings.target];
 }
 
 void settings_save(void) {
@@ -140,6 +172,14 @@ void settings_save(void) {
 		snprintf(key, sizeof(key), "contact%d", i);
 		nvs_set_str(handle, key, settings.contacts[i]);
 	}
+	for (i = 0; i < SETTINGS_SLOTS; i++) {
+		snprintf(key, sizeof(key), "slot%d", i);
+		nvs_set_u32(handle, key, settings.slot_hz[i]);
+	}
+	nvs_set_u32(handle, "target", settings.target);
+	nvs_set_u32(handle, "slots_quiet", settings.slots_quiet);
+	nvs_set_u32(handle, "calls_quiet", settings.contacts_quiet);
+	nvs_set_u32(handle, "calls_blocked", settings.contacts_blocked);
 	nvs_commit(handle);
 	nvs_close(handle);
 }

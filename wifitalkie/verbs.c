@@ -257,6 +257,9 @@ static void freq_set(const char *word) {
 		return;
 	}
 	settings.hz = (uint32_t)hz;
+	// the target's slot with it, if the target is a slot
+	if (settings.target < SETTINGS_SLOTS)
+		settings.slot_hz[settings.target] = settings.hz;
 	settings_save();
 	console_say("FREQ %u, ROOM %u KHZ", (unsigned)settings.hz,
 		(unsigned)((settings.hz + 500) / 1000));

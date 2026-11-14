@@ -17,6 +17,13 @@ extern "C" {
 #define SETTINGS_PASSWORD_ROOM 65
 #define SETTINGS_KNOWN 10
 #define SETTINGS_CONTACTS 20
+// the frequency slots, F1 to F3, on the menu
+#define SETTINGS_SLOTS 3
+// settings.target: a slot, 0 to SETTINGS_SLOTS - 1, or from this on a
+// contact, SETTINGS_TARGET_CONTACT + its place
+#define SETTINGS_TARGET_CONTACT 8
+// the slots' frequencies before any is set
+#define SETTINGS_DEFAULT_SLOT_HZ {21090000, 7074000, 14200000}
 #define SETTINGS_CALLSIGN_ROOM 16
 #define SETTINGS_GRID_ROOM 12
 #define SETTINGS_HOST_ROOM 64
@@ -57,12 +64,18 @@ struct settings {
 	char known_ssid[SETTINGS_KNOWN][SETTINGS_SSID_ROOM];
 	char known_password[SETTINGS_KNOWN][SETTINGS_PASSWORD_ROOM];
 	char contacts[SETTINGS_CONTACTS][SETTINGS_CALLSIGN_ROOM];
+	uint32_t slot_hz[SETTINGS_SLOTS];  // the frequency slots' frequencies
+	uint32_t target;             // what the talkie speaks to: a slot or a contact
+	uint32_t slots_quiet;        // bit i: slot i's text not read out as Morse
+	uint32_t contacts_quiet;     // bit i: contact i's text not read out
+	uint32_t contacts_blocked;   // bit i: contact i not heard at all
 };
 
 extern struct settings settings;
 
 void settings_load(void);
 void settings_save(void);
+void settings_targets(void);
 
 #ifdef __cplusplus
 }

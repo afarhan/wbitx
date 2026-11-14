@@ -4,8 +4,11 @@
 // contacts.c — the callsigns the talkie keeps, up to SETTINGS_CONTACTS.
 //
 // They are entered and deleted at the setup portal (portal.cpp), and
-// listed, entered, edited and deleted on the screen's CONTACTS page, in the
-// order they were added. A callsign
+// listed on the screen's menu, in the order they were added, to be
+// chosen, entered, edited and deleted there. Each has two flags, a bit
+// in contacts_quiet and contacts_blocked at its place, which move with
+// it; and the target, settings.target, follows a contact moved up, or
+// goes to F1 if its contact is deleted. A callsign
 // is kept in capitals, letters, figures and the stroke only, as typed on a
 // telephone it may come in small letters or with spaces round it; one
 // already there is not added twice. It knows nothing of the ESP32, so
@@ -68,13 +71,30 @@ int contacts_add(struct settings *s, const char *callsign) {
 	if (!contacts_callsign(callsign, call) || count == SETTINGS_CONTACTS || contacts_find(s, call) >= 0)
 		return 0;
 	snprintf(s->contacts[count], sizeof(s->contacts[count]), "%s", call);
+	s->contacts_quiet &= ~(1u << count);
+	s->contacts_blocked &= ~(1u << count);
 	return 1;
+}
+
+// mask with bit i taken out, those above it moved down
+static uint32_t without_bit(uint32_t mask, int i) {
+	uint32_t below = mask & ((1u << i) - 1);
+
+	return below | ((mask >> (i + 1)) << i);
 }
 
 // the i'th taken out, those after it moved up; 1 if there was one
 int contacts_forget(struct settings *s, int i) {
+	uint32_t target = SETTINGS_TARGET_CONTACT + (uint32_t)i;
+
 	if (i < 0 || i >= SETTINGS_CONTACTS || s->contacts[i][0] == 0)
 		return 0;
+	s->contacts_quiet = without_bit(s->contacts_quiet, i);
+	s->contacts_blocked = without_bit(s->contacts_blocked, i);
+	if (s->target == target)
+		s->target = 0;
+	else if (s->target > target)
+		s->target--;
 	for (; i < SETTINGS_CONTACTS - 1; i++)
 		memcpy(s->contacts[i], s->contacts[i + 1], sizeof(s->contacts[i]));
 	s->contacts[i][0] = 0;
