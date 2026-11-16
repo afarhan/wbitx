@@ -8,10 +8,13 @@ PY ?= /home/farhan/Documents/radiocloud/phone_cad/.venv/bin/python
 all:
 	$(PY) case.py
 
+mold:
+	$(PY) mold/mold.py
+
 serve: all
 	python3 -m http.server 8000
 
 clean:
 	rm -rf exports
 
-.PHONY: all serve clean
+.PHONY: all mold serve clean
