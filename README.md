@@ -52,3 +52,17 @@ What the talkie says by itself: `WIFI UP`, `SERVICE ...`, `ROOM 7074 KHZ, 3 HERE
 zbitxre's `PROTOCOL.md` ("Authentication", "VoIP: the repeater"),
 `accounts/voip.py` and `clients/remote/zbitx_remote.c`.
 `wifitalkie/sha256.c` is zbitxre's `clients/remote/sha256.c`, as it is.
+
+## Updating over WiFi
+
+`firmware/wifitalkie.ino.bin` is the firmware as `make` builds it. To put it
+on a talkie without a cable: MENU > Setup on the talkie, join its access
+point TALKIE-<callsign> from a phone or laptop, open 192.168.4.1, the
+Firmware tab, type the four-figure code the talkie shows, choose the file
+and SEND. The talkie and the page both show how far it has got; when it
+says done, close the page. A firmware that does not start goes back to the
+old one by itself.
+
+## License
+
+GPL-3.0-or-later; see LICENSE.

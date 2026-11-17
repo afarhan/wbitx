@@ -12,6 +12,11 @@ extern "C" {
 void screen_open(void);
 void screen_poll(long now);
 void screen_describe(char *text, int room);
+void screen_time_heard(long long unix_s, long now);
+void screen_text_heard(const char *from, const char *to, int wpm, const char *word, long now);
+void screen_text_sent(int count, long now);
+void screen_text_refused(const char *why, long now);
+void screen_update_shown(void);
 
 #ifdef __cplusplus
 }

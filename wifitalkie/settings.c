@@ -83,7 +83,11 @@ void settings_load(void) {
 	number_get(handle, "headset", &settings.is_headset);
 	number_get(handle, "white", &settings.is_white);
 	number_get(handle, "morse_typing", &settings.is_morse_typing);
-	number_get(handle, "local", &settings.is_local);
+	// Local (ESP-NOW) is no longer offered on the menu, the author's word
+	// of 17 November 2026; one left in it from before starts on the
+	// internet, as there is no way back on the talkie. The verb LINK
+	// still sets it until the next start, for the bench.
+	settings.is_local = 0;
 	number_get(handle, "wpm", &settings.wpm);
 	number_get(handle, "sidetone", &settings.sidetone);
 	if (settings.sidetone > SETTINGS_SIDETONE_MOST)

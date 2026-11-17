@@ -19,6 +19,7 @@ void service_describe(char *text, int room);
 void service_brief(char *text, int room);
 void service_code(char shown[AUTH_COOKIE_SHOWN_ROOM]);
 int service_is_online(void);
+int service_send_word(const char *to, int wpm, const char *word);
 int service_is_unregistered(void);
 
 #ifdef __cplusplus

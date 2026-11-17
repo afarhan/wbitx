@@ -19,6 +19,7 @@ void update_close(void);
 int update_is_open(void);
 int update_code(void);
 void update_said(char *text, int room);
+int update_percent(void);
 void update_poll(long now);
 
 // for portal.cpp, as the file comes in

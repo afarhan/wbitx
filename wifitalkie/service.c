@@ -39,10 +39,13 @@
 // ONCE IT IS UP
 //
 // The talkie says its grid, GRID with nothing after it if none is set, and
-// ALLOWS voip, as a radio with VOIP online does, and then nothing but PING
-// a minute; a line not heard from for SILENCE_MOST_MS is taken to be lost.
-// The service answers ALLOWS with VOIP STREAM <id> <nonce>, which voip.c
-// takes up; VOIP ROOM and VOIP BUSY go to voip.c too, for what it shows.
+// ALLOWS voip text, as a radio with VOIP online does, with text too, and
+// then nothing but PING a minute, and the words of text the screen sends
+// (service_send_word()); a line not heard from for SILENCE_MOST_MS is
+// taken to be lost. The service answers ALLOWS with VOIP STREAM <id>
+// <nonce>, which voip.c takes up, and with TIME, the screen's clock; VOIP
+// ROOM and VOIP BUSY go to voip.c too, for what it shows, and TEXT and
+// TEXT SENT to the screen (PROTOCOL.md "Text, a word at a time").
 // Whatever else the service says is shown on the console as it is, for
 // this first talkie is also a way of seeing the service.
 //
@@ -73,6 +76,8 @@
 #include "network.h"
 #include "service.h"
 #include "settings.h"
+#include "text.h"
+#include "screen.h"
 #include "voip.h"
 
 #define NOT_OPEN (-1)
@@ -397,6 +402,47 @@ static void connected(long now) {
 	say_status(said);
 }
 
+// TIME, TEXT and TEXT SENT, and a word refused, for the screen; 1 if line
+// was one of them
+static int text_line_heard(const char *line, long now) {
+	char from[TEXT_PARTY_ROOM];
+	char to[TEXT_PARTY_ROOM];
+	char word[TEXT_WORD_ROOM];
+	long long unix_s;
+	int wpm;
+	int count;
+
+	if (sscanf(line, "TIME %lld", &unix_s) == 1) {
+		screen_time_heard(unix_s, now);
+		return 1;
+	}
+	if (sscanf(line, "TEXT SENT %d", &count) == 1) {
+		screen_text_sent(count, now);
+		return 1;
+	}
+	if (sscanf(line, "TEXT %10s %10s %d %40s", from, to, &wpm, word) == 4) {
+		screen_text_heard(from, to, wpm, word, now);
+		return 1;
+	}
+	if (!strncmp(line, "ERROR TEXT ", strlen("ERROR TEXT "))) {
+		console_say("SERVICE SAYS %s", line);
+		screen_text_refused(line + strlen("ERROR TEXT "), now);
+		return 1;
+	}
+	return 0;
+}
+
+// a word of text to a callsign or a room's kHz, sent on the line; 0 if it
+// was, -1 if the talkie is not on line
+int service_send_word(const char *to, int wpm, const char *word) {
+	char line[LINE_ROOM];
+
+	if (state != STATE_ONLINE)
+		return -1;
+	snprintf(line, sizeof(line), "TEXT %s %d %s\n", to, wpm, word);
+	return send_text(line);
+}
+
 static void heard(const char *line, long now) {
 	char token[LINE_ROOM];
 	char nonce[LINE_ROOM];
@@ -418,6 +464,8 @@ static void heard(const char *line, long now) {
 		voip_busy_heard(line + strlen("VOIP BUSY "), now);
 		return;
 	}
+	if (text_line_heard(line, now))
+		return;
 	console_say("SERVICE SAYS %s", line);
 }
 
@@ -461,7 +509,7 @@ static void line_poll(long now) {
 	}
 	if (!is_allows_told) {
 		is_allows_told = 1;
-		if (send_text("ALLOWS voip\n") < 0) {
+		if (send_text("ALLOWS voip text\n") < 0) {
 			lost(now, "ALLOWS could not be sent");
 			return;
 		}

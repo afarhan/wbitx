@@ -171,6 +171,17 @@ void network_local(int is_on) {
 	}
 }
 
+// the join being tried stopped, and the library's reconnecting with it,
+// as WiFi.disconnect() does not: the driver refuses a scan while it is
+// connecting (WIFI_SCAN_FAILED), and goes on hopping channels while the
+// portal's access point is up. network_join() turns the reconnecting on
+// again.
+static void stop_joining(void) {
+	WiFi.setAutoReconnect(false);
+	esp_wifi_disconnect();
+	vTaskDelay(pdMS_TO_TICKS(BEGIN_SETTLE_MS));
+}
+
 static void begin(const char *ssid, const char *password) {
 	int is_set = 0;
 	int i;
@@ -351,13 +362,19 @@ void network_poll(long now) {
 void network_scan_begin(void) {
 	if (is_scanning)
 		return;
-	if (!network_is_up()) {
-		WiFi.disconnect();
+	int tries;
+	int is_begun = 0;
+
+	if (!network_is_up())
 		is_join_after_scan = 1;
-	}
 	scanned_count = 0;
 	WiFi.scanDelete();
-	if (WiFi.scanNetworks(true) == WIFI_SCAN_FAILED) {
+	for (tries = 0; tries < BEGIN_TRIES && !is_begun; tries++) {
+		if (is_join_after_scan)
+			stop_joining();
+		is_begun = WiFi.scanNetworks(true) != WIFI_SCAN_FAILED;
+	}
+	if (!is_begun) {
 		console_say("WIFI SCAN: IT DID NOT START");
 		if (is_join_after_scan) {
 			is_join_after_scan = 0;
@@ -398,18 +415,23 @@ void network_scan(void) {
 
 	// a scan is refused while a join is being tried; the join is begun
 	// again after
-	WiFi.disconnect();
+	int was_joined = network_is_up();
+
+	if (!was_joined)
+		stop_joining();
 	found = WiFi.scanNetworks();
 	if (found <= 0) {
 		console_say("SCAN: NONE HEARD (%d)", found);
-		network_join();
+		if (!was_joined)
+			network_join();
 		return;
 	}
 	for (i = 0; i < found; i++)
 		console_say("SCAN %s RSSI %d CHANNEL %d", WiFi.SSID(i).c_str(), (int)WiFi.RSSI(i),
 			(int)WiFi.channel(i));
 	WiFi.scanDelete();
-	network_join();
+	if (!was_joined)
+		network_join();
 }
 
 // the network being tried while none is joined, for the screen; nothing
@@ -459,7 +481,7 @@ void network_describe(char *text, int room) {
 int network_ap_begin(const char *name) {
 	is_held = 1;
 	if (!network_is_up())
-		WiFi.disconnect();
+		stop_joining();
 	WiFi.mode(WIFI_AP_STA);
 	if (!WiFi.softAP(name)) {
 		console_say("SETUP: THE ACCESS POINT DID NOT START");

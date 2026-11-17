@@ -26,6 +26,9 @@
 //
 // Writing the flash holds the loop up while the file comes in, some
 // seconds: the watchdog is fed at each piece, and the speaker may click.
+// The screen is not drawn by the loop then, so each piece that moves the
+// percentage draws it, screen_update_shown(), and so do the end and a
+// failure; the browser shows its own bar as it sends (portal.cpp).
 
 #include <Arduino.h>
 #include <Update.h>
@@ -36,6 +39,7 @@
 
 #include "console.h"
 #include "portal.h"
+#include "screen.h"
 #include "update.h"
 
 #define CODE_LEAST 1000
@@ -47,6 +51,7 @@ static int is_open;
 static int code;
 static size_t expected;
 static int percent_said;
+static int percent_shown;
 static int is_done;
 static long done_ms;
 static int is_trial_over;
@@ -95,12 +100,14 @@ int update_begin(size_t total) {
 		Update.abort();
 	expected = total;
 	percent_said = -1;
+	percent_shown = 0;
 	if (!Update.begin(UPDATE_SIZE_UNKNOWN)) {
 		update_abort(Update.errorString());
 		return 0;
 	}
 	snprintf(said, sizeof(said), "RECEIVING");
 	console_say("UPDATE: RECEIVING %u BYTES", (unsigned)total);
+	screen_update_shown();
 	return 1;
 }
 
@@ -120,8 +127,12 @@ int update_take(const uint8_t *data, size_t length) {
 			percent = 99;
 		if (percent / 10 != percent_said / 10) {
 			percent_said = percent;
-			snprintf(said, sizeof(said), "RECEIVING %d%%", percent);
 			console_say("UPDATE: %d%%", percent);
+		}
+		if (percent != percent_shown) {
+			percent_shown = percent;
+			snprintf(said, sizeof(said), "RECEIVING %d%%", percent);
+			screen_update_shown();
 		}
 	}
 	return 1;
@@ -129,17 +140,22 @@ int update_take(const uint8_t *data, size_t length) {
 
 // 1 if the file was whole and is to start next
 int update_end(void) {
+	size_t written;
+
 	if (!Update.isRunning())
 		return 0;
 	esp_task_wdt_reset();
+	written = Update.progress();
 	if (!Update.end(true)) {
 		update_abort(Update.errorString());
 		return 0;
 	}
 	is_done = 1;
 	done_ms = (long)millis();
+	percent_shown = 100;
 	snprintf(said, sizeof(said), "DONE: RESTARTING");
-	console_say("UPDATE: %u BYTES WRITTEN, RESTARTING", (unsigned)Update.progress());
+	console_say("UPDATE: %u BYTES WRITTEN, RESTARTING", (unsigned)written);
+	screen_update_shown();
 	return 1;
 }
 
@@ -148,6 +164,12 @@ void update_abort(const char *why) {
 		Update.abort();
 	snprintf(said, sizeof(said), "FAILED: %s", why);
 	console_say("UPDATE FAILED: %s", why);
+	screen_update_shown();
+}
+
+// how much of the file is written, 0 to 100, for the screen's bar
+int update_percent(void) {
+	return percent_shown;
 }
 
 void update_poll(long now) {

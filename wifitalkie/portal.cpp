@@ -443,10 +443,31 @@ static void show_update(void) {
 	}
 	page += "<form method=post enctype='multipart/form-data' action='/update?code=";
 	page += update_code();
-	page += "'><p>Choose the firmware file, <b>wifitalkie.ino.bin</b>, and SEND. "
+	page += "' id=up><p>Choose the firmware file, <b>wifitalkie.ino.bin</b>, and SEND. "
 		"It takes some seconds; keep this page open until it says it is done.</p>"
 		"<input type=file name=firmware accept='.bin' required>"
-		"<button class=go>SEND</button></form>";
+		"<button class=go>SEND</button></form>"
+		"<div id=going style='display:none'><p>Sending&hellip; <b id=pc>0%</b></p>"
+		"<progress id=bar max=100 value=0 style='width:100%;height:1.5em'></progress>"
+		"<p>Keep this page open. The talkie shows the same.</p></div>"
+		// sent by script for a bar as it goes; without script the form
+		// sends it all the same, with no bar
+		"<script>"
+		"var f=document.getElementById('up');"
+		"f.onsubmit=function(e){"
+		"e.preventDefault();"
+		"var x=new XMLHttpRequest(),b=document.getElementById('bar'),"
+		"p=document.getElementById('pc');"
+		"f.style.display='none';document.getElementById('going').style.display='';"
+		"x.upload.onprogress=function(v){if(v.lengthComputable){"
+		"var n=Math.floor(v.loaded*100/v.total);b.value=n;p.textContent=n+'%';}};"
+		"x.onload=function(){var d=new DOMParser().parseFromString(x.responseText,'text/html');"
+		"document.body.innerHTML=d.body.innerHTML;};"
+		"x.onerror=function(){document.getElementById('going').innerHTML="
+		"'<p class=off>The sending stopped. The talkie still runs the firmware it had.</p>"
+		"<a class=back href=\"'+f.action+'\">&lsaquo; Try again</a>';};"
+		"x.open('POST',f.action);x.send(new FormData(f));};"
+		"</script>";
 	end_page(page);
 }
 
@@ -476,8 +497,10 @@ static void update_sent(void) {
 	update_heading(page);
 	update_said(said, sizeof(said));
 	if (!strncmp(said, "DONE", 4)) {
-		page += "<p>The firmware is in. The talkie is restarting into it; this page "
-			"is finished, and the talkie's own WiFi goes with it.</p>"
+		page += "<progress max=100 value=100 style='width:100%;height:1.5em'></progress>"
+			"<p><b>Done.</b> The firmware is in, and the talkie is restarting into it.</p>"
+			"<p><b>You can close this page now.</b> The talkie's own WiFi goes "
+			"as it restarts; put this phone back on its usual WiFi.</p>"
 			"<p>If the new firmware does not start properly, the talkie goes back "
 			"to the old one by itself.</p>";
 	} else if (!is_code_right()) {

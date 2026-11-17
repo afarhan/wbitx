@@ -6,3 +6,7 @@ __pycache__/
 fp-info-cache
 ~*.lck
 *.kicad_prl
+
+# third-party pictures, kept locally only
+case/teenage-engineering-ep-2350.webp
+wifitalkie/schema-C3.jpg

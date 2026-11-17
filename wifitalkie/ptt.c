@@ -22,8 +22,9 @@
 //
 // ENTER speaks only on the home page; on every other page it is the
 // screen's, and the screen says so with ptt_lend(). The PTT key, PIN_KEY_PTT
-// on the right side, speaks on every page, debounced the same way, and is
-// set up here, an input with its pull-up. The verb still speaks.
+// on the right side, speaks on every page but the Text page, which takes it
+// with ptt_key_lend(), debounced the same way, and is set up here, an
+// input with its pull-up. The verb still speaks.
 //
 // VOX: the voice keys the talkie as the button does (vox.c, by way of
 // microphone.c), with the same minute at most; PTT ON (VOX) says so.
@@ -61,6 +62,7 @@ static int is_cut;
 static int is_lit;
 static long cut_ms;
 static int is_lent;
+static int is_key_lent;
 static int is_by_vox;
 
 void ptt_set(int is_verb) {
@@ -100,7 +102,7 @@ void ptt_poll(long now) {
 	}
 	if (now - key_changed_ms >= DEBOUNCE_MS)
 		is_key_down = key_level == 0;
-	is_wanted = is_verb_down || is_key_down || (is_button_down && !is_lent);
+	is_wanted = is_verb_down || (is_key_down && !is_key_lent) || (is_button_down && !is_lent);
 	if (!is_wanted && !is_down)
 		is_by_vox = microphone_vox();
 	is_wanted = is_wanted || microphone_vox();
@@ -153,6 +155,20 @@ void ptt_lamp(int is_lighting) {
 
 int ptt_is_lit(void) {
 	return is_lit;
+}
+
+// the PTT key lent to the screen, which the Text page takes to switch
+// between reading and sending; lent back still held, it has to be let go
+// before it speaks
+void ptt_key_lend(int is_lending) {
+	if (is_key_lent && !is_lending && is_key_down)
+		is_cut = 1;
+	is_key_lent = is_lending;
+}
+
+// the PTT key, down, debounced, whether or not it is lent
+int ptt_key_is_down(void) {
+	return is_key_down;
 }
 
 // lent back still held, the button has to be let go before it speaks

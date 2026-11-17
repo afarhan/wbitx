@@ -24,6 +24,7 @@
 #include "../wifitalkie/dial.h"
 #include "../wifitalkie/entry.h"
 #include "../wifitalkie/morse.h"
+#include "../wifitalkie/text.h"
 #include "../wifitalkie/contacts.h"
 #include "../wifitalkie/known.h"
 #include "../wifitalkie/playback.h"
@@ -590,6 +591,68 @@ static void test_morse(void) {
 	printf("morse: iambic, every character, held, squeezed, kept, taken at the gap\n");
 }
 
+// the tones a player sounds, from 0 ms in steps of 5, until it is idle:
+// when each began, in began, and how long, in lengths; how many
+static int played(struct text_play *p, long *began, int *lengths, int most, long until) {
+	int n = 0;
+	long now;
+	int ms;
+
+	for (now = 0; now < until; now += 5) {
+		ms = text_play_next(p, now, 1);
+		if (ms > 0 && n < most) {
+			began[n] = now;
+			lengths[n++] = ms;
+		}
+	}
+	return n;
+}
+
+static void test_text(void) {
+	static struct text t;
+	struct text_play p;
+	int found[TEXT_RUNS];
+	long began[8];
+	int lengths[8];
+	char word[8];
+	int i;
+
+	text_begin(&t);
+	text_add(&t, "VU2XZ", "VU2ESE", "HELLO");
+	text_add(&t, "VU2XZ", "VU2ESE", "OM");
+	expect(t.count == 1 && !strcmp(text_run(&t, 0)->words, "HELLO OM"),
+		"words from the same to the same go on one run");
+	text_add(&t, "VU2ESE", "VU2XZ", "HI");
+	text_add(&t, "W1AW", "7074", "CQ");
+	expect(t.count == 3 && !strcmp(text_run(&t, 2)->words, "CQ"), "another's begins a run");
+	expect(text_runs_of(&t, "VU2XZ", found, TEXT_RUNS) == 2 && found[0] == 0 && found[1] == 1
+		&& text_runs_of(&t, "7074", found, TEXT_RUNS) == 1 && found[0] == 2,
+		"a party's runs are those from it and to it");
+	for (i = 0; i < TEXT_RUNS + 5; i++) {
+		snprintf(word, sizeof(word), "W%d", i);
+		text_add(&t, i % 2 ? "A1A" : "B1B", "7074", word);
+	}
+	expect(t.count == TEXT_RUNS && !strcmp(text_run(&t, TEXT_RUNS - 1)->words, "W36")
+		&& !strcmp(text_run(&t, 0)->words, "W5"), "the oldest runs are let go");
+	expect(text_clock_now(&t, 1000) == -1, "no time before it is told");
+	text_clock_set(&t, 1763112000LL, 5000);
+	expect(text_clock_now(&t, 65000) == 1763112060LL, "the time is what was told, and millis() since");
+	expect(text_last(&t, "VU2XZ") == 0, "nobody has spoken yet");
+	text_touch(&t, "VU2XZ", 125000);
+	expect(text_last(&t, "VU2XZ") == 1763112120LL, "when one last spoke is kept");
+	text_play_begin(&p);
+	text_play_add(&p, "EE", 12);
+	text_play_add(&p, "T", 12);
+	expect(played(&p, began, lengths, 8, 5000) == 3 && lengths[0] == 100 && began[1] - began[0] == 400
+		&& lengths[2] == 300 && began[2] - began[1] == 800,
+		"played at its speed: three units between letters, seven between words");
+	text_play_begin(&p);
+	text_play_add(&p, "E", 20);
+	expect(text_play_next(&p, 0, 0) == 0 && text_play_is_busy(&p), "nothing is begun while a voice is heard");
+	expect(text_play_next(&p, 10, 1) == 60, "and the word is played after");
+	printf("text: runs of words, the time, who spoke when, played as Morse\n");
+}
+
 static void test_known(void) {
 	struct settings s;
 	char ssid[SETTINGS_SSID_ROOM];
@@ -824,6 +887,7 @@ int main(void) {
 	test_entry();
 	test_keyboard();
 	test_morse();
+	test_text();
 	test_known();
 	test_contacts();
 	test_speech();
