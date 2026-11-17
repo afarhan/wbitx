@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Ashhar Farhan
 //
-// display.c — the 0.96 inch OLED, 128 by 64 dots, on I2C.
+// display.c — the 0.96 inch OLED, 128 by 64 dots, on I2C, drawn on less a
+// dot all round (DISPLAY_MARGIN, display.h).
 //
 // The module is an SSD1306 at address 0x3c, or 0x3d with its jumper moved;
 // both are tried. Some modules sold as the same are an SH1106, which has
@@ -73,8 +74,8 @@ static i2c_master_bus_handle_t bus;
 static i2c_master_dev_handle_t device;
 static int is_open;
 static int is_off;
-static uint8_t frame[DISPLAY_ROWS][DISPLAY_WIDE];
-static uint8_t sent[DISPLAY_ROWS][DISPLAY_WIDE];
+static uint8_t frame[DISPLAY_ROWS][DISPLAY_PANEL_WIDE];
+static uint8_t sent[DISPLAY_ROWS][DISPLAY_PANEL_WIDE];
 static int is_sent[DISPLAY_ROWS];
 static int next_page;
 static long pages_sent;
@@ -124,6 +125,8 @@ void display_clear(void) {
 static void dot(int x, int y) {
 	if (x < 0 || x >= DISPLAY_WIDE || y < 0 || y >= DISPLAY_HIGH)
 		return;
+	x += DISPLAY_MARGIN;
+	y += DISPLAY_MARGIN;
 	frame[y / DISPLAY_ROW_HIGH][x] |= (uint8_t)(1 << (y % DISPLAY_ROW_HIGH));
 }
 
@@ -147,7 +150,8 @@ void display_invert(int x, int y, int wide, int high) {
 	for (i = x; i < x + wide; i++) {
 		for (j = y; j < y + high; j++) {
 			if (i >= 0 && i < DISPLAY_WIDE && j >= 0 && j < DISPLAY_HIGH)
-				frame[j / DISPLAY_ROW_HIGH][i] ^= (uint8_t)(1 << (j % DISPLAY_ROW_HIGH));
+				frame[(j + DISPLAY_MARGIN) / DISPLAY_ROW_HIGH][i + DISPLAY_MARGIN]
+					^= (uint8_t)(1 << ((j + DISPLAY_MARGIN) % DISPLAY_ROW_HIGH));
 		}
 	}
 }
@@ -252,17 +256,17 @@ static void send_page(int page) {
 		(uint8_t)(COLUMN_LOW_SET | (COLUMN_OFFSET & NIBBLE)),
 		(uint8_t)(COLUMN_HIGH_SET | (COLUMN_OFFSET >> NIBBLE_BITS)),
 	};
-	uint8_t data[DISPLAY_WIDE + 1];
+	uint8_t data[DISPLAY_PANEL_WIDE + 1];
 
 	data[0] = DATA;
-	memcpy(&data[1], frame[page], DISPLAY_WIDE);
+	memcpy(&data[1], frame[page], DISPLAY_PANEL_WIDE);
 	if (i2c_master_transmit(device, where, sizeof(where), WAIT_MS) != ESP_OK
 			|| i2c_master_transmit(device, data, sizeof(data), WAIT_MS) != ESP_OK) {
 		pages_failed++;
 		return;
 	}
 	pages_sent++;
-	memcpy(sent[page], frame[page], DISPLAY_WIDE);
+	memcpy(sent[page], frame[page], DISPLAY_PANEL_WIDE);
 	is_sent[page] = 1;
 }
 
@@ -285,7 +289,7 @@ void display_poll(void) {
 	for (tried = 0; tried < DISPLAY_ROWS; tried++) {
 		page = next_page;
 		next_page = (next_page + 1) % DISPLAY_ROWS;
-		if (is_sent[page] && !memcmp(sent[page], frame[page], DISPLAY_WIDE))
+		if (is_sent[page] && !memcmp(sent[page], frame[page], DISPLAY_PANEL_WIDE))
 			continue;
 		send_page(page);
 		return;

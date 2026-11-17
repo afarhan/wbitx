@@ -185,10 +185,10 @@
 #define TEXT_ROOM 64
 #define RULE_Y 9
 #define LINES_Y 11
-#define LINE_PITCH 11
+#define LINE_PITCH 10
 #define MENU_ROWS 5
 #define LIST_ROWS 4
-#define HELP_Y 57
+#define HELP_Y 55
 #define BIG_SCALE 3
 #define PAGE_BIG_Y 18
 #define HOME_BIG_Y 12
@@ -208,7 +208,7 @@
 // foot clear of the help
 #define KEY_PITCH 12
 #define KEYS_Y 14
-#define KEY_ROW_PITCH 11
+#define KEY_ROW_PITCH 10
 #define LETTER_EDGE 2
 #define WPM_STEP 1
 #define HELP_EVERY_MS 2000
