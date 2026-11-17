@@ -9,7 +9,10 @@
 extern "C" {
 #endif
 
-void portal_open(void);
+#define PORTAL_CONFIGURE 0
+#define PORTAL_UPDATE 1
+
+void portal_open(int how);
 void portal_close(void);
 void portal_poll(long now);
 int portal_is_open(void);

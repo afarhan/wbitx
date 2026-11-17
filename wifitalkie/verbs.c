@@ -72,6 +72,7 @@
 #include "settings.h"
 #include "sleep.h"
 #include "speaker.h"
+#include "update.h"
 #include "verbs.h"
 #include "voip.h"
 #include "vox.h"
@@ -447,6 +448,10 @@ void verbs_do(const char *line, long now) {
 	if (!strcmp(verb, "KEYS")) {
 		keys_describe(said, sizeof(said));
 		console_say("KEYS %s", said);
+		return;
+	}
+	if (!strcmp(verb, "UPDATE") && !strcasecmp(first, "GITHUB")) {
+		update_from_github();
 		return;
 	}
 	if (!strcmp(verb, "SCREEN")) {

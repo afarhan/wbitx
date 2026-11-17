@@ -41,10 +41,15 @@
 //                  the file to send; sent, a page saying it is done and
 //                  the talkie restarting, or why it failed
 //
-// One portal for all of it: each page is under one of four tabs, a bar at
-// the top, the author's of 2026-11-11: User, the callsign and the
-// activation code with MAKE A NEW CODE; WiFi, the networks (also /wifi);
-// Contacts; and Firmware. A talkie with no callsign opens on User.
+// It opens one of two ways, the author's of 2026-11-17, from the talkie's
+// Settings: Configure..., portal_open(PORTAL_CONFIGURE), for all but the
+// firmware, each page under one of three tabs, a bar at the top, the
+// author's of 2026-11-11: User, the callsign and the activation code with
+// MAKE A NEW CODE; WiFi, the networks (also /wifi); and Contacts. A talkie
+// with no callsign opens on User. No firmware is taken then. Or Update...,
+// Locally, portal_open(PORTAL_UPDATE), for the firmware only: every
+// address comes to /update, with no tabs, and the talkie's screen shows
+// the code it asks for.
 //
 // A talkie new from its box, with no callsign or no network, is taken
 // through the pages as a wizard of three steps, the author's of
@@ -91,6 +96,7 @@
 static WebServer server(WEB_PORT);
 static DNSServer dns;
 static int is_open;
+static int is_update_mode;
 static int is_first_time;
 static int is_server_begun;
 static char name[NAME_ROOM];
@@ -158,7 +164,6 @@ static const struct tab_link tabs[] = {
 	{TAB_USER, "User", "/callsign"},
 	{TAB_WIFI, "WiFi", "/wifi"},
 	{TAB_CONTACTS, "Contacts", "/contacts"},
-	{TAB_FIRMWARE, "Firmware", "/update"},
 };
 #define TABS ((int)(sizeof(tabs) / sizeof(tabs[0])))
 
@@ -188,7 +193,7 @@ static void begin_page(String &page, const char *heading) {
 		"nav a{flex:1;text-align:center;padding:10px 2px;color:#036}"
 		"nav a.on{background:#036;color:#fff;border-radius:4px 4px 0 0}"
 		"</style></head><body>";
-	if (tab != TAB_NONE) {
+	if (tab != TAB_NONE && !is_update_mode) {
 		page += "<nav>";
 		for (i = 0; i < TABS; i++) {
 			page += "<a href=";
@@ -435,7 +440,7 @@ static void show_update(void) {
 		if (server.hasArg("code"))
 			page += "<p class=off>That is not the code on the talkie.</p>";
 		page += "<form method=get action='/update'>"
-			"<p>Type the update code shown on the talkie's Setup page, four figures.</p>"
+			"<p>Type the update code shown on the talkie's screen, four figures.</p>"
 			"<input name=code inputmode=numeric autocomplete=off maxlength=4>"
 			"<button class=go>NEXT</button></form>";
 		end_page(page);
@@ -518,7 +523,9 @@ static void update_sent(void) {
 }
 
 static void show_first(void) {
-	if (settings.callsign[0] == 0)
+	if (is_update_mode)
+		show_update();
+	else if (settings.callsign[0] == 0)
 		show_callsign();
 	else
 		show_networks();
@@ -686,30 +693,50 @@ static void elsewhere(void) {
 	server.send(302, "text/plain", "");
 }
 
+// a page of Configure only, or of Update only; in the other way of
+// opening, sent to the first page
+static void configure_only(const char *uri, HTTPMethod method, void (*handler)(void)) {
+	server.on(uri, method, [handler]() {
+		if (is_update_mode)
+			elsewhere();
+		else
+			handler();
+	});
+}
+
+static void update_only(void) {
+	if (!is_update_mode)
+		elsewhere();
+	else
+		update_sent();
+}
+
 static void begin_server(void) {
 	server.on("/", HTTP_GET, show_first);
-	server.on("/callsign", HTTP_GET, show_callsign);
-	server.on("/callsign", HTTP_POST, callsign_set);
-	server.on("/code/new", HTTP_POST, code_new);
-	server.on("/network", HTTP_GET, show_network);
-	server.on("/contacts", HTTP_GET, show_contacts);
-	server.on("/wifi/join", HTTP_POST, wifi_join);
-	server.on("/wifi/forget", HTTP_POST, wifi_forget);
-	server.on("/contact/add", HTTP_POST, contact_add);
-	server.on("/contact/forget", HTTP_POST, contact_forget);
-	server.on("/scan", HTTP_GET, scan);
-	server.on("/wifi", HTTP_GET, show_networks);
-	server.on("/update", HTTP_GET, show_update);
-	server.on("/update", HTTP_POST, update_sent, update_receive);
+	configure_only("/callsign", HTTP_GET, show_callsign);
+	configure_only("/callsign", HTTP_POST, callsign_set);
+	configure_only("/code/new", HTTP_POST, code_new);
+	configure_only("/network", HTTP_GET, show_network);
+	configure_only("/contacts", HTTP_GET, show_contacts);
+	configure_only("/wifi/join", HTTP_POST, wifi_join);
+	configure_only("/wifi/forget", HTTP_POST, wifi_forget);
+	configure_only("/contact/add", HTTP_POST, contact_add);
+	configure_only("/contact/forget", HTTP_POST, contact_forget);
+	configure_only("/scan", HTTP_GET, scan);
+	configure_only("/wifi", HTTP_GET, show_networks);
+	server.on("/update", HTTP_GET, show_first);
+	// the file is refused by update.cpp unless the Update way is open
+	server.on("/update", HTTP_POST, update_only, update_receive);
 	server.onNotFound(elsewhere);
 	is_server_begun = 1;
 }
 
-void portal_open(void) {
+void portal_open(int how) {
 	uint8_t mac[6];
 
 	if (is_open)
 		return;
+	is_update_mode = how == PORTAL_UPDATE;
 	if (settings.callsign[0] != 0) {
 		snprintf(name, sizeof(name), "%s%s", NAME_PREFIX, settings.callsign);
 	} else {
@@ -723,10 +750,14 @@ void portal_open(void) {
 	server.begin();
 	dns.setErrorReplyCode(DNSReplyCode::NoError);
 	dns.start(DNS_PORT, "*", WiFi.softAPIP());
-	network_scan_begin();
 	is_join_due = 0;
-	is_first_time = settings.callsign[0] == 0 || known_count(&settings) == 0;
-	update_open();
+	if (is_update_mode) {
+		is_first_time = 0;
+		update_open();
+	} else {
+		network_scan_begin();
+		is_first_time = settings.callsign[0] == 0 || known_count(&settings) == 0;
+	}
 	is_open = 1;
 }
 

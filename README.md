@@ -55,13 +55,22 @@ zbitxre's `PROTOCOL.md` ("Authentication", "VoIP: the repeater"),
 
 ## Updating over WiFi
 
-`firmware/wifitalkie.ino.bin` is the firmware as `make` builds it. To put it
-on a talkie without a cable: MENU > Setup on the talkie, join its access
-point TALKIE-<callsign> from a phone or laptop, open 192.168.4.1, the
-Firmware tab, type the four-figure code the talkie shows, choose the file
-and SEND. The talkie and the page both show how far it has got; when it
-says done, close the page. A firmware that does not start goes back to the
-old one by itself.
+`firmware/wifitalkie.ino.bin` is the firmware as `make release` puts it
+there, with `firmware/version.txt`, the time it was built.
+
+From GitHub: on the talkie, joined to a network, Settings > Update... >
+From github.com, ENTER. It takes the file if it is newer than its own and
+restarts into it; otherwise it says Up to date. The serial command
+`UPDATE GITHUB` does the same.
+
+Locally, from a phone or laptop: Settings > Update... > Locally on the
+talkie, join its access point TALKIE-<callsign>, open 192.168.4.1, type
+the four-figure code the talkie shows, choose the file and SEND. The
+talkie and the page both show how far it has got; when it says done,
+close the page.
+
+Either way, a firmware that does not start goes back to the old one by
+itself.
 
 ## License
 

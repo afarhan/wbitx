@@ -97,12 +97,18 @@
 //                    as a mark across it, and KEYED while the voice keys
 //                    the talkie
 //     Callsign       entered a character at a time, below
-//     Setup...       the setup portal (portal.cpp), open while the
-//                    page is shown: what to join on a telephone and
-//                    where to go, and the code its Firmware tab asks
-//                    for, or how a firmware being sent goes. It opens
-//                    by itself at power-up when
-//                    the talkie knows no network.
+//     Configure...   the setup portal (portal.cpp) for the callsign, the
+//                    networks and the contacts, open while the page is
+//                    shown: what to join on a telephone and where to go.
+//                    It opens by itself at power-up when the talkie
+//                    knows no network.
+//     Update...      a list of two (update.cpp):
+//         From github.com  the newest firmware on github.com/afarhan/wbitx,
+//                    ENTER to begin, over the WiFi joined; how far on a
+//                    bar, then Up to date, or restarting into it
+//         Locally    the setup portal for the firmware only: what to join
+//                    on a telephone, where to go, and the code it asks
+//                    for; then how far the file sent has got
 //     Device key     the talkie's key, to add at my.sbitx.net as one
 //                    of the owner's radios, and whether it is in yet
 //     Theme          Black, lit dots on black, or White, the display
@@ -110,7 +116,8 @@
 //     Info           the network, the address, the signal, the
 //                    callsign, the battery
 //
-// Info, Setup and Device key stay up; the others go home when idle.
+// Info, Configure, the two Update pages and Device key stay up; the others
+// go home when idle.
 //
 // The callsign is entered on a page of its own, on the keyboard (entry.c,
 // draw_keyboard()) or, with settings.is_morse_typing, keyed as Morse:
@@ -229,6 +236,9 @@
 #define PAGE_TARGET 26
 #define PAGE_TEXT 27
 #define PAGE_VOLUME 28
+#define PAGE_UPDATE 29
+#define PAGE_UPDATE_GITHUB 30
+#define PAGE_UPDATE_LOCAL 31
 // the sidetone heard at each step of its level
 #define SIDETONE_STEP_MS 250
 // a word on the entry page, why the text was not kept, shown this long
@@ -279,10 +289,16 @@ static const struct item settings_items[] = {
 	{"Sidetone", PAGE_SIDETONE},
 	{"VOX", PAGE_VOX},
 	{"Callsign", PAGE_CALLSIGN},
-	{"Setup...", PAGE_SETUP},
+	{"Configure...", PAGE_SETUP},
+	{"Update...", PAGE_UPDATE},
 	{"Device key", PAGE_ACTIVATE},
 	{"Theme", PAGE_THEME},
 	{"Info", PAGE_INFO},
+};
+
+static const struct item update_items[] = {
+	{"From github.com", PAGE_UPDATE_GITHUB},
+	{"Locally", PAGE_UPDATE_LOCAL},
 };
 
 struct menu {
@@ -293,11 +309,13 @@ struct menu {
 
 #define MAIN_MENU 0
 #define SETTINGS_MENU 1
-#define MENUS 2
+#define UPDATE_MENU 2
+#define MENUS 3
 
 static const struct menu menus[MENUS] = {
 	{"Menu", main_items, (int)(sizeof(main_items) / sizeof(main_items[0]))},
 	{"Settings", settings_items, (int)(sizeof(settings_items) / sizeof(settings_items[0]))},
+	{"Update", update_items, (int)(sizeof(update_items) / sizeof(update_items[0]))},
 };
 #define MENU_ROWS 5
 
@@ -540,10 +558,14 @@ static void go(int to) {
 		morse_begin(&morse, (int)settings.wpm);
 		entry_said = NULL;
 	}
-	if (page == PAGE_SETUP && to != PAGE_SETUP)
+	if ((page == PAGE_SETUP || page == PAGE_UPDATE_LOCAL) && to != page)
 		portal_close();
+	if (page == PAGE_UPDATE_GITHUB && to != page)
+		update_forget();
 	if (to == PAGE_SETUP)
-		portal_open();
+		portal_open(PORTAL_CONFIGURE);
+	if (to == PAGE_UPDATE_LOCAL)
+		portal_open(PORTAL_UPDATE);
 	if (to == PAGE_CONTACT)
 		is_contact_gone = 0;
 	if (to == PAGE_WIFI && page == PAGE_MENU) {
@@ -811,6 +833,16 @@ static void take_menu(const struct key_press *press) {
 
 	if (press->key == KEY_MENU && level == SETTINGS_MENU) {
 		level = MAIN_MENU;
+		return;
+	}
+	if (press->key == KEY_MENU && level == UPDATE_MENU) {
+		level = SETTINGS_MENU;
+		return;
+	}
+	if (press->key == KEY_ENTER && to == PAGE_UPDATE) {
+		level = UPDATE_MENU;
+		chosen[UPDATE_MENU] = 0;
+		menu_top[UPDATE_MENU] = 0;
 		return;
 	}
 	if (press->key == KEY_MENU)
@@ -1120,6 +1152,12 @@ static void take_page(const struct key_press *press, long now) {
 	}
 	if (choices_of(page) != NULL) {
 		take_choices(choices_of(page), press);
+		return;
+	}
+	// From github.com: ENTER begins, and holds the loop until done
+	if (page == PAGE_UPDATE_GITHUB && press->key == KEY_ENTER) {
+		update_from_github();
+		touched_ms = now;
 		return;
 	}
 	if (page == PAGE_SIDETONE && is_up_or_down(press)) {
@@ -1592,17 +1630,30 @@ static void draw_joining(long now) {
 
 // new firmware coming in from the portal (update.cpp): how far, on a
 // bar, and what to do when it is in or has failed
-static void draw_update(const char *said) {
+static void draw_update(const char *said, int is_github) {
 	char text[TEXT_ROOM];
 	int percent = update_percent();
 	int wide;
 
-	title("Firmware update");
+	title(is_github ? "From github.com" : "Update locally");
 	if (!strncmp(said, "DONE", 4)) {
 		line(0, "Updated.");
 		line(1, "Restarting...");
-		line(2, "Close the page");
-		line(3, "on the phone.");
+		if (!is_github) {
+			line(2, "Close the page");
+			line(3, "on the phone.");
+		}
+		return;
+	}
+	if (!strcmp(said, "CHECKING")) {
+		line(0, "Asking github.com");
+		line(1, "for the newest...");
+		return;
+	}
+	if (!strcmp(said, "UP TO DATE")) {
+		line(0, "Up to date:");
+		line(1, "this is the newest.");
+		help("MENU: BACK");
 		return;
 	}
 	if (!strncmp(said, "FAILED", 6)) {
@@ -1611,7 +1662,7 @@ static void draw_update(const char *said) {
 		fit(text, DISPLAY_WIDE);
 		line(1, text);
 		line(2, "Old firmware kept.");
-		help("TRY AGAIN, OR MENU: CLOSE");
+		help(is_github ? "ENTER: AGAIN   MENU: BACK" : "TRY AGAIN, OR MENU: CLOSE");
 		return;
 	}
 	line(0, "Receiving...");
@@ -1619,8 +1670,10 @@ static void draw_update(const char *said) {
 	display_bar(0, line_y(1), wide, percent * wide / 100);
 	snprintf(text, sizeof(text), "%d%%", percent);
 	display_text_at(DISPLAY_WIDE - display_text_wide(text, 1), line_y(1), 1, text);
-	line(2, "Keep the phone");
-	line(3, "page open.");
+	if (!is_github) {
+		line(2, "Keep the phone");
+		line(3, "page open.");
+	}
 }
 
 // drawn and sent at once, for update.cpp, which holds the loop up while
@@ -1631,20 +1684,38 @@ void screen_update_shown(void) {
 
 	update_said(said, sizeof(said));
 	display_clear();
-	draw_update(said);
+	draw_update(said, page == PAGE_UPDATE_GITHUB);
 	for (i = 0; i < DISPLAY_ROWS; i++)
 		display_poll();
 }
 
-static void draw_setup(void) {
+// From github.com: what ENTER does, or how the update goes
+static void draw_github(void) {
+	char said[UPDATE_TEXT_ROOM];
+
+	update_said(said, sizeof(said));
+	if (said[0] != 0) {
+		draw_update(said, 1);
+		return;
+	}
+	title("From github.com");
+	line(0, "Get the newest");
+	line(1, "firmware from");
+	line(2, "github.com?");
+	help(network_is_up() ? "ENTER: BEGIN   MENU: BACK" : "NO WIFI   MENU: BACK");
+}
+
+// the portal open, Configure or Update locally: what to join and where
+// to go, and for Update the code it asks; then how a file sent goes
+static void draw_setup(int is_update) {
 	char text[TEXT_ROOM];
 
 	update_said(text, sizeof(text));
-	if (text[0] != 0) {
-		draw_update(text);
+	if (is_update && text[0] != 0) {
+		draw_update(text, 0);
 		return;
 	}
-	title("Setup");
+	title(is_update ? "Update locally" : "Configure");
 	if (!portal_is_open()) {
 		line(1, "It did not start.");
 		help("MENU: BACK");
@@ -1654,9 +1725,11 @@ static void draw_setup(void) {
 	portal_name(text, sizeof(text));
 	line(1, text);
 	line(2, "open 192.168.4.1");
-	snprintf(text, sizeof(text), "Update code %d", update_code());
-	fit(text, DISPLAY_WIDE);
-	line(3, text);
+	if (is_update) {
+		snprintf(text, sizeof(text), "Update code %d", update_code());
+		fit(text, DISPLAY_WIDE);
+		line(3, text);
+	}
 	if (network_ap_clients() > 0) {
 		snprintf(text, sizeof(text), "%d JOINED   MENU: CLOSE", network_ap_clients());
 		help(text);
@@ -1956,8 +2029,10 @@ static void draw(long now) {
 		draw_wifi(now);
 	if (page == PAGE_WIFI_JOINING)
 		draw_joining(now);
-	if (page == PAGE_SETUP)
-		draw_setup();
+	if (page == PAGE_SETUP || page == PAGE_UPDATE_LOCAL)
+		draw_setup(page == PAGE_UPDATE_LOCAL);
+	if (page == PAGE_UPDATE_GITHUB)
+		draw_github();
 	if (page == PAGE_INFO)
 		draw_info();
 	if (page == PAGE_ACTIVATE)
@@ -2070,6 +2145,7 @@ void screen_poll(long now) {
 			go(PAGE_SETUP);
 	}
 	if (page != PAGE_HOME && page != PAGE_INFO && page != PAGE_SETUP
+			&& page != PAGE_UPDATE_GITHUB && page != PAGE_UPDATE_LOCAL
 			&& page != PAGE_ACTIVATE && now - touched_ms >= MENU_IDLE_MS)
 		go(PAGE_HOME);
 	if (is_save_due && now >= save_ms) {

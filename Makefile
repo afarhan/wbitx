@@ -5,6 +5,14 @@
 #   make upload PORT=...     upload it (default /dev/ttyACM0)
 #   make monitor             type verbs at the talkie (tools/talkie.py)
 #   make check               the host tests
+#   make release             the firmware built put in firmware/, with
+#                            firmware/version.txt, for Update... From
+#                            github.com once committed and pushed
+#
+# Each build is stamped with the time it was built, FIRMWARE_BUILT in
+# wifitalkie/built.h, made here and not kept in git: the firmware's own
+# description carries the core library's date, not the sketch's, so the
+# talkie tells a newer firmware on GitHub by this (update.cpp).
 
 FQBN = esp32:esp32:esp32c3:CDCOnBoot=cdc,PartitionScheme=min_spiffs
 PORT ?= /dev/ttyACM0
@@ -16,6 +24,7 @@ PLAIN = wifitalkie/auth.c wifitalkie/battery.c wifitalkie/button.c wifitalkie/co
 all: build/wifitalkie.ino.bin
 
 build/wifitalkie.ino.bin: wifitalkie/build_opt.h wifitalkie/*.c wifitalkie/*.cpp wifitalkie/*.h wifitalkie/*.ino
+	echo "#define FIRMWARE_BUILT $$(date +%s)LL" > wifitalkie/built.h
 	arduino-cli compile --fqbn $(FQBN) --warnings default --output-dir build wifitalkie
 
 upload: build/wifitalkie.ino.bin
@@ -34,7 +43,12 @@ check: tests/test_units tests/voip_tool
 	tests/test_units
 	ZBITXRE=$(ZBITXRE) python3 tests/test_service.py
 
+release: build/wifitalkie.ino.bin
+	cp build/wifitalkie.ino.bin firmware/wifitalkie.ino.bin
+	sed -n 's/^#define FIRMWARE_BUILT \([0-9]*\)LL$$/\1/p' wifitalkie/built.h > firmware/version.txt
+	@echo "firmware/ is built $$(cat firmware/version.txt); commit and push it for From github.com"
+
 clean:
 	rm -rf build tests/test_units tests/voip_tool
 
-.PHONY: all upload monitor check clean
+.PHONY: all upload monitor check release clean
