@@ -24,6 +24,18 @@
 //
 // A packet numbered at or behind the last taken, or too far ahead of it,
 // is not taken: voip_is_ahead() says which, as the radio's daemon does.
+//
+// A CALL BY CALLSIGN
+//
+// The frequency at 20 says where speech goes, and is also where a callsign
+// goes: from VOIP_CALL_BASE up it is not a frequency but a callsign of up
+// to six letters and figures, read as a number in base 37 (a blank 0, the
+// figures 1 to 10, the letters 11 to 36), VOIP_CALL_BASE being 2^32 less
+// 37^6. Every frequency below 1.729 GHz is left as it was, and no two
+// callsigns are the same number. The repeater sends speech so addressed to
+// the radios of the account with that callsign alone, wherever they are
+// tuned, with the number as it came, so that the talkie hearing it knows it
+// for a call to itself; voip.py in zbitxre does the same reckoning.
 
 #include <string.h>
 
@@ -81,6 +93,42 @@ int voip_id_of_hex(const char *hex, uint8_t id[VOIP_STREAM_ID_BYTES]) {
 
 long voip_channel_of(uint32_t hz) {
 	return (long)((hz + VOIP_HZ_A_CHANNEL / 2) / VOIP_HZ_A_CHANNEL);
+}
+
+static int base37_of(char letter) {
+	if (letter >= '0' && letter <= '9')
+		return letter - '0' + 1;
+	if (letter >= 'A' && letter <= 'Z')
+		return letter - 'A' + 11;
+	if (letter >= 'a' && letter <= 'z')
+		return letter - 'a' + 11;
+	return -1;
+}
+
+// the number that calls a callsign, as the frequency of a packet; what
+// follows a '-', the radio's name (VU2ESE-sbitx), is not part of it, the
+// call going to all the account's radios. 0 if it cannot be called: empty,
+// longer than six, or with other than letters and figures
+uint32_t voip_call_hz(const char *callsign) {
+	uint32_t value = 0;
+	int count = 0;
+	int digit;
+
+	for (; *callsign != 0 && *callsign != '-'; callsign++) {
+		digit = base37_of(*callsign);
+		if (digit < 0 || ++count > VOIP_CALL_LETTERS)
+			return 0;
+		value = value * VOIP_CALL_RADIX + (uint32_t)digit;
+	}
+	if (count == 0)
+		return 0;
+	for (; count < VOIP_CALL_LETTERS; count++)
+		value *= VOIP_CALL_RADIX;
+	return VOIP_CALL_BASE + value;
+}
+
+int voip_is_call(uint32_t hz) {
+	return hz >= VOIP_CALL_BASE;
 }
 
 // sound is NULL for a packet of kind 0, whose sound is silence

@@ -809,6 +809,21 @@ static void test_local_packet(void) {
 		"a local packet spoilt is refused");
 }
 
+// a callsign as a frequency: above every frequency, one number for each,
+// the radio's name not part of it, and none for what cannot be called
+static void test_call_hz(void) {
+	expect(voip_call_hz("A") == VOIP_CALL_BASE + 11u * 37 * 37 * 37 * 37 * 37, "A is 11 then five blanks");
+	expect(voip_call_hz("ZZZZZZ") == 0xffffffffu, "ZZZZZZ is the last number there is");
+	expect(voip_call_hz("vu2ese") == voip_call_hz("VU2ESE"), "a callsign's case does not count");
+	expect(voip_call_hz("VU2ESE-sbitx") == voip_call_hz("VU2ESE"), "the radio's name is not part of it");
+	expect(voip_call_hz("VU2ES") != voip_call_hz("VU2ESE") && voip_call_hz("VU2ES") != 0,
+		"a callsign and one longer are not the same");
+	expect(voip_is_call(voip_call_hz("0")) && !voip_is_call(1300000000u) && !voip_is_call(21090000),
+		"a call is above the frequencies, the 23 cm band among them");
+	expect(voip_call_hz("") == 0 && voip_call_hz("VU2ESEX") == 0 && voip_call_hz("VU2/P") == 0
+		&& voip_call_hz("-sbitx") == 0, "nothing for what cannot be called");
+}
+
 // the pin's volts for a cell, as the divider and the pull-up make them
 static int pin_for(double cell) {
 	double r1 = BATTERY_TOP_OHMS, r2 = BATTERY_BOTTOM_OHMS, rp = BATTERY_PULLUP_OHMS;
@@ -894,6 +909,7 @@ int main(void) {
 	test_cookie();
 	test_stretch();
 	test_local_packet();
+	test_call_hz();
 	test_battery();
 	test_vox();
 	if (failures == 0)

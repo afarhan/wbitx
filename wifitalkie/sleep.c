@@ -24,7 +24,7 @@
 // the display says so for LOW_SAID_MS and the talkie sleeps. A key wakes
 // it, and it sleeps again LOW_FOR_MS after, until it is charged. Asleep it
 // still takes 0.8 mA, most of it the SuperMini's red lamp; that is weeks
-// from 3.7 V to a cell spoilt, not years, so a cell with its own
+// from 3.3 V to a cell spoilt, not years, so a cell with its own
 // protection is the better guard.
 
 #include "freertos/FreeRTOS.h"
@@ -46,7 +46,7 @@
 #define QUIET_MS 200
 #define QUIET_MOST_MS 5000
 #define SAID_MS 50
-#define LOW_MV 3700   // the cell feeds 5 V through the Schottky: browns out soon below
+#define LOW_MV 3300   // as read, after the Schottky's drop from the cell
 #define LOW_FOR_MS 10000
 #define LOW_SAID_MS 3000
 // 0 while the battery's reading is tried on the bench supply, the author's

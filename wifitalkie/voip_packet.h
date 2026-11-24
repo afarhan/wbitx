@@ -24,6 +24,10 @@ extern "C" {
 #define VOIP_CODEC_MULAW 0
 #define VOIP_AHEAD_MOST 3000
 #define VOIP_HZ_A_CHANNEL 1000
+// a frequency from here up is a callsign (voip_packet.c): 2^32 - 37^6
+#define VOIP_CALL_BASE 1729240887u
+#define VOIP_CALL_LETTERS 6
+#define VOIP_CALL_RADIX 37
 
 #define VOIP_OPENED 0
 #define VOIP_NOT_OURS 1
@@ -40,6 +44,8 @@ struct voip_heard {
 
 int voip_id_of_hex(const char *hex, uint8_t id[VOIP_STREAM_ID_BYTES]);
 long voip_channel_of(uint32_t hz);
+uint32_t voip_call_hz(const char *callsign);
+int voip_is_call(uint32_t hz);
 void voip_packet_make(uint8_t packet[VOIP_PACKET_BYTES], const uint8_t id[VOIP_STREAM_ID_BYTES],
 	const char *key, int kind, uint32_t hz, uint32_t number, const uint8_t *sound);
 void voip_packet_make_as(uint8_t packet[VOIP_PACKET_BYTES], const uint8_t id[VOIP_STREAM_ID_BYTES],

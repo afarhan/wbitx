@@ -25,6 +25,13 @@
 // steady 1 kHz goes in its place, to try the way up without a microphone.
 // Every packet is numbered, one after another, both kinds together.
 //
+// With a contact the target, speech goes to its callsign, not the dial:
+// the frequency of each packet of speech is voip_call_hz() of the
+// contact's callsign, and the repeater sends it to that account's radios
+// alone. The packets of kind 0 still say the dial, so the talkie stays in
+// its channel and hears it as before. A contact whose callsign cannot be
+// called that way, past six letters, is not sent to.
+//
 // VOX: while the PTT is up, the last PREROLL_FRAMES of the microphone's are
 // kept, and when the voice keys the talkie (ptt_is_vox()) they go first,
 // so that the word that keyed it is not cut: the voice is some tens of
@@ -38,7 +45,8 @@
 //
 // A packet is taken if it is the stream's, its tag is right by the down key,
 // it is speech, its number is ahead of the last and not too far, and its
-// frequency is in the talkie's channel; the speech then goes to the
+// frequency is in the talkie's channel, or is a call (voip_is_call()),
+// which the repeater sends only to the account it calls; the speech then goes to the
 // speaker's queue. While the PTT is down nothing is taken: the talkie is
 // one way at a time, as a walkie-talkie is. The speaker's callsign, which
 // the service wrote in from the speaker's account, is said on the console
@@ -187,8 +195,17 @@ static int is_linked(void) {
 	return settings.is_local ? local_is_open() : fd != NOT_OPEN;
 }
 
+// where speech goes: the dial, or with a contact the target, its callsign;
+// 0 nowhere
+static uint32_t speech_hz(void) {
+	if (settings.is_local || settings.target < SETTINGS_TARGET_CONTACT)
+		return settings.hz;
+	return voip_call_hz(settings.contacts[settings.target - SETTINGS_TARGET_CONTACT]);
+}
+
 static void send_packet(int kind, const uint8_t *sound) {
 	uint8_t packet[VOIP_PACKET_BYTES];
+	uint32_t hz = kind == VOIP_KIND_SPEECH ? speech_hz() : settings.hz;
 
 	number_sent++;
 	if (settings.is_local) {
@@ -198,7 +215,7 @@ static void send_packet(int kind, const uint8_t *sound) {
 			count_sent++;
 		return;
 	}
-	voip_packet_make(packet, id, up_key, kind, settings.hz, number_sent, sound);
+	voip_packet_make(packet, id, up_key, kind, hz, number_sent, sound);
 	if (send(fd, packet, sizeof(packet), 0) == (ssize_t)sizeof(packet))
 		count_sent++;
 }
@@ -230,7 +247,7 @@ static void speak(int is_talking) {
 				preroll_count++;
 			continue;
 		}
-		if (!is_linked() || settings.hz == 0)
+		if (!is_linked() || speech_hz() == 0)
 			continue;
 		if (preroll_count > 0 && ptt_is_vox()) {
 			for (i = preroll_count; i > 0; i--)
@@ -270,7 +287,8 @@ static void take(const uint8_t *packet, int length, int is_talking, long now) {
 	}
 	is_taken_begun = 1;
 	number_taken = heard.number;
-	if (voip_channel_of(heard.hz) != voip_channel_of(settings.hz) || is_talking) {
+	if ((!voip_is_call(heard.hz) && voip_channel_of(heard.hz) != voip_channel_of(settings.hz))
+			|| is_talking) {
 		count_dropped++;
 		return;
 	}

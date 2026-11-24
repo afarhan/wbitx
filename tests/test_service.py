@@ -122,6 +122,40 @@ class ServiceTest(unittest.TestCase):
         self.assertEqual(tool("open", TALKIE_ID.hex(), up, to_talkie[1].hex()), "WRONG_TAG")
         self.assertEqual(tool("open", RADIO_ID.hex(), down, to_talkie[1].hex()), "NOT_OURS")
 
+    def test_a_call_by_callsign(self):
+        for callsign in ("A", "VU2ESE", "vu2ese-sbitx", "ZZZZZZ", "VU2ESEX", "VU2/P"):
+            self.assertEqual(int(tool("call", callsign)), voip.call_hz(callsign) or 0, callsign)
+        sent = []
+        repeater = voip.Voip(lambda packet, address: sent.append((packet, address)),
+                             lambda radio, line: None, 2500)
+        repeater.open("talkie", TALKIE_ID, CALLSIGN, self.stretched, NONCE)
+        radio = repeater.open("radio", RADIO_ID, OTHER, "radio's stretch", NONCE)
+        up = tool("key", self.stretched, "zbitx-voip-up-1", NONCE)
+        down = tool("key", self.stretched, "zbitx-voip-down-1", NONCE)
+        now = 1000.0
+
+        # tuned far apart; the talkie calls the radio's callsign and is heard
+        repeater.take(bytes.fromhex(tool("make", TALKIE_ID.hex(), up, 0, HZ, 1)),
+                      TALKIE_ADDRESS, now)
+        repeater.take(voip.packet(RADIO_ID, radio.up_key, voip.KIND_TUNED, "", 14200000, 1),
+                      RADIO_ADDRESS, now)
+        call = tool("call", OTHER)
+        for number in range(2, 5):
+            now += STEP
+            repeater.take(bytes.fromhex(tool("make", TALKIE_ID.hex(), up, 3, call, number)),
+                          TALKIE_ADDRESS, now)
+        self.assertEqual(len([p for p, address in sent if address == RADIO_ADDRESS]), 3)
+
+        # the radio calls back; the talkie opens it, the call's number in it
+        now += 5
+        sent.clear()
+        now += STEP
+        repeater.take(voip.packet(RADIO_ID, radio.up_key, voip.KIND_SPEECH, "",
+                                  voip.call_hz(CALLSIGN), 2), RADIO_ADDRESS, now)
+        to_talkie = [p for p, address in sent if address == TALKIE_ADDRESS]
+        opened = tool("open", TALKIE_ID.hex(), down, to_talkie[0].hex()).split()
+        self.assertEqual(opened[:3], ["OPENED", OTHER, tool("call", CALLSIGN)])
+
 
 if __name__ == "__main__":
     unittest.main()

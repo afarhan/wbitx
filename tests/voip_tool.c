@@ -9,10 +9,11 @@
 //     voip_tool key <stretched> <words> <nonce>
 //     voip_tool make <id> <key> <kind> <hz> <number> [<sound in hex>]
 //     voip_tool open <id> <key> <packet in hex>
+//     voip_tool call <callsign>
 //
 // Each prints its result in hex on one line; open prints
 // "OPENED <callsign> <hz> <number> <sound>", or why the packet was not
-// opened.
+// opened; call prints the frequency that calls the callsign, in decimal.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,6 +123,10 @@ int main(int argc, char **argv) {
 		return make(argc, argv);
 	if (argc == 5 && !strcmp(argv[1], "open"))
 		return open_packet(argv);
+	if (argc == 3 && !strcmp(argv[1], "call")) {
+		printf("%u\n", voip_call_hz(argv[2]));
+		return 0;
+	}
 	fprintf(stderr, "usage: see the head of tests/voip_tool.c\n");
 	return 2;
 }
