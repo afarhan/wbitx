@@ -82,7 +82,9 @@
 //                    is open or remembered; one with a key not known, or
 //                    ENTER held for a new key, opens Setup; the last item
 //                    scans again. Then a page says whether it joined.
-//     Sleep          the talkie asleep, until any key wakes it (sleep.c)
+//     Sleep          the talkie asleep, until any key wakes it (sleep.c);
+//                    also the main menu's first row, and MENU held
+//                    SLEEP_HOLD_MS on the home page
 //     Audio          the in-built mic or the handsfree's
 //     Typing         text on the keyboard, or keyed as Morse
 //     Morse speed    for entering text, large; UP and DOWN step it,
@@ -264,8 +266,11 @@
 #define TARGET_DELETE 7
 #define TARGET_ITEMS 8
 // the main menu's rows: Settings..., the slots, the contacts, Add Callsign...
-#define ROW_SETTINGS 0
-#define ROW_SLOTS 1
+#define ROW_SLEEP 0
+#define ROW_SETTINGS 1
+#define ROW_SLOTS 2
+// MENU held this long on the home page puts the talkie to sleep
+#define SLEEP_HOLD_MS 3000
 #define ROW_CONTACTS (ROW_SLOTS + SETTINGS_SLOTS)
 
 struct item {
@@ -337,6 +342,7 @@ static int marked;
 static long drawn_ms;
 static long save_ms;
 static int is_save_due;
+static long menu_down_ms;   // MENU went down on the home page, or 0
 static char last_key[TEXT_ROOM];
 static long touched_ms;
 static long polled_ms;
@@ -422,8 +428,8 @@ static long entry_said_ms;
 static int is_begun;
 
 void screen_open(void) {
-	// ENTER is the screen's everywhere; the PTT key speaks
-	ptt_lend(1);
+	// ENTER is the PTT on the home page, the screen's on every other page
+	ptt_lend(page != PAGE_HOME);
 	keys_open();
 	display_open();
 	display_white(settings.is_white != 0);
@@ -575,6 +581,7 @@ static void go(int to) {
 	}
 	if (choices_of(to) != NULL)
 		marked = choices_of(to)->in_use();
+	ptt_lend(to != PAGE_HOME);
 	page = to;
 }
 
@@ -759,12 +766,9 @@ static void take_home(const struct key_press *press, long now) {
 		go(PAGE_MENU);
 		return;
 	}
-	if (press->key == KEY_ENTER) {
-		open_target(settings.target, PAGE_HOME);
-		return;
-	}
-	// UP and DOWN are the paddles, taken in screen_poll()
-	(void)now;
+	// ENTER is the PTT here (ptt.c); UP and DOWN set the volume
+	if (is_up_or_down(press))
+		level_step(&volume_level, press, now);
 }
 
 // the Text page, reading: UP back to older lines, DOWN on to newer, MENU
@@ -776,6 +780,16 @@ static void take_text(const struct key_press *press) {
 		text_back--;
 	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
 		go(PAGE_TARGET);
+}
+
+// the settings saved if they are due, home, and asleep until a key wakes it
+static void asleep(void) {
+	if (is_save_due) {
+		is_save_due = 0;
+		settings_save();
+	}
+	go(PAGE_HOME);
+	sleep_now();
 }
 
 // the main menu: UP and DOWN choose, round the ends, so that UP from the
@@ -796,6 +810,10 @@ static void take_main(const struct key_press *press) {
 		*at = (*at + 1) % rows;
 	if (press->key != KEY_ENTER)
 		return;
+	if (*at == ROW_SLEEP) {
+		asleep();
+		return;
+	}
 	if (*at == ROW_SETTINGS) {
 		level = SETTINGS_MENU;
 		chosen[SETTINGS_MENU] = 0;
@@ -858,12 +876,7 @@ static void take_menu(const struct key_press *press) {
 		return;
 	}
 	if (press->key == KEY_ENTER && to == PAGE_SLEEP) {
-		if (is_save_due) {
-			is_save_due = 0;
-			settings_save();
-		}
-		go(PAGE_HOME);
-		sleep_now();
+		asleep();
 		return;
 	}
 	if (press->key == KEY_ENTER)
@@ -1788,7 +1801,9 @@ static void draw_main(void) {
 	for (i = *top; i < rows && i < *top + MENU_ROWS; i++) {
 		target = row_target(i);
 		value[0] = 0;
-		if (i == ROW_SETTINGS) {
+		if (i == ROW_SLEEP) {
+			snprintf(name, sizeof(name), "Sleep");
+		} else if (i == ROW_SETTINGS) {
 			snprintf(name, sizeof(name), "Settings...");
 		} else if (target < 0) {
 			snprintf(name, sizeof(name), "Add Callsign...");
@@ -2049,6 +2064,18 @@ void screen_poll(long now) {
 
 	polled_ms = now;
 
+	// MENU held SLEEP_HOLD_MS on the home page: asleep once it is let go
+	if (page == PAGE_HOME && keys_is_down(KEY_MENU)) {
+		if (!menu_down_ms)
+			menu_down_ms = now;
+		else if (now - menu_down_ms >= SLEEP_HOLD_MS) {
+			menu_down_ms = 0;
+			asleep();
+		}
+	} else {
+		menu_down_ms = 0;
+	}
+
 	keys_set_kind(KEY_DOWN, is_entering(page) && !settings.is_morse_typing
 		? BUTTON_HOLDING_REPEATING : BUTTON_REPEATING);
 	if (keys_poll(now, &press))
@@ -2080,7 +2107,7 @@ void screen_poll(long now) {
 		}
 		was_ptt_key = is_key;
 	}
-	is_keying = (is_entering(page) && settings.is_morse_typing) || page == PAGE_HOME;
+	is_keying = is_entering(page) && settings.is_morse_typing;
 	// the paddles, each element heard as it begins
 	// the speaker held ready for a tone: on the home page only while the
 	// paddles are in use, the rest of the time it rests

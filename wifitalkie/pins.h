@@ -27,10 +27,10 @@
 #define PIN_SPEAKER_RIGHT 5
 #define PIN_DISPLAY_SDA 6
 #define PIN_DISPLAY_SCL 7
-#define PIN_KEY_MENU 8
-#define PIN_KEY_UP 9
-#define PIN_KEY_DOWN 10
-#define PIN_KEY_ENTER 20
+#define PIN_KEY_MENU 20      // MENU and ENTER swapped, UP and DOWN swapped (the author's, 2026-11-23)
+#define PIN_KEY_UP 10
+#define PIN_KEY_DOWN 9
+#define PIN_KEY_ENTER 8
 #define PIN_KEY_PTT 21
 #define PIN_MIC_POWER 1
 #define PIN_BATTERY 2
