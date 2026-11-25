@@ -12,17 +12,16 @@
 // so far is kept with the chosen added to its end, or its last character
 // taken off, up to most characters. screen.c says which key does which.
 //
-// Or the keyboard, ENTRY_KEYBOARD, forty keys in four rows of ten, with a
-// key chosen, key_at: entry_key_move() goes along them one at a time, on
-// from the end of a row to the start of the next and round from the last
-// to the first, and entry_key_row() goes a row down or up, round from the
-// bottom to the top and the top to the bottom. A key moved to is typed
-// once it has been left ENTRY_KEY_SETTLE_MS (entry_key_moved(),
-// entry_key_settle()). A character from the chosen to any other is so at
-// most one or two rows down and five along, five presses at the most and
-// about four on the mean, where along all forty would be ten on the mean.
-// entry_key_take() adds the chosen to the text, if it is of the set; a
-// key not of the set is passed over, and screen.c leaves it out.
+// Or the keyboard (the author's, 2026-11-25): three layers, the small
+// letters, the capitals and the symbols, each four rows of eleven keys. The
+// letter layers have the space, the digits and . , - / @ ! ? too; the
+// symbols layer every printable character that is not a letter. The
+// layers are one strip: entry_key_move() goes along a row, on from its end
+// to the next row's start, from a layer's last key to the next layer's
+// first, and round from the last layer to the first, and back the same
+// way. Keys not of the set are passed over and not shown, and so is a
+// layer that has nothing of the set the others have not (a callsign's is
+// all on the capitals). entry_key_take() types the chosen.
 //
 // It knows nothing of the ESP32, so tests/test_units.c tries it.
 
@@ -30,6 +29,8 @@
 #include <string.h>
 
 #include "entry.h"
+
+static void settle_on_open(struct entry *e, int at);
 
 void entry_begin(struct entry *e, const char *set, const char *text, int most) {
 	if (most > ENTRY_ROOM - 1)
@@ -40,9 +41,8 @@ void entry_begin(struct entry *e, const char *set, const char *text, int most) {
 	e->set = set;
 	e->set_length = (int)strlen(set);
 	e->at = 0;
-	e->key_at = ENTRY_KEY_FIRST;
-	e->is_key_pending = 0;
-	e->key_moved_ms = 0;
+	// at the small letters' first, or the first open after it
+	settle_on_open(e, ENTRY_LOWER * ENTRY_KEYS);
 }
 
 void entry_scroll(struct entry *e, int up) {
@@ -83,64 +83,98 @@ char entry_around(const struct entry *e, int offset) {
 	return e->set[at];
 }
 
-// 1 if the keyboard's key at is of the set, to be shown and taken
-int entry_key_is_open(const struct entry *e, int at) {
-	return memchr(e->set, ENTRY_KEYBOARD[at], (size_t)e->set_length) != NULL;
+// the layers, row by row
+static const char *const layers[ENTRY_LAYERS] = {
+	"abcdefghijk" "lmnopqrstuv" "wxyz .,-/@?" "0123456789!",
+	"ABCDEFGHIJK" "LMNOPQRSTUV" "WXYZ .,-/@?" "0123456789!",
+	"!\"#$%&'()*+" ",-./:;<=>?@" "[\\]^_`{|}~ " "0123456789 ",
+};
+
+const char *entry_keyboard(int layer) {
+	return layers[layer];
 }
 
-// by keys along, -1 or 1, on past those not of the set
-void entry_key_move(struct entry *e, int by) {
-	int i;
-
-	for (i = 0; i < ENTRY_KEYS; i++) {
-		e->key_at = (e->key_at + by + ENTRY_KEYS) % ENTRY_KEYS;
-		if (entry_key_is_open(e, e->key_at))
-			return;
-	}
+static int layer_of(int at) {
+	return at / ENTRY_KEYS;
 }
 
-// a row down, by 1, or up, by -1, and on past a key not of the set
-void entry_key_row(struct entry *e, int by) {
-	int i;
-
-	for (i = 0; i < ENTRY_KEYBOARD_ROWS; i++) {
-		e->key_at = (e->key_at + by * ENTRY_KEYBOARD_ACROSS + ENTRY_KEYS) % ENTRY_KEYS;
-		if (entry_key_is_open(e, e->key_at))
-			return;
-	}
+// the key at, a place on the strip, layer by layer
+char entry_key_at(const struct entry *e, int at) {
+	(void)e;
+	return layers[layer_of(at)][at % ENTRY_KEYS];
 }
 
 char entry_key(const struct entry *e) {
-	return ENTRY_KEYBOARD[e->key_at];
+	return entry_key_at(e, e->key_at);
 }
 
-// the chosen key added to the text: 1 if it was, 0 with the text full or
-// the key not of the set
+static int of_set(const struct entry *e, char c) {
+	return memchr(e->set, c, (size_t)e->set_length) != NULL;
+}
+
+// 1 if layer has a character of the set that neither other layer has
+static int layer_adds(const struct entry *e, int layer) {
+	const char *k;
+	int other;
+
+	for (k = layers[layer]; *k; k++) {
+		int is_elsewhere = 0;
+
+		if (!of_set(e, *k))
+			continue;
+		for (other = 0; other < ENTRY_LAYERS; other++)
+			if (other != layer && strchr(layers[other], *k) != NULL)
+				is_elsewhere = 1;
+		if (!is_elsewhere)
+			return 1;
+	}
+	return 0;
+}
+
+// 1 if layer is gone through: it adds to the set, or, with none that
+// does, it is the capitals
+int entry_layer_is_open(const struct entry *e, int layer) {
+	int any = 0;
+	int i;
+
+	for (i = 0; i < ENTRY_LAYERS; i++)
+		any |= layer_adds(e, i);
+	return any ? layer_adds(e, layer) : layer == ENTRY_UPPER;
+}
+
+// 1 if the key at, a place on the strip, is to be shown and may be chosen
+int entry_key_is_open(const struct entry *e, int at) {
+	return entry_layer_is_open(e, layer_of(at)) && of_set(e, entry_key_at(e, at));
+}
+
+// what a key shows, if not its character: the space
+const char *entry_key_label(char key) {
+	return key == ' ' ? "sp" : NULL;
+}
+
+// along the strip by -1 or 1, round its ends, on past keys not open
+void entry_key_move(struct entry *e, int by) {
+	int all = ENTRY_LAYERS * ENTRY_KEYS;
+	int i;
+
+	for (i = 0; i < all; i++) {
+		e->key_at = (e->key_at + by + all) % all;
+		if (entry_key_is_open(e, e->key_at))
+			return;
+	}
+}
+
+// the chosen on the first open key of the strip from at
+static void settle_on_open(struct entry *e, int at) {
+	e->key_at = at - 1;
+	if (e->key_at < 0)
+		e->key_at += ENTRY_LAYERS * ENTRY_KEYS;
+	entry_key_move(e, 1);
+}
+
+// the chosen key typed: 1 if it was, 0 with the text full or it not open
 int entry_key_take(struct entry *e) {
 	if (!entry_key_is_open(e, e->key_at))
 		return 0;
 	return entry_put(e, entry_key(e));
-}
-
-// the chosen key moved to at now: it is typed once it has been left
-// ENTRY_KEY_SETTLE_MS
-void entry_key_moved(struct entry *e, long now) {
-	e->is_key_pending = 1;
-	e->key_moved_ms = now;
-}
-
-// the key moved to is not to be typed
-void entry_key_cancel(struct entry *e) {
-	e->is_key_pending = 0;
-}
-
-// the key moved to typed, if it has been left long enough or is_now:
-// 1 if it was
-int entry_key_settle(struct entry *e, long now, int is_now) {
-	if (!e->is_key_pending)
-		return 0;
-	if (!is_now && now - e->key_moved_ms < ENTRY_KEY_SETTLE_MS)
-		return 0;
-	e->is_key_pending = 0;
-	return entry_key_take(e);
 }

@@ -208,13 +208,16 @@
 #define CODE_Y 30
 // the keyboard's: a key's width, its rows' tops and pitch, the last row's
 // foot clear of the help
-#define KEY_PITCH 12
+#define KEY_PITCH 11
 #define KEYS_Y 14
 #define KEY_ROW_PITCH 10
 #define LETTER_EDGE 2
 #define WPM_STEP 1
 #define HELP_EVERY_MS 2000
 #define JOIN_SHOWN_MS 20000
+#define JOIN_FAILED_MS 6000
+// a network heard weaker than this, in dBm, may not hear the talkie
+#define WEAK_RSSI -75
 
 #define PAGE_HOME 0
 #define PAGE_MENU 1
@@ -241,6 +244,7 @@
 #define PAGE_UPDATE 29
 #define PAGE_UPDATE_GITHUB 30
 #define PAGE_UPDATE_LOCAL 31
+#define PAGE_WIFI_KEY 32
 // the sidetone heard at each step of its level
 #define SIDETONE_STEP_MS 250
 // a word on the entry page, why the text was not kept, shown this long
@@ -340,6 +344,10 @@ static const struct choices *choices_of(int on_page);
 static int marked;
 
 static long drawn_ms;
+// OK or CANCEL, from the keyboard, shown on its own for FLASH_MS
+static const char *flashed;
+static long flashed_ms;
+#define FLASH_MS 800
 static long save_ms;
 static int is_save_due;
 static long menu_down_ms;   // MENU went down on the home page, or 0
@@ -364,11 +372,10 @@ static const char *entry_help[] = {
 #define ENTRY_HELPS ((int)(sizeof(entry_help) / sizeof(entry_help[0])))
 
 static const char *keyboard_help[] = {
-	"UP/DOWN: ALONG",
-	"ENTER/MENU: ROW UP/DN",
-	"STOP: IT IS TYPED",
-	"HOLD DOWN: DELETE",
-	"HOLD ENTER: DONE",
+	"UP/DOWN: CHOOSE",
+	"ENTER: TYPE IT",
+	"MENU: DELETE",
+	"HOLD ENTER: OK",
 	"HOLD MENU: CANCEL",
 };
 
@@ -377,7 +384,6 @@ static const char *keyboard_help[] = {
 static const char *wifi_help[] = {
 	"ENTER: JOIN",
 	"HOLD ENTER: NEW KEY",
-	"NEW KEYS: AT SETUP",
 	"*: REMEMBERED",
 	"MENU: BACK",
 };
@@ -387,6 +393,10 @@ static const char *wifi_help[] = {
 static int wifi_chosen;
 static int wifi_top;
 static char wifi_ssid[SETTINGS_SSID_ROOM];
+// the key last tried on wifi_ssid, to be edited if it did not join, and
+// the signal the network was heard at in the scan
+static char wifi_key[SETTINGS_PASSWORD_ROOM];
+static int wifi_rssi;
 static long joining_since_ms;
 // the target opened, a slot or SETTINGS_TARGET_CONTACT + a contact's
 // place, for its menu and the pages it opens; and where its menu was
@@ -453,6 +463,7 @@ static void save_soon(long now) {
 
 static int is_entering(int on_page) {
 	return on_page == PAGE_CALLSIGN || on_page == PAGE_CONTACT
+		|| on_page == PAGE_WIFI_KEY
 		|| (on_page == PAGE_TEXT && is_text_sending);
 }
 
@@ -462,6 +473,8 @@ static int entered_from(int on_page) {
 		return PAGE_TARGET;
 	if (on_page == PAGE_TEXT)
 		return PAGE_TARGET;
+	if (on_page == PAGE_WIFI_KEY)
+		return PAGE_WIFI;
 	return PAGE_MENU;
 }
 
@@ -552,6 +565,10 @@ static void go(int to) {
 	}
 	if (to == PAGE_TEXT || to == PAGE_HOME)
 		entry_begin(&entry, ENTRY_ANY, "", TEXT_WORD_ROOM - 1);
+	// from a join that failed, the key that was tried, to be put right
+	if (to == PAGE_WIFI_KEY)
+		entry_begin(&entry, ENTRY_ANY, page == PAGE_WIFI_JOINING ? wifi_key : "",
+			SETTINGS_PASSWORD_ROOM - 1);
 	if (to == PAGE_TEXT && page != PAGE_TEXT) {
 		text_back = 0;
 		was_ptt_key = ptt_key_is_down();
@@ -887,27 +904,30 @@ static void take_menu(const struct key_press *press) {
 static void join(const char *password, long now) {
 	snprintf(settings.ssid, sizeof(settings.ssid), "%s", wifi_ssid);
 	snprintf(settings.password, sizeof(settings.password), "%s", password);
+	snprintf(wifi_key, sizeof(wifi_key), "%s", password);
 	settings_save();
+	network_watch(wifi_ssid);
 	network_join();
 	joining_since_ms = now;
 	go(PAGE_WIFI_JOINING);
 }
 
 // a network chosen from the list: joined if it is open or remembered; if
-// not, or if is_new_key, SETUP is opened for its key to be entered there
+// not, or if is_new_key, its key entered on the keyboard (PAGE_WIFI_KEY)
 static void pick(int i, int is_new_key, long now) {
 	int rssi;
 	int is_open;
 	int known;
 
 	network_scanned(i, wifi_ssid, sizeof(wifi_ssid), &rssi, &is_open);
+	wifi_rssi = rssi;
 	known = known_find(&settings, wifi_ssid);
 	if (is_open)
 		join("", now);
 	else if (known >= 0 && !is_new_key)
 		join(settings.known_password[known], now);
 	else
-		go(PAGE_SETUP);
+		go(PAGE_WIFI_KEY);
 }
 
 static void take_wifi(const struct key_press *press, long now) {
@@ -1006,6 +1026,10 @@ static void send_entry(long now) {
 // ENTER pressed on a page of text entry, no letter being chosen: the text
 // is kept
 static void accept(long now) {
+	if (page == PAGE_WIFI_KEY) {
+		join(entry.text, now);
+		return;
+	}
 	while (entry.length > 0 && entry.text[entry.length - 1] == ' ')
 		entry_delete(&entry);
 	if (page == PAGE_CONTACT && !contact_keep(now))
@@ -1023,37 +1047,58 @@ static void accept(long now) {
 	go(entered_from(page));
 }
 
-// the keyboard: UP and DOWN go along it, ENTER a row up and MENU a row
-// down, and the key moved to is typed once it is left (screen_poll()).
-// DOWN held takes characters off, one and then one more each
-// BUTTON_HELD_EVERY_MS; ENTER held types the key moved to, if it is not
-// yet, and keeps the text; MENU held (in take()) leaves it unkept. DOWN,
-// ENTER and MENU are holding keys while the keyboard is up, so each moves
-// as it comes up, and DOWN does not repeat (screen_poll())
-static void take_keyboard(const struct key_press *press, long now) {
-	if (press->key == KEY_UP) {
+// MENU held on the keyboard: the text left as it was; on the Text page the
+// word dropped and back to reading
+static void abandon(void) {
+	if (page == PAGE_TEXT) {
+		is_text_sending = 0;
+		entry_begin(&entry, ENTRY_ANY, "", TEXT_WORD_ROOM - 1);
+		drawn_ms -= DRAW_EVERY_MS;
+		return;
+	}
+	go(entered_from(page));
+}
+
+// the keyboard: UP and DOWN go back and on along the strip of its three
+// layers, round its ends; ENTER types the chosen key, MENU takes the last
+// character off; ENTER held is ENTRY_OK, MENU held ENTRY_CANCEL. ENTER and
+// MENU are holding keys while the keyboard is up, so each acts as it comes
+// up (screen_poll())
+static int keyboard_key(const struct key_press *press) {
+	int is_short = press->what == BUTTON_PRESSED;
+
+	if (press->key == KEY_UP)
 		entry_key_move(&entry, -1);
-		entry_key_moved(&entry, now);
-	}
-	if (press->key == KEY_DOWN && press->what == BUTTON_PRESSED) {
+	if (press->key == KEY_DOWN)
 		entry_key_move(&entry, 1);
-		entry_key_moved(&entry, now);
-	}
-	if (press->key == KEY_DOWN && press->what != BUTTON_PRESSED) {
-		entry_key_cancel(&entry);
+	if (press->key == KEY_ENTER && is_short)
+		entry_key_take(&entry);
+	if (press->key == KEY_MENU && is_short)
 		entry_delete(&entry);
-	}
-	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED) {
-		entry_key_row(&entry, 1);
-		entry_key_moved(&entry, now);
-	}
-	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED) {
-		entry_key_row(&entry, -1);
-		entry_key_moved(&entry, now);
-	}
-	if (press->key == KEY_ENTER && press->what == BUTTON_HELD) {
-		entry_key_settle(&entry, now, 1);
+	if (press->key == KEY_ENTER && press->what == BUTTON_HELD)
+		return ENTRY_OK;
+	if (press->key == KEY_MENU && press->what == BUTTON_HELD)
+		return ENTRY_CANCEL;
+	return ENTRY_GOING;
+}
+
+// the keyboard's ENTRY_OK keeps the text, its ENTRY_CANCEL leaves it
+static void take_keyboard(const struct key_press *press, long now) {
+	int said = keyboard_key(press);
+
+	if (said == ENTRY_OK) {
 		accept(now);
+		// not if it was not kept, entry_said saying why
+		if (entry_said == NULL || entry_said_ms != now)
+			flashed = "OK";
+	}
+	if (said == ENTRY_CANCEL) {
+		abandon();
+		flashed = "CANCEL";
+	}
+	if (said != ENTRY_GOING) {
+		flashed_ms = now;
+		drawn_ms = now - DRAW_EVERY_MS;
 	}
 }
 
@@ -1193,9 +1238,15 @@ static void take_page(const struct key_press *press, long now) {
 		go(PAGE_MENU);
 }
 
+static int join_failed(long now);
+
 static void take(const struct key_press *press, long now) {
 	say_key(press);
 	touched_ms = now;
+	if (is_entering(page) && !settings.is_morse_typing) {
+		take_keyboard(press, now);
+		return;
+	}
 	if (press->key == KEY_MENU && press->what == BUTTON_HELD) {
 		go(PAGE_HOME);
 		return;
@@ -1206,6 +1257,11 @@ static void take(const struct key_press *press, long now) {
 	}
 	if (page == PAGE_WIFI) {
 		take_wifi(press, now);
+		return;
+	}
+	if (page == PAGE_WIFI_JOINING && press->key == KEY_ENTER
+			&& press->what == BUTTON_PRESSED && join_failed(now)) {
+		go(PAGE_WIFI_KEY);
 		return;
 	}
 	if (page == PAGE_CONTACT_DELETE) {
@@ -1543,32 +1599,36 @@ static void entry_help_now(const char *const *helps, int count, long now) {
 		help(helps[now / HELP_EVERY_MS % count]);
 }
 
-// the text's end and a cursor, or the key moved to and not yet typed, and
-// under it the keyboard, the chosen key in reverse video and those not of
-// the set left out; no title, for room, but the heading in the text's place while it is empty
+// the text's end and a cursor, and under it the chosen key's layer, the
+// chosen key in reverse video and those not open left out; no title, for
+// room, but the heading in the text's place while it is empty
 static void draw_keyboard(const char *heading, long now) {
 	char text[TEXT_ROOM];
 	int shown = entry.length;
 	int left = (DISPLAY_WIDE - ENTRY_KEYBOARD_ACROSS * KEY_PITCH) / 2;
+	int first = entry.key_at - entry.key_at % ENTRY_KEYS;
 	int at;
 
-	snprintf(text, sizeof(text), "%s%c", entry.text,
-		entry.is_key_pending && entry.length < entry.most ? entry_key(&entry) : '_');
+	snprintf(text, sizeof(text), "%s_", entry.text);
 	while (shown > 0 && display_text_wide(text + entry.length - shown, 1) > DISPLAY_WIDE)
 		shown--;
-	// the heading in the text's place, while there is none
-	if (entry.length == 0 && !entry.is_key_pending)
+	if (entry.length == 0)
 		display_text_at(0, 0, 1, heading);
 	else
 		display_text_at(0, 0, 1, text + entry.length - shown);
 	rule(RULE_Y);
-	for (at = 0; at < ENTRY_KEYS; at++) {
+	for (at = first; at < first + ENTRY_KEYS; at++) {
 		int x = left + at % ENTRY_KEYBOARD_ACROSS * KEY_PITCH;
-		int y = KEYS_Y + at / ENTRY_KEYBOARD_ACROSS * KEY_ROW_PITCH;
+		int y = KEYS_Y + at % ENTRY_KEYS / ENTRY_KEYBOARD_ACROSS * KEY_ROW_PITCH;
+		char key = entry_key_at(&entry, at);
+		const char *label = entry_key_label(key);
 
 		if (!entry_key_is_open(&entry, at))
 			continue;
-		display_letter_at(x + (KEY_PITCH - FONT_WIDE) / 2, y, 1, ENTRY_KEYBOARD[at]);
+		if (label != NULL)
+			display_small_at(x + (KEY_PITCH - display_small_wide(label)) / 2, y, label);
+		else
+			display_letter_at(x + (KEY_PITCH - FONT_WIDE) / 2, y, 1, key);
 		if (at == entry.key_at)
 			display_invert(x, y - LETTER_EDGE, KEY_PITCH - 1, FONT_HIGH + 2 * LETTER_EDGE);
 	}
@@ -1622,23 +1682,91 @@ static void draw_wifi(long now) {
 	help(wifi_help[now / HELP_EVERY_MS % WIFI_HELPS]);
 }
 
-static void draw_joining(long now) {
+// why a join failed, in two lines, from the driver's reason
+// (esp_wifi_types.h's wifi_err_reason_t) and the signal: the key's
+// handshake not finished is a wrong key, or, heard weakly, perhaps frames
+// lost on the way (network.c's TX_POWER)
+static void why_not(int reason, int rssi, const char **a, const char **b) {
+	int is_weak = rssi != 0 && rssi < WEAK_RSSI;
+
+	*b = "";
+	if (reason == 15 || reason == 204 || reason == 23) {
+		*a = is_weak ? "Key not taken: weak" : "The key is wrong.";
+		*b = is_weak ? "signal, or wrong key" : "ENTER to put it right";
+	} else if (reason == 2 || reason == 4 || reason == 200 || reason == 205) {
+		*a = "No answer from it:";
+		*b = "too far from it?";
+	} else if (reason == 201) {
+		*a = "Not heard: out of";
+		*b = "range, or it is off";
+	} else if (reason == 202 || reason == 203) {
+		*a = "It turned the";
+		*b = "talkie away.";
+	} else if (reason == 210 || reason == 211) {
+		*a = "Its security is";
+		*b = "not one we can do.";
+	} else if (reason != 0) {
+		*a = "Not joined:";
+		*b = "the driver said";
+	} else {
+		*a = "Not joined.";
+		*b = is_weak ? "The signal is weak." : "Is the key right?";
+	}
+}
+
+// joining the network chosen; joined, with its address; or, once it has
+// failed (a failure heard and JOIN_FAILED_MS gone, or JOIN_SHOWN_MS), why,
+// and the signal, for the key to be edited with ENTER
+static int join_failed(long now) {
+	int rssi;
 	char text[TEXT_ROOM];
 
+	network_ssid(text, sizeof(text));
+	if (network_is_up() && !strcmp(text, wifi_ssid))
+		return 0;
+	if (now - joining_since_ms >= JOIN_SHOWN_MS)
+		return 1;
+	return network_failure(wifi_ssid, &rssi) != 0 && now - joining_since_ms >= JOIN_FAILED_MS;
+}
+
+static void draw_joining(long now) {
+	char text[TEXT_ROOM];
+	const char *a;
+	const char *b;
+	int rssi = 0;
+	int reason = network_failure(wifi_ssid, &rssi);
+
+	if (rssi == 0)
+		rssi = wifi_rssi;
 	title("WiFi");
-	line(0, wifi_ssid);
+	snprintf(text, sizeof(text), "%s", wifi_ssid);
+	fit(text, DISPLAY_WIDE);
+	line(0, text);
 	network_ssid(text, sizeof(text));
 	if (network_is_up() && !strcmp(text, wifi_ssid)) {
 		line(1, "Joined");
 		network_address(text, sizeof(text));
 		line(2, text);
-	} else if (now - joining_since_ms < JOIN_SHOWN_MS) {
-		line(1, "Joining...");
-	} else {
-		line(1, "Not joined.");
-		line(2, "Is the key right?");
+		help("MENU: BACK");
+		return;
 	}
-	help("MENU: BACK");
+	if (!join_failed(now)) {
+		line(1, "Joining...");
+		help("MENU: BACK");
+		return;
+	}
+	why_not(reason, rssi, &a, &b);
+	if (reason > 0 && !strcmp(b, "the driver said"))
+		snprintf(text, sizeof(text), "reason %d", reason);
+	else
+		snprintf(text, sizeof(text), "%s", b);
+	line(1, a);
+	line(2, text);
+	if (rssi != 0) {
+		snprintf(text, sizeof(text), "Signal %d dBm%s", rssi, rssi < WEAK_RSSI ? ", weak" : "");
+		line(3, text);
+	}
+	help(now / HELP_EVERY_MS % 2 ? "MENU: BACK" : "ENTER: EDIT THE KEY");
 }
 
 // new firmware coming in from the portal (update.cpp): how far, on a
@@ -1999,6 +2127,11 @@ static void draw(long now) {
 	char text[TEXT_ROOM];
 
 	display_clear();
+	if (flashed != NULL && now - flashed_ms < FLASH_MS) {
+		big(flashed, (DISPLAY_HIGH - FONT_MAIN_HIGH * BIG_SCALE) / 2);
+		return;
+	}
+	flashed = NULL;
 	if (page == PAGE_HOME)
 		draw_home();
 	if (page == PAGE_MENU)
@@ -2042,6 +2175,13 @@ static void draw(long now) {
 		draw_text(now);
 	if (page == PAGE_WIFI)
 		draw_wifi(now);
+	if (page == PAGE_WIFI_KEY) {
+		char prompt[TEXT_ROOM + SETTINGS_SSID_ROOM];
+
+		snprintf(prompt, sizeof(prompt), "Enter Key for %s", wifi_ssid);
+		fit(prompt, DISPLAY_WIDE);
+		draw_entry(prompt, now);
+	}
 	if (page == PAGE_WIFI_JOINING)
 		draw_joining(now);
 	if (page == PAGE_SETUP || page == PAGE_UPDATE_LOCAL)
@@ -2076,8 +2216,11 @@ void screen_poll(long now) {
 		menu_down_ms = 0;
 	}
 
-	keys_set_kind(KEY_DOWN, is_entering(page) && !settings.is_morse_typing
-		? BUTTON_HOLDING_REPEATING : BUTTON_REPEATING);
+	{
+		int is_kb = is_entering(page) && !settings.is_morse_typing;
+
+		keys_set_kind(KEY_ENTER, is_kb ? BUTTON_HOLDING : BUTTON_HOLDING_REPEATING);
+	}
 	if (keys_poll(now, &press))
 		take(&press, now);
 	if (portal_joined(wifi_ssid, sizeof(wifi_ssid))) {
@@ -2085,12 +2228,6 @@ void screen_poll(long now) {
 		touched_ms = now;
 		go(PAGE_WIFI_JOINING);
 	}
-	// the keyboard's key moved to typed once it is left, and not while a
-	// key is down, DOWN perhaps held to delete
-	if (is_entering(page) && !settings.is_morse_typing
-			&& !keys_is_down(KEY_UP) && !keys_is_down(KEY_DOWN)
-			&& !keys_is_down(KEY_MENU) && !keys_is_down(KEY_ENTER))
-		entry_key_settle(&entry, now, 0);
 	// the PTT key, on the Text page, turns between reading and sending
 	if (page == PAGE_TEXT) {
 		int is_key = ptt_key_is_down();

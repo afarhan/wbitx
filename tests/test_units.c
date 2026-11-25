@@ -392,53 +392,45 @@ static void test_entry(void) {
 
 static void test_keyboard(void) {
 	struct entry e;
+	int layer, i;
+	char seen[128] = {0};
 
-	expect((int)strlen(ENTRY_KEYBOARD) == ENTRY_KEYS, "the keyboard has all its keys");
-	entry_begin(&e, ENTRY_CALLSIGN, "", SETTINGS_CALLSIGN_ROOM - 1);
-	expect(entry_key(&e) == 'Q', "the keyboard starts at Q");
-	entry_key_move(&e, -1);
-	expect(entry_key(&e) == '0', "back from a row's start goes to the row above's end");
-	entry_key_move(&e, 1);
-	entry_key_row(&e, 1);
-	entry_key_row(&e, 1);
-	expect(entry_key(&e) == 'Z', "a row down, and down again");
-	entry_key_row(&e, 1);
-	expect(entry_key(&e) == '1', "down from the bottom goes round to the top");
-	entry_key_take(&e);
-	expect(!strcmp(e.text, "1"), "the chosen key is typed");
-	e.key_at = 19;	/* P */
-	entry_key_row(&e, 1);
-	expect(entry_key(&e) == '0', "keys not of the set, the comma and question mark, are passed over going down");
-	e.key_at = 36;	/* M */
-	entry_key_move(&e, 1);
-	expect(entry_key(&e) == '/', "the stop is passed over along, the stroke is of a callsign's set");
-	entry_key_move(&e, 1);
-	expect(entry_key(&e) == '1', "on from the last open key goes round to the first");
-	expect(entry_key_take(&e) && !strcmp(e.text, "11"), "typed again");
-	e.key_at = 37;	/* . */
-	expect(!entry_key_take(&e) && !strcmp(e.text, "11"), "a key not of the set types nothing");
-	e.key_at = ENTRY_KEY_FIRST;
-	entry_key_row(&e, -1);
-	expect(entry_key(&e) == '1', "a row up");
-	entry_key_row(&e, -1);
-	expect(entry_key(&e) == 'Z', "up from the top goes round to the bottom");
-	entry_begin(&e, ENTRY_CALLSIGN, "", 8);
-	entry_key_move(&e, 1);
-	entry_key_moved(&e, 1000);
-	expect(!entry_key_settle(&e, 1000 + ENTRY_KEY_SETTLE_MS - 1, 0) && e.length == 0,
-		"a key moved to is not typed while it is still being moved");
-	expect(entry_key_settle(&e, 1000 + ENTRY_KEY_SETTLE_MS, 0) && !strcmp(e.text, "W"),
-		"a key moved to is typed once it is left");
-	expect(!entry_key_settle(&e, 9000, 0) && !strcmp(e.text, "W"), "and only once");
-	entry_key_moved(&e, 9000);
-	expect(entry_key_settle(&e, 9000, 1) && !strcmp(e.text, "WW"), "or at once, when asked");
-	entry_key_moved(&e, 9000);
-	entry_key_cancel(&e);
-	expect(!entry_key_settle(&e, 99000, 0) && !strcmp(e.text, "WW"), "a key moved to, cancelled, is not typed");
+	for (layer = 0; layer < ENTRY_LAYERS; layer++) {
+		expect((int)strlen(entry_keyboard(layer)) == ENTRY_KEYS, "each layer has all its keys");
+		for (i = 0; i < ENTRY_KEYS; i++)
+			seen[(int)entry_keyboard(layer)[i]] = 1;
+	}
+	for (i = ' '; i <= '~'; i++)
+		expect(seen[i], "every printable character is on a layer");
 	entry_begin(&e, ENTRY_ANY, "", 8);
-	e.key_at = 29;
-	expect(entry_key_take(&e) && !strcmp(e.text, ","), "the comma is of the whole set");
-	printf("keyboard: along, down and up, round, passed over, typed when left\n");
+	expect(entry_key(&e) == 'a', "the keyboard starts at a");
+	entry_key_move(&e, -1);
+	expect(entry_key_at(&e, e.key_at) == ' ' && e.key_at == 3 * ENTRY_KEYS - 1,
+		"back from the first goes round to the symbols' last");
+	entry_key_move(&e, 1);
+	for (i = 0; i < ENTRY_KEYBOARD_ACROSS; i++)
+		entry_key_move(&e, 1);
+	expect(entry_key(&e) == 'l', "on from a row's end to the next row's start");
+	e.key_at = ENTRY_KEYS - 1;
+	entry_key_move(&e, 1);
+	expect(entry_key(&e) == 'A', "on from the small letters' last to the capitals' first");
+	expect(entry_key_take(&e) && !strcmp(e.text, "A"), "the chosen is typed");
+	e.key_at = 2 * ENTRY_KEYS + 2;
+	expect(entry_key_take(&e) && !strcmp(e.text, "A#"), "a symbol typed");
+	expect(entry_delete(&e) && !strcmp(e.text, "A"), "and taken off");
+	entry_begin(&e, ENTRY_CALLSIGN, "", SETTINGS_CALLSIGN_ROOM - 1);
+	expect(!entry_layer_is_open(&e, ENTRY_LOWER) && entry_layer_is_open(&e, ENTRY_UPPER)
+		&& !entry_layer_is_open(&e, ENTRY_SYMBOLS), "a callsign's is all on the capitals");
+	expect(entry_key(&e) == 'A', "a callsign starts at A");
+	e.key_at = ENTRY_KEYS + 2 * ENTRY_KEYBOARD_ACROSS + 3;	/* Z */
+	entry_key_move(&e, 1);
+	expect(entry_key(&e) == '/', "the space, stop, comma and dash are passed over");
+	e.key_at = ENTRY_KEYS + ENTRY_KEYS - 2;	/* 9 */
+	entry_key_move(&e, 1);
+	expect(entry_key(&e) == 'A', "on past a callsign's last goes round to A");
+	entry_key_move(&e, -1);
+	expect(entry_key(&e) == '9', "and back");
+	printf("entry: the keyboard's three layers as one strip, a callsign's on the capitals\n");
 }
 
 #define KEYED_WPM 12

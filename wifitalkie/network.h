@@ -19,6 +19,8 @@ int network_scanned_count(void);
 void network_scanned(int i, char *ssid, int room, int *rssi, int *is_open);
 void network_ssid(char *text, int room);
 void network_trying(char *text, int room);
+int network_failure(const char *ssid, int *rssi);
+void network_watch(const char *ssid);
 void network_local(int is_on);
 void network_off(void);
 void network_on(void);

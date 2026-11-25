@@ -119,6 +119,11 @@ static char trying[SETTINGS_SSID_ROOM];
 // change of reason, so that a join tried over and over does not fill the
 // console
 static int is_off;
+// the last failure of a join of failed_ssid, its reason and the signal it
+// was heard at, for the screen; network_failure()
+static char failed_ssid[SETTINGS_SSID_ROOM];
+static volatile int failed_reason;
+static volatile int failed_rssi;
 
 static void on_lost(arduino_event_id_t event, arduino_event_info_t info) {
 	int reason = info.wifi_sta_disconnected.reason;
@@ -126,6 +131,12 @@ static void on_lost(arduino_event_id_t event, arduino_event_info_t info) {
 	(void)event;
 	if (reason == REASON_NOT_HEARD)
 		is_not_heard = 1;
+	if (info.wifi_sta_disconnected.ssid_len == strlen(failed_ssid)
+			&& !memcmp(info.wifi_sta_disconnected.ssid, failed_ssid, strlen(failed_ssid))
+			&& reason != WIFI_REASON_ASSOC_LEAVE) {
+		failed_rssi = info.wifi_sta_disconnected.rssi;
+		failed_reason = reason;
+	}
 	if (reason == reason_said)
 		return;
 	reason_said = reason;
@@ -202,6 +213,22 @@ static void begin(const char *ssid, const char *password) {
 		console_say("WIFI JOINING %s", ssid);
 	else
 		console_say("WIFI %s NOT BEGUN: THE DRIVER WOULD NOT LET GO", ssid);
+}
+
+// why the join of ssid, begun with network_watch(), last failed: the
+// driver's reason, 0 for none yet, and the signal it was heard at
+int network_failure(const char *ssid, int *rssi) {
+	if (strcmp(ssid, failed_ssid))
+		return 0;
+	*rssi = failed_rssi;
+	return failed_reason;
+}
+
+// ssid's failures kept from now, for network_failure()
+void network_watch(const char *ssid) {
+	failed_reason = 0;
+	failed_rssi = 0;
+	snprintf(failed_ssid, sizeof(failed_ssid), "%s", ssid);
 }
 
 // the network set, from the start of the turn of those remembered
