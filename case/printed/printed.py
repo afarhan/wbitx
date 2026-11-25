@@ -65,7 +65,8 @@ FACE_R = 1.0        # the front face's and the back's outer edges
 CORNER = 3.0        # the outside's corners seen from the front
 IN_CORNER = 1.0
 CLR = 0.4           # board to the walls
-INNER_H = 23.0      # floor to the face's inside (the user's, 2026-11-23): the holder, the speaker's rim over it
+INNER_H = 20.7      # floor to the face's inside (the user's, 2026-11-24: thinned, the speaker beside the cell): the cell's top 20.35, 0.35 under the face
+assert INNER_H >= 20.35 + 0.3, "the cell reaches the face"
 D = BACK + INNER_H + FACE   # the thickness
 
 # ---------------------------------------------------------------- board
@@ -128,11 +129,12 @@ JACK_V = uv("J4")[1]
 JACK_UP, JACK_HOLE = 2.5, 6.5
 USB_U = uv("U1")[0]
 USB_UP, USB_W, USB_H = 2.6, 9.5, 4.2
+USB_FIX = 0.5       # the hole and its recess toward the PTT's side (the user's print, 2026-11-25: the socket sat off centre)
 KNOB_U = uv("SW_POWER1")[0]
 KNOB_UP, KNOB_W, KNOB_H = 0.75, 4.6, 2.2
 
 # ---------------------------------------------------------- speaker, cell
-SPK_D, SPK_DEEP, SPK_MAGNET = 50.0, 16.0, 31.5
+SPK_D, SPK_DEEP, SPK_MAGNET = 50.0, 16.0, 32.0   # the largest magnet in the group build (the user's)
 SPK_RIM, SPK_CONE = 2.5, 7.5
 SPK_CLR = 0.3
 RIB = 1.2
@@ -158,6 +160,7 @@ GROOVE_W, GROOVE_D = 0.8, 0.5
 
 # screws: M3 self-tapping into plastic
 M3_CLEAR, M3_PILOT, M3_HEAD_D, M3_HEAD_H = 3.4, 2.6, 6.2, 3.0
+M3_TAP = 2.9        # this case's pilots (the user's, 2026-11-25: 2.6 printed too small, the M3 wouldn't thread); wearable2 keeps M3_PILOT
 POST_D, STANDOFF_D, PILOT_SKIN = 6.0, 6.5, 1.0
 BOSS_D, BOSS_SKIN = 10.5, 0.8    # the standoff's foot round the head's pocket
 
@@ -218,7 +221,12 @@ HX0 = WALL + HOLDER_CLR
 HX1 = HX0 + HOLDER_W
 HCX = (HX0 + HX1) / 2
 CELL_R = CELL_D / 2
-CELL_Z = BACK + HOLDER_H - CELL_R
+# the holder on the front, upside down (the user's, 2026-11-24): its base on
+# the face's inside, the cell toward the back; everything goes into the
+# front, then the back drops over it
+HOLDER_ON_FRONT = True
+H_LO, H_HI = ((Z_FACE_IN - HOLDER_H, Z_FACE_IN) if HOLDER_ON_FRONT else (BACK, BACK + HOLDER_H))
+CELL_Z = H_LO + CELL_R if HOLDER_ON_FRONT else H_HI - CELL_R
 
 
 def spk_r(depth):
@@ -252,12 +260,22 @@ def cell_gap():
 # overlaps the holder); the board, the speaker and the PTT keep to the right
 # wall, so the jack and the PTT are where they were; the holder to the left
 WIDEN = 2.0
-OW = math.ceil(BW + CLR + 2 * WALL) + WIDEN
+# the speaker beside the cell, not over it (the user's, 2026-11-24: the group
+# build's speakers have 29 to 32 mm magnets, and not all fitted the overlap)
+SIDE_BY_SIDE = True
+OW = (math.ceil((WALL + HOLDER_CLR + HOLDER_W + 0.4 + 2 * SPK_R + WALL) * 10) / 10 if SIDE_BY_SIDE
+      else math.ceil(BW + CLR + 2 * WALL) + WIDEN)
 IW = OW - 2 * WALL
 
 
+# the board left (the user's, 2026-11-24, asked 2 mm: wearable2's lever, its T
+# head between the plunger and the wall, needs the room); 1.5 is as far as
+# its notch's edge stays clear of the cell's round
+BOARD_SHIFT = -1.5
+
+
 def bx(u):
-    return OW - WALL - CLR - BW + u
+    return OW - WALL - CLR - BW + BOARD_SHIFT + u
 
 
 def by(v):
@@ -273,6 +291,10 @@ HCY = (HY0 + HY1) / 2
 
 SPK_X = OW - WALL - SPK_R
 SPK_Y = OH - WALL - SPK_R
+# beside the holder on the front: the speaker's ring and the holder's ridge
+# both stop square across this band either side of the speaker's axis, where
+# they would meet; past it the ring's outside is 0.3 clear of the ridge
+SPK_BAND = math.sqrt((SPK_R + RIB) ** 2 - (SPK_X - (HX1 + HOLDER_CLR + RIDGE_T + 0.3)) ** 2)
 
 PTT_X, PTT_Y, PTT_Z = bx(BW), by(PTT_V), z_back(PTT_UP)
 
@@ -333,10 +355,14 @@ LEV_IN = OW + LEV_GAP
 # the bar's slot and the claw's cut stop SLOT_SKIN off the back face, 0.2
 # under the lever's back face: the lever rests on them and can't slide off
 # the PTT toward the back (the user's)
+OLD_LEVER = False
 SLOT_SKIN = LEV_Z - 0.2
-assert SLOT_SKIN >= 0.6, "no skin under the lever"
+assert not OLD_LEVER or SLOT_SKIN >= 0.6, "no skin under the lever"
+# the back's: the left one only; wearable2 has none by the PTT (the user's, 2026-11-24)
+BACK_SUPPORTS = None
 SUPPORTS = [(bx(0) + 6.3, bx(0) + 10.3, by(BH) + 19.0, by(BH) + 23.0),
             (bx(BW) - 6.4, bx(BW) - 3.4, by(0) - 3.2, by(0) - 0.8)]
+BACK_SUPPORTS = SUPPORTS[:1]
 assert SUPPORTS[1][1] <= OW - WALL - CLAW_X - CLAW_CLR - CLAW_IN - 0.4, "the post meets the claw's cut"
 PIV = (OW + 5.5, OH - 5.0)
 LEV_END = PTT_Y - 12.0
@@ -344,10 +370,11 @@ LEV_END = PTT_Y - 12.0
 # ------------------------------------------------------------ checks
 assert bx(0) >= WALL + 0.1 - 1e-9
 _dx = bx(NOTCH_U) - CLR - HCX
-assert _dx >= CELL_R or CELL_Z + math.sqrt(CELL_R ** 2 - _dx ** 2) <= Z_BB - 0.3, \
+assert HOLDER_ON_FRONT or _dx >= CELL_R or CELL_Z + math.sqrt(CELL_R ** 2 - _dx ** 2) <= Z_BB - 0.3, \
     "the cell meets the board's edge"
 assert HY0 >= by(NOTCH_V) + 0.3, "the holder meets the board's notch"
-assert H_TOP <= Z_FACE_IN - 0.3, "the holder reaches the face"
+assert H_HI <= Z_FACE_IN - 0.3 or HOLDER_ON_FRONT, "the holder reaches the face"
+assert H_LO >= BACK + 0.3, "the cell reaches the floor"
 assert SPK_Y - SPK_R >= by(0) + 1, "the speaker meets the board"
 assert CAP_Z0 + CAP_FLANGE_T <= Z_FACE_IN - 0.05, "the keytop's flange reaches the face"
 assert COLLAR_H >= 0.25, "no room for the collars"
@@ -436,7 +463,7 @@ def ports():
     zj, zu, zk = z_back(JACK_UP), z_back(USB_UP), z_back(KNOB_UP)
     xr0, xr1 = OW - WALL - 1, OW + 1
     yb0, yb1 = -1, WALL + 1
-    jy, ux, kx = by(JACK_V), bx(USB_U), bx(KNOB_U)
+    jy, ux, kx = by(JACK_V), bx(USB_U) + USB_FIX, bx(KNOB_U)
     bw = BAR_W / 2 + BAR_CLR
     top = Z_SPLIT + 0.01
     return ([(box(xr0, xr1, PTT_Y - bw, PTT_Y + bw, SLOT_SKIN, Z_SPLIT),
@@ -454,7 +481,7 @@ def recesses():
     """Let into the side walls' outside round the jack and the USB-C, so a
     plug reaches its socket through PORT_WALL, not the full wall."""
     jy, zj = by(JACK_V), z_back(JACK_UP)
-    ux, zu = bx(USB_U), z_back(USB_UP)
+    ux, zu = bx(USB_U) + USB_FIX, z_back(USB_UP)
     return (cyl_x(OW - PORT_RECESS, OW + 1, jy, zj, JACK_RECESS_D / 2)
             + hole_y(-1, PORT_RECESS, ux, zu, *USB_RECESS))
 
@@ -470,7 +497,7 @@ def speaker_room():
 
 
 def holder_box(grow=0.0):
-    return box(HX0 - grow, HX1 + grow, HY0 - grow, HY1 + grow, BACK - 0.01, H_TOP + grow)
+    return box(HX0 - grow, HX1 + grow, HY0 - grow, HY1 + grow, H_LO - grow, H_HI + grow)
 
 
 
@@ -487,9 +514,25 @@ def front_shell():
     out = fillet(out.faces().sort_by(Axis.Z)[-1].edges(), FACE_R)
     s = out - inside(Z_SPLIT - 1, ff)
 
+    if HOLDER_ON_FRONT:
+        # the holder's cradle, as the back's was, hanging from the face: a pin
+        # through its base's hole, a ridge round its foot, the stop wall at its
+        # lower end (wires pass under it), cut short over the board
+        g = HOLDER_CLR
+        s += cyl_z(HCX, HCY, PIN_D / 2, ff - PIN_H, ff + 0.5)
+        ridge = (box(HX0 - g - RIDGE_T, HX1 + g + RIDGE_T, HY0 - g - RIDGE_T, HY1 + g + RIDGE_T,
+                     ff - RIDGE_H, ff + 0.5)
+                 - box(HX0 - g, HX1 + g, HY0 - g, HY1 + g, 0, D))
+        stop = box(HX0 - g - RIDGE_T, min(HX1 + g + RIDGE_T, bx(0) - 0.3), HY0 - g - RIDGE_T, HY0 - g,
+                   ff - STOP_H, ff + 0.5)
+        # the ridge clear of the speaker's pocket (no sliver between); below
+        # the seam 0.2 off the back's wall
+        ridge -= box(HX1 + g - 0.01, HX1 + g + RIDGE_T + 1, SPK_Y - SPK_BAND, SPK_Y + SPK_BAND, 0, D + 1)
+        s += (ridge + stop) & (inside(Z_SPLIT, D, 0.5) + inside(0, Z_SPLIT + 0.01, -0.2))
     # the speaker's ring, clear of the holder
     ring = (cyl_z(SPK_X, SPK_Y, SPK_R + RIB, ff - RING_H, ff + 0.5)
-            - box(-1, HX1 + 0.3, -1, OH + 1, 0, D))
+            - (box(-1, SPK_X - 10, SPK_Y - SPK_BAND, SPK_Y + SPK_BAND, 0, D) if HOLDER_ON_FRONT
+               else box(-1, HX1 + 0.3, -1, OH + 1, 0, D) if not SIDE_BY_SIDE else box(-1, 0, -1, 0, 0, 1)))
     s += ring & inside(Z_SPLIT, D, 0.5)
     s -= (cyl_z(SPK_X, SPK_Y, SPK_R, ff - SPK_RIM, ff)
           + cone_z(SPK_X, SPK_Y, SPK_R, SPK_R - (SPK_D - SPK_MAGNET) / 2, ff - SPK_RIM, ff - SPK_CONE)
@@ -512,14 +555,14 @@ def front_shell():
 
     # ---- cuts
     for (x, y, board) in SCREWS:
-        s -= cyl_z(x, y, M3_PILOT / 2, Z_SPLIT - 6, D - PILOT_SKIN)
+        s -= cyl_z(x, y, M3_TAP / 2, Z_SPLIT - 6, D - PILOT_SKIN)
     s -= cyl_z(mx, my, TUBE_ID / 2, Z_BF, ff + 0.01)
     s -= cyl_z(mx, my, MIC_HOLE / 2, ff - 0.1, D + 1)
 
     open_r = SPK_D / 2 - 3.0
     hr = GRILLE_HOLE / 2
     for (x, y) in grille_xy():
-        if any(math.hypot(x - sx, y - sy) < M3_PILOT / 2 + hr + 0.5 for sx, sy, _ in SCREWS):
+        if any(math.hypot(x - sx, y - sy) < M3_TAP / 2 + hr + 0.5 for sx, sy, _ in SCREWS):
             continue
         if (x - SPK_X) ** 2 + (y - SPK_Y) ** 2 <= open_r ** 2:
             s -= cyl_z(x, y, hr, ff - 1, D + 1)
@@ -549,9 +592,15 @@ def front_shell():
         s -= cyl_z(PIV[0], PIV[1], LEV_HOLE / 2, ANCHOR_Z0 - 1, TUBE_TOP + 0.3)
         s -= cyl_z(PIV[0], PIV[1], M3_CLEAR / 2, TUBE_TOP, D + 1)
         s -= cone_z(PIV[0], PIV[1], M3_CLEAR / 2, CSK_D / 2 + 0.01, CSK_Z, D + 0.01)
-    else:
+    elif PADDLE:
         # the paddle's pin, down from the face's inside into a socket on the back
         s += cyl_z(PX, PY, PIN_R, PIN_Z0, Z_FACE_IN + 0.01)
+    else:
+        # wearable2's hinge: the column outside the right wall, hanging from
+        # the face (below the seam only outside the wall), the M3's pilot up it
+        s += ((w_column() & box(0, OW + 30, -20, OH + 20, 0, D))
+              - box(-1, OW, -1, OH + 1, -1, Z_SPLIT + 0.3))
+        s -= cyl_z(W_PIV[0], W_PIV[1], M3_TAP / 2, W_COL_Z - W_COL_R - 1, D - PILOT_SKIN)
     # posts down to the board's front face, opposite the back's supports:
     # the board rests on them while the case is put together (the user's)
     for (x0, x1, y0, y1) in SUPPORTS:
@@ -560,6 +609,7 @@ def front_shell():
         s = s.fuse(pad)
     for cut in snap_cuts():
         s -= cut
+    s = s.fuse(hook_front())
     return s
 
 
@@ -587,19 +637,20 @@ def back_tray():
 
     # the holder: a pin through its base, an outline ridge round its foot,
     # a stop wall at its lower end
-    s += cyl_z(HCX, HCY, PIN_D / 2, floor, BACK + PIN_H)
     g = HOLDER_CLR
+    if not HOLDER_ON_FRONT:
+        s += cyl_z(HCX, HCY, PIN_D / 2, floor, BACK + PIN_H)
     ridge = (box(HX0 - g - RIDGE_T, HX1 + g + RIDGE_T, HY0 - g - RIDGE_T, HY1 + g + RIDGE_T,
                  floor, BACK + RIDGE_H)
              - box(HX0 - g, HX1 + g, HY0 - g, HY1 + g, 0, D))
     stop = box(HX0 - g - RIDGE_T, HX1 + g + RIDGE_T, HY0 - g - RIDGE_T, HY0 - g, floor, BACK + STOP_H)
-    if CRADLE:
+    if CRADLE and not HOLDER_ON_FRONT:
         s += (ridge + stop) & inside(0, D, 0.5)
 
     # posts under the board either side of the display, up to its back face
     # as the standoffs are, so hard typing can't bend it (the user's); on
     # bare board, clear of every part's courtyard
-    for (x0, x1, y0, y1) in SUPPORTS:
+    for (x0, x1, y0, y1) in BACK_SUPPORTS:
         s += box(x0, x1, y0, y1, floor, Z_BB)
 
 
@@ -615,18 +666,28 @@ def back_tray():
         # the floor cut for the claw, open to the back face and the slot
         s -= box(OW - WALL - CLAW_X - CLAW_CLR - CLAW_IN, OW - WALL + 0.01,
                  PTT_Y - CLAW_Y - CLAW_CLR, PTT_Y + CLAW_Y + CLAW_CLR, SLOT_SKIN, LEV_Z + CLAW_Z1 + 0.5)
-    else:
+    elif PADDLE:
         # the paddle's window in the right wall, open up to the seam
         s -= box(OW - WALL - 0.5, OW + 1, PAD_Y0 - WIN_END, PAD_Y1 + WIN_END, PAD_Z0 - PAD_CLR, Z_SPLIT + 1)
         # the pin's socket on the floor
         s += cyl_z(PX, PY, SOCKET_R, BACK - 0.5, SOCKET_TOP)
         s -= cyl_z(PX, PY, PIN_R + PIN_CLR, PIN_Z0 - 1.0, SOCKET_TOP + 1)
+    else:
+        # wearable2's ports() slot: through the wall, open to the back face
+        # and the seam, FLOOR_SLOT into the floor under the bar's rising
+        # underside; wider on the hinge's side for the swing
+        w = W_BAR_W / 2 + W_BAR_CLR
+        sw = W_BAR_TRAVEL * (W_PIV[0] - (OW - WALL - W_FLOOR_SLOT)) / (PTT_Y - W_PIV[1])
+        s -= box(OW - WALL - W_FLOOR_SLOT, OW + 1, PTT_Y - w - sw, PTT_Y + w, -1, Z_SPLIT)
+    if PTT_SUPPORT and not OLD_LEVER:
         # under the PTT's body, so pressing can't push it down off the board
         s += box(PTT_SUP_X0, PTT_SUP_X1, PTT_Y - 2.3, PTT_Y + 2.3, BACK - 0.5, PTT_BODY_Z0 - 0.1)
     for slit in snap_slits():
         s -= slit
     for tab in snap_tabs():
         s = s.fuse(tab)
+    for cut in hook_back_cuts():
+        s -= cut
     return s
 
 
@@ -637,12 +698,14 @@ def back_tray():
 # plunger at rest; a tail at its foot behind the wall under the window is
 # the outward stop. Only the PTT's pad of it reaches up to the plunger: by
 # the diodes (D1, D3 to the board's back face) it stays under them.
-OLD_LEVER = False
+PTT_SUPPORT = False     # none under the PTT, as on wearable2 (the user's, 2026-11-24)
+PADDLE = False          # the inside paddle: the board stopped it closing on the switch (the user's, 2026-11-24)
 AIR = 0.4                                   # the paddle off the plunger at rest
-PAD_PROUD, PAD_CLR, WIN_END = 1.0, 0.3, 0.4  # out of the wall; round it in the window, its ends
+PAD_PROUD, PAD_CLR, WIN_END = 1.0, 0.3, 0.4  # out of the wall at the hinge's end; round it in the window, its ends
+PAD_PROUD_FOOT = 2.5                         # at its foot: the face tilts out, to be seen as the PTT (the user's)
 PAD_X0 = OW - WALL                          # its inner face, on the wall's inside
-PAD_X1 = OW + PAD_PROUD
-assert abs(PAD_X0 - (PTT_X + AIR)) < 1e-6, "the paddle's air gap"
+PAD_X1 = OW + PAD_PROUD_FOOT
+assert not PADDLE or abs(PAD_X0 - (PTT_X + AIR)) < 1e-6, "the paddle's air gap"
 PAD_Y0, PAD_Y1 = 26.4, 47.0                 # along the wall: from under the diodes to over the board's top
 PAD_Z0 = 5.0                                # its foot (on the bed as printed)
 PAD_Z1 = Z_SPLIT - PAD_CLR                  # its top, under the front's wall
@@ -655,25 +718,134 @@ PIN_Z0 = 2.4                                # its tip, in the socket
 SOCKET_R, SOCKET_TOP = PIN_R + PIN_CLR + 1.2, 4.0
 TAIL_W, TAIL_Y = 2.0, 3.0                   # the stop: in from the wall, down past the window
 PTT_BODY_Z0 = Z_BB - 3.3                    # the PTT's body under the board (ASSUMED 3.3, as parts())
-PTT_SUP_X0, PTT_SUP_X1 = bx(BW) - 0.78 - 3.4, bx(BW) - 1.0
+PTT_SUP_X0, PTT_SUP_X1 = bx(BW) - 0.78 - 3.4, bx(BW) - 2.8   # clear of the T head's swing
 
 
 def paddle_lever():
     z0, z1 = PAD_Z0, PAD_Z1
     # the paddle: low inside under the diodes, full height in the wall, and
     # the PTT's pad full height to its inner face
-    s = (box(PAD_X0, PAD_X1, PAD_Y0, PAD_Y1, z0, PAD_LOW)
-         + box(PAD_X0 + PAD_RECESS, PAD_X1, PAD_Y0, PAD_Y1, z0, z1)
-         + box(PAD_X0, PAD_X1, PTT_Y - 2.5, PTT_Y + 2.5, z0, z1))
+    s = (box(PAD_X0, OW, PAD_Y0, PAD_Y1, z0, PAD_LOW)
+         + box(PAD_X0 + PAD_RECESS, OW, PAD_Y0, PAD_Y1, z0, z1)
+         + box(PAD_X0, OW, PTT_Y - 2.5, PTT_Y + 2.5, z0, z1))
+    # the button outside the wall: a wedge, PAD_PROUD at the hinge's end
+    # out to PAD_PROUD_FOOT at the foot
+    s += prism_xy([(OW - 0.01, PAD_Y0), (OW + PAD_PROUD_FOOT, PAD_Y0),
+                   (OW + PAD_PROUD, PAD_Y1), (OW - 0.01, PAD_Y1)], z0, z1)
+    # the foot's outer corner cut back, so it clears the window's end as the
+    # paddle swings in (the window is printed; only the lever is changed)
+    s -= box(PAD_X0 - 0.01, OW + PAD_PROUD_FOOT + 1, PAD_Y0 - 1, PAD_Y0 + 0.4, z0 - 1, z1 + 1)
     # the tail behind the wall under the window: the stop
-    s += (box(PAD_X0 - TAIL_W, PAD_X0, PAD_Y0 - TAIL_Y, PAD_Y0 + 0.6, z0, PAD_LOW)
-          + box(PAD_X0 - TAIL_W, PAD_X0 + 0.01, PAD_Y0 - 0.01, PAD_Y0 + 0.6, z0, PAD_LOW))
+    # (up behind the paddle 3 mm, so their joint is long enough to take the stop)
+    s += (box(PAD_X0 - TAIL_W, PAD_X0, PAD_Y0 - TAIL_Y, PAD_Y0 + 3.0, z0, PAD_LOW)
+          + box(PAD_X0 - TAIL_W, PAD_X0 + 0.01, PAD_Y0 + 0.4, PAD_Y0 + 3.0, z0, PAD_LOW))
     # the arm up to the eye, inside, 0.3 off the wall above the window
     s += box(PX, PAD_X0 + 0.5, PAD_Y1 - 2.4, PAD_Y1, z0, PAD_LOW)
     s += box(PX - EYE_R + 0.5, PAD_X0 - 0.3, PAD_Y1 - 2.4, PY, z0, PAD_LOW)
     s += cyl_z(PX, PY, EYE_R, z0, PAD_LOW)
     s -= cyl_z(PX, PY, PIN_R + PIN_CLR, z0 - 1, PAD_LOW + 1)
     return s
+
+
+# ------------------------------------- wearable2's PTT lever (2026-11-24)
+# The user's: "use what was on wearable2 for the PTT". Its hinge on a column
+# hanging from the front outside the right wall, over the jack; an M3 from
+# the lever's back through it into the column clamps it; a bar through a
+# slot in the back's wall onto the plunger, AIR_GAP off it at rest. Here the
+# board's edge is 0.4 off the wall (wearable2's 4.7), so the T head that is
+# the outward stop can't stand between the plunger and the wall: it is at
+# the bar's foot instead, under the switch, its wings W_HEAD_GAP off the
+# wall's inside. The bar's top W_BAR_UNDER under the board, so the board
+# can't stop it (the user's: it stopped the paddle).
+W_BAR_W, W_BAR_CLR, W_BAR_UNDER = 2.0, 0.3, 0.3     # wearable2's
+W_BAR_TOP = Z_BB - W_BAR_UNDER
+W_PRELOAD = -AIR
+W_HEAD_W, W_HEAD_GAP = 4.0, 0.1
+W_HEAD_T = (OW - WALL - W_HEAD_GAP) - (PTT_X - W_PRELOAD)
+W_FLOOR_SLOT, W_BAR_TRAVEL = 2.3, 1.6
+W_LEV_GAP, W_LEV_T, W_LEV_FLARE = 2.0, 3.0, 2.0
+W_LEV_IN = OW + W_LEV_GAP
+W_COL_R, W_COL_H, W_NECK_W, W_PIV_R = 3.2, 7.0, 3.0, 5.2
+W_COL_Z = D - W_COL_H
+W_COL_TIP = W_COL_Z - W_COL_R + M3_TAP / 2 + 0.8
+W_PIV = (OW + W_PIV_R + 0.4, round(by(JACK_V) + 10.0 / 2 + 0.5 + W_PIV_R, 1))
+W_LEV_TOP = PTT_Y + 4.85                    # as far over the PTT as wearable2's
+W_LEV_CLR, W_NECK_CLR, W_LEV_SCREW = 0.2, 0.3, 3.2
+assert W_HEAD_T >= 1.35, ("the T head", W_HEAD_T)   # wearable2's 1.9; 1.4 here
+assert W_BAR_TOP >= PTT_Z + PTT_PLUNGER / 2, "the bar misses the plunger's top"
+
+
+def w_column(grow=0.0):
+    """wearable2's column(): round from the face down to W_COL_Z, a 45
+    degree point under; its neck to the wall, a 45 degree point too."""
+    r, z = W_COL_R + grow, W_COL_Z - grow
+    c = (cyl_z(W_PIV[0], W_PIV[1], r, z, D + 1)
+         + cone_z(W_PIV[0], W_PIV[1], 0.01, r, z - r, z + 0.01))
+    w = W_NECK_W + 2 * grow
+    x0 = OW - 1.0 - grow
+    neck = (box(x0, W_PIV[0], W_PIV[1] - w / 2, W_PIV[1] + w / 2, z, D + 1)
+            + Pos(x0, W_PIV[1], z) * Rot(45, 0, 0)
+            * Box(W_PIV[0] - x0, w / 2 ** 0.5, w / 2 ** 0.5, align=(Align.MIN, Align.CENTER, Align.CENTER)))
+    if grow == 0.0:
+        # its point cut off flat where the wall round the M3's pilot is 0.8
+        c -= box(W_PIV[0] - 10, W_PIV[0] + 10, W_PIV[1] - 10, W_PIV[1] + 10, -1, W_COL_TIP)
+    return c + neck
+
+
+def w_lever_pocket():
+    """wearable2's: W_LEV_CLR round the column, W_NECK_CLR round its neck
+    swept over the swing."""
+    r, z = W_COL_R + W_LEV_CLR, W_COL_Z - W_LEV_CLR
+    p = (cyl_z(W_PIV[0], W_PIV[1], r, z, D + 1)
+         + cone_z(W_PIV[0], W_PIV[1], 0.01, r, z - r, z + 0.01))
+    g = W_NECK_CLR
+    zn, w, x0 = W_COL_Z - g, W_NECK_W + 2 * g, OW - 1.0 - g
+    neck = (box(x0, W_PIV[0], W_PIV[1] - w / 2, W_PIV[1] + w / 2, zn, D + 1)
+            + Pos(x0, W_PIV[1], zn) * Rot(45, 0, 0)
+            * Box(W_PIV[0] - x0, w / 2 ** 0.5, w / 2 ** 0.5, align=(Align.MIN, Align.CENTER, Align.CENTER)))
+    for a in (-8.0, -6.0, -4.0, -2.0, 0.0, 1.0):
+        p += Pos(W_PIV[0], W_PIV[1], 0) * Rot(0, 0, a) * Pos(-W_PIV[0], -W_PIV[1], 0) * neck
+    return p
+
+
+def w_lever():
+    """wearable2's lever(), printed on its back."""
+    L, T, F = W_LEV_IN, W_LEV_T, W_LEV_FLARE
+    py = W_PIV[1]
+    s = prism_xy([(L, py), (L + T, py), (L + T, py + 3.0), (L + T + F, py + 11.0),
+                  (L + T + F, W_LEV_TOP), (L, W_LEV_TOP)], 0, D)
+    s += cyl_z(W_PIV[0], py, W_PIV_R, 0, D)
+    try:
+        s = fillet(s.edges().filter_by(Axis.Z), 1.5)
+    except Exception:
+        pass
+    s -= w_lever_pocket()
+    s -= cyl_z(W_PIV[0], py, W_LEV_SCREW / 2, -1, D + 1)
+    s -= head_pocket(W_PIV[0], py)
+    # wearable2's bar: from the lever's back face through the wall, inside
+    # it its underside rising at 45 degrees; a 45 degree roof
+    x0 = PTT_X - W_PRELOAD
+    xi = OW - WALL
+    roof = W_BAR_W / 2
+    zt = W_BAR_TOP - roof
+    side = prism_xy([(x0, xi - x0), (xi, 0), (L + 0.5, 0), (L + 0.5, zt), (x0, zt)],
+                    -W_BAR_W / 2, W_BAR_W / 2)
+    bar = Pos(0, PTT_Y, 0) * Rot(90, 0, 0) * side
+    bar = bar.fuse(Pos(x0, PTT_Y, zt) * Rot(45, 0, 0)
+                   * Box(L + 0.5 - x0, W_BAR_W / 2 ** 0.5, W_BAR_W / 2 ** 0.5,
+                         align=(Align.MIN, Align.CENTER, Align.CENTER)))
+    # its T head on the plunger, flat on top; under it 45 degrees in to the bar
+    hz0 = PTT_Z - PTT_PLUNGER / 2 - 0.5
+    hz1 = W_BAR_TOP
+    taper = (W_HEAD_W - W_BAR_W) / 2
+    bar = bar.fuse(box(x0, x0 + W_HEAD_T, PTT_Y - W_HEAD_W / 2, PTT_Y + W_HEAD_W / 2, hz0, hz1))
+    wedge = prism_xy([(-W_HEAD_W / 2, hz0), (W_HEAD_W / 2, hz0), (W_BAR_W / 2, hz0 - taper),
+                      (-W_BAR_W / 2, hz0 - taper)], 0, W_HEAD_T)
+    bar = bar.fuse(Pos(x0, PTT_Y, 0) * Rot(0, 0, 90) * Rot(90, 0, 0) * wedge)
+    whole_lever = s.solids()[0]
+    for piece in s.solids()[1:]:
+        whole_lever = whole_lever.fuse(piece)
+    return whole_lever.fuse(bar).clean()
 
 
 # ---------------------------------------------------------- the snaps
@@ -690,7 +862,46 @@ SNAP_SIDE = 0.1                              # round the tab in the front's slot
 SNAP_SLIT = 0.35                             # the slits down its sides in the back's wall, so it can flex
 SNAP_PAD = 0.15                              # inside the front's wall: its strip by the window 0.85, two lines
 SNAP_PLAY = 0.1                              # the catch's play
-SNAP_AT = [("left", OH - 14.0), ("top", 14.0)]
+SNAP_AT = []     # the tabs out (the user's, 2026-11-25): the holder, 0.3 inside the wall, left them no room to flex; the hook below instead
+# the top-left corner's hook (the user's, 2026-11-25), rigid, in the top wall
+# over the holder: a tongue from the front's wall, its inner HOOK_T, reaches
+# HOOK_L past the seam, a nose out at its tip; the back's wall takes the
+# tongue in a rebate, the nose in a window through its outer part, under a
+# bar. The back goes on tilted ~5 degrees (its bottom end up), HOOK_SLIDE
+# toward the top; its top edge slides down onto the nose, then it swings
+# shut about the seam's outer edge; the screws hold it
+HOOK_X0, HOOK_X1 = 4.0, 20.0
+HOOK_T, HOOK_L, HOOK_NH, HOOK_C = 0.7, 3.0, 1.2, 0.1
+HOOK_N = 0.85                # the nose's reach under the bar, to 0.05 short of the outside (the user's, 2026-11-25: 0.5 didn't lock)
+HOOK_SLIDE = 0.95
+# three short noses, full-wall pillars between their windows, so the bar
+# over each window is a short bridge (the user's, 2026-11-25: 16 mm was long)
+HOOK_SEGS, HOOK_PILLAR = 3, 1.4
+_HOOK_GAP = HOOK_PILLAR + 2 * HOOK_C
+_HOOK_SEG = (HOOK_X1 - HOOK_X0 - (HOOK_SEGS - 1) * _HOOK_GAP) / HOOK_SEGS
+HOOK_NOSES = [(HOOK_X0 + i * (_HOOK_SEG + _HOOK_GAP), HOOK_X0 + i * (_HOOK_SEG + _HOOK_GAP) + _HOOK_SEG)
+              for i in range(HOOK_SEGS)]
+HOOK_IN = 0.15               # the tongue stands this far in past the wall's inside (the holder 0.39 off it): 0.85 thick
+_HY_I = OH - WALL
+_HOOK_BAR = WALL - HOOK_T - HOOK_C
+assert _HOOK_BAR >= 0.8 - 1e-9, "the bar over the nose under two lines"
+assert HOOK_SLIDE >= HOOK_N + 0.1 - 1e-9, "the slide doesn't clear the nose"
+assert HOOK_T + HOOK_IN >= 0.8 and OH - WALL - HOOK_IN - HY1 >= 0.2, "the tongue"
+
+
+def hook_front():
+    zs = Z_SPLIT
+    s = box(HOOK_X0, HOOK_X1, _HY_I - HOOK_IN, _HY_I + HOOK_T, zs - HOOK_L, zs + 0.5)
+    for (a, b) in HOOK_NOSES:
+        s = s.fuse(box(a, b, _HY_I + HOOK_T - 0.01, _HY_I + HOOK_T + HOOK_N, zs - HOOK_L, zs - HOOK_L + HOOK_NH))
+    return s
+
+
+def hook_back_cuts():
+    zs, c = Z_SPLIT, HOOK_C
+    return [box(HOOK_X0 - c, HOOK_X1 + c, _HY_I - 0.5, _HY_I + HOOK_T + c, zs - HOOK_L - c, zs + 0.01),
+            ] + [box(a - c, b + c, _HY_I + HOOK_T - 0.01, OH + 1, zs - HOOK_L - c, zs - HOOK_L + HOOK_NH + c)
+                 for (a, b) in HOOK_NOSES]
 assert SNAP_T + SNAP_BARB < WALL + SNAP_PAD, "the barb would reach into the case"
 
 
@@ -868,9 +1079,14 @@ def parts():
                + cyl_z(SPK_X, SPK_Y, SPK_MAGNET / 2, ff - SPK_DEEP, ff - SPK_CONE))
     # the holder as a tray under the cell, its hole round the pin
     base = 1.2
-    holder = (box(HX0, HX1, HY0, HY1, BACK, CELL_Z)
-              - box(HX0 + 1.2, HX1 - 1.2, HY0 + 1.5, HY1 - 1.5, BACK + base, D)
-              - cyl_z(HCX, HCY, 1.6, 0, D))
+    if HOLDER_ON_FRONT:
+        holder = (box(HX0, HX1, HY0, HY1, CELL_Z, H_HI)
+                  - box(HX0 + 1.2, HX1 - 1.2, HY0 + 1.5, HY1 - 1.5, -1, H_HI - base)
+                  - cyl_z(HCX, HCY, 1.6, 0, D))
+    else:
+        holder = (box(HX0, HX1, HY0, HY1, BACK, CELL_Z)
+                  - box(HX0 + 1.2, HX1 - 1.2, HY0 + 1.5, HY1 - 1.5, BACK + base, D)
+                  - cyl_z(HCX, HCY, 1.6, 0, D))
     cell = cyl_y(HCX, HY0 + 5.0, HY1 - 5.0, CELL_Z, CELL_R)
     return [(board, "board", (0.10, 0.40, 0.25)),
             (oled, "oled", (0.10, 0.25, 0.65)),
@@ -934,11 +1150,11 @@ def glb(items, path):
 
 def main():
     print(f"box {OW:.1f} wide, {OH:.1f} tall, {D:.1f} thick "
-          f"({(OW + LEV_GAP + LEV_T + LEV_FLARE) if OLD_LEVER else PAD_X1:.1f} wide with the lever); "
+          f"({(OW + LEV_GAP + LEV_T + LEV_FLARE) if OLD_LEVER else PAD_X1 if PADDLE else W_PIV[0] + W_PIV_R:.1f} wide with the lever); "
           f"seam {D - Z_SPLIT:.1f} from the face")
     front = front_shell()
     back = back_tray()
-    lev = lever() if OLD_LEVER else paddle_lever()
+    lev = lever() if OLD_LEVER else paddle_lever() if PADDLE else w_lever()
     caps = keytops()
     if "check" in sys.argv:
         check(front, back, lev, caps)
@@ -946,7 +1162,7 @@ def main():
     # to print: the front face down, the back and the lever on their backs
     export_stl(Pos(0, 0, D) * Rot(180, 0, 0) * front, os.path.join(OUT, "front.stl"))
     export_stl(back, os.path.join(OUT, "back.stl"))
-    export_stl(lev.moved(Location((0, 0, -(LEV_Z if OLD_LEVER else PAD_Z0)))), os.path.join(OUT, "lever.stl"))
+    export_stl(lev.moved(Location((0, 0, -(LEV_Z if OLD_LEVER else PAD_Z0 if PADDLE else 0)))), os.path.join(OUT, "lever.stl"))
     export_stl(whole(caps).translate((0, 0, -CAP_Z0)), os.path.join(OUT, "keytops.stl"))
     print(f"wrote {OUT}/front.stl back.stl lever.stl keytops.stl")
     # one .glb per piece for viewer.html, which colours, outlines and
