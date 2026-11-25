@@ -199,6 +199,14 @@ _mr = MAG_D / 2 + MAG_CLR
 MAGNETS = [(MAG_X, (WALL + _mr + CY0 - CELL_CLR - _mr - 0.6) / 2),
            (OW - MAG_X, SCREWS[0][1] + math.sqrt((BOSS_D_ / 2 + _mr + MAG_RIM + 0.1) ** 2
                                                   - (OW - MAG_X - SCREWS[0][0]) ** 2))]
+# the right one up under the PTT (the user's, 2026-11-25: both low, it tipped
+# forward off a shirt): as far right as the lever's bar lets it (the bar's 45
+# degree underside, pressed in its travel, 0.3 over the boss), its rim to the
+# top wall
+MAG_TOP_RIGHT = True
+if MAG_TOP_RIGHT:
+    MAGNETS[1] = ((OW - WALL) - (MAG_TOP + 0.3) - 1.6 - 0.3 - _mr - MAG_RIM,
+                  OH - WALL - _mr - MAG_RIM)
 
 # the keys exactly where the board's switches are
 KEYS = list(P.KEYS)
@@ -277,6 +285,45 @@ HOOK_X0 = POCKET_X1 - TOOTH_W
 LEV_CLR = 0.2                     # the lever round its column (the user's: it rattled at 0.4)
 NECK_CLR = 0.3                    # round the column's neck, over the lever's whole swing
 LEV_SCREW = 3.2                   # the lever turns on its M3: 0.1 a side (it rattled at 3.4)
+
+# ---------------------------------------------------------------- right-wall hook
+# (the user's, 2026-11-25: the top right didn't close; as wbitx's): a tongue
+# from the front stands inside the right wall below the seam, noses out
+# through windows in the back's wall, the full wall over each as its bar.
+# The back goes on tilted about its right edge (left side up), HOOK_SLIDE
+# out to the right, slides in onto the noses, swings shut
+HOOK_T, HOOK_L, HOOK_NH, HOOK_C = 1.0, 3.0, 1.2, 0.1
+HOOK_N = WALL - HOOK_C - 0.05              # through the wall to 0.05 short of the outside
+HOOK_SLIDE = HOOK_C + HOOK_N + 0.1
+# where the inside of the right wall is free: above the T head to the top
+# wall; between the hinge's neck and the bar's slot (two noses)
+_hw = BAR_W / 2 + BAR_CLR
+_sw = BAR_TRAVEL * (PIV[0] - (OW - WALL - FLOOR_SLOT)) / (PTT_Y - PIV[1])
+_b0, _b1 = PIV[1] + NECK_W / 2 + NECK_CLR + 1.0, PTT_Y - _hw - _sw - 0.6
+HOOK_NOSES = [(PTT_Y + HEAD_W / 2 + 0.3, OH - WALL - IN_CORNER - 0.2),
+              (_b0, (_b0 + _b1) / 2 - 0.7), ((_b0 + _b1) / 2 + 0.7, _b1)]
+assert all(b - a >= 2.5 for a, b in HOOK_NOSES), HOOK_NOSES
+
+
+def hook_front():
+    zs, x1 = Z_SPLIT, OW - WALL - HOOK_C
+    # above the seam the tongue joins the front's wall by a 45 degree gusset
+    # (the front prints face down: a flat shelf there would hang)
+    xi, xw = x1 - HOOK_T, OW - WALL + 0.4
+    out = []
+    for (a, b) in HOOK_NOSES:
+        gusset = prism_xy([(xi, zs), (xw, zs), (xw, zs + 0.5 + (xw - xi)), (xi, zs + 0.5)],
+                          -(b - a) / 2, (b - a) / 2)
+        out.append(box(xi, x1, a, b, zs - HOOK_L, zs + 0.5)
+                   .fuse(Pos(0, (a + b) / 2, 0) * Rot(90, 0, 0) * gusset)
+                   .fuse(box(x1 - 0.01, x1 + HOOK_C + HOOK_N, a, b, zs - HOOK_L, zs - HOOK_L + HOOK_NH)))
+    return out
+
+
+def hook_back_cuts():
+    zs, c = Z_SPLIT, HOOK_C
+    return [box(OW - WALL - 0.01, OW + 1, a - c, b + c, zs - HOOK_L - c, zs - HOOK_L + HOOK_NH + c)
+            for (a, b) in HOOK_NOSES]
 
 # ---------------------------------------------------------------- grille
 G_PITCH, G_HOLE, G_EDGE, DIMPLE = 3.6, 2.4, 2.6, 0.6
@@ -541,8 +588,13 @@ def front_shell():
         s += box(x - 0.75, x + 0.75, by(0) + LOCATE_GAP, OH - WALL + 0.01, Z_SPLIT, Z_FACE_IN + 0.01)
     # the hinge's column (the back's wall and tongue below the seam are left
     # alone), the screw's pilot up it from its point, closed at the face
-    s += (column() & box(0, OW + 20, -20, OH + 20, 0, D)) - box(-1, OW, -1, OH + 1, -1, Z_SPLIT + TONGUE_H + 0.3)
+    s += ((column() & box(0, OW + 20, -20, OH + 20, 0, D)) - box(-1, OW, -1, OH + 1, -1, Z_SPLIT + TONGUE_H + 0.3)
+          # the neck's point flat at the seam by the wall: the back's wall
+          # passes under it, held out to the right, as it goes on (the hook)
+          - box(OW - 0.01, OW + HOOK_SLIDE + 0.3, -1, OH + 1, -1, Z_SPLIT + 0.1))
     s -= cyl_z(PIV[0], PIV[1], M3_PILOT / 2, COL_Z - COL_R - 1, D - PILOT_SKIN)
+    for tongue in hook_front():
+        s = s.fuse(tongue)
     return s
 
 
@@ -612,6 +664,8 @@ def back_tray():
              Z_BB - JACK_UP - 2.9 - 0.3, Z_BB)
     for hole, notch in ports():
         s -= hole + notch
+    for cut in hook_back_cuts():
+        s -= cut
     return s
 
 

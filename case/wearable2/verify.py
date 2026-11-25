@@ -102,7 +102,8 @@ def turned(t):
 
 for t, what in ((0.0, "at rest"), (0.35, "pressed 0.35"), (0.8, "pressed 0.8")):
     lp = turned(t)
-    hit = {n: round(vol(lp, o), 2) for n, o in (("front", front), ("back", back), ("board", P["board"]))}
+    hit = {n: round(vol(lp, o), 2) for n, o in (("front", front), ("back", back), ("board", P["board"]),
+                                                 ("magnets", P["magnets"]))}
     check(f"lever {what} touches nothing but the PTT", max(hit.values()) <= 0.01, str(hit))
 check("lever's T head stops it on the wall", 0.05 <= gap(lev, back) <= 0.15, f"head to wall {gap(lev, back):.2f}")
 check("an air gap at rest between the bar and the plunger (the user's)", 0.3 <= gap(lev, P["ptt"]) <= 0.5,
@@ -168,15 +169,43 @@ holes = [(dx, dz) for dx in np.arange(-6.5, 6.6, 0.5) for dz in np.arange(-3.5, 
          and (abs(dx) > W.USB_SHELL_W / 2 or abs(dz) > W.USB_SHELL_H / 2)]
 check("USB: closed round the socket", not holes, f"{len(holes)} open spots")
 
-# ---- assembly: the back lowers onto the front, board, lever, keytops
-fixed = {"front": front, "lever": lev, "keytops": caps, **{n: s for n, s in P.items() if n not in ("cell", "magnets")}}
+# ---- assembly: the back (with the cell and magnets) goes on over the front,
+# board, keytops (the lever goes on after): tilted 5 degrees about its right
+# edge, HOOK_SLIDE out to the right, lowered, slid in onto the hook's noses,
+# swung shut (2026-11-25). Allowed: 0.05 mm3 a pose, the top-left standoff
+# brushing the front's left wall by ~0.02 mm mid-swing
+fixed = {"front": front, "keytops": caps, **{n: s for n, s in P.items() if n not in ("cell", "magnets")}}
+moving = [whole(back), P["cell"], P["magnets"]]
+_xp, _zp = W.OW, W.Z_SPLIT
+
+
+def _rot(a):
+    return Pos(_xp, 0, _zp) * Rot(0, a, 0) * Pos(-_xp, 0, -_zp)
+
+
+_sg = 1 if (_rot(3) * Pos(0, 0, _zp)).position.Z < _zp else -1
+
+
+def _hits(T):
+    return sum(vol(T * m, o) for m in moving for o in fixed.values())
+
+
 bad = []
-for dz in (0.3, 1, 2, 4, 6, 9, 13):
-    for nm, m in (("back", whole(back).translate((0, 0, -dz))), ("cell", whole(P["cell"]).translate((0, 0, -dz)))):
-        for n, o in fixed.items():
-            if vol(m, o) > 0.01:
-                bad.append(f"{nm}/{n} at {dz}")
-check("the back goes on", not bad, ", ".join(bad[:5]) or "clear all the way")
+poses = ([(f"down {dz}", Pos(W.HOOK_SLIDE, 0, -dz) * _rot(5 * _sg)) for dz in (9, 6, 3, 1.5, 0.5, 0)]
+         + [(f"slide {s}", Pos(s, 0, 0) * _rot(5 * _sg)) for s in (0.9, 0.6, 0.3, 0)]
+         + [(f"swing {a}", _rot(a * _sg)) for a in (4, 3, 2, 1, 0.5, 0)])
+for what, T in poses:
+    v = _hits(T)
+    if v > 0.05:
+        bad.append(f"{what}: {v:.2f}")
+check("the back goes on (tilt, slide onto the hook, swing shut)", not bad, ", ".join(bad[:5]) or "clear all the way")
+_pull = vol(whole(back).translate((0, 0, -0.2)), front)
+check("the hook holds: pulled 0.2 apart, the noses bear on the bars", _pull >= 0.5, f"{_pull:.2f} mm3")
+_straight = vol(whole(back).translate((0, 0, -1.0)), front)
+check("the hook is real: straight on, the noses block", _straight >= 1.0, f"{_straight:.2f} mm3")
+check("a magnet at the top right, under the PTT (the user's)",
+      W.MAGNETS[1][1] >= W.OH - W.WALL - W.MAG_D / 2 - W.MAG_CLR - W.MAG_RIM - 0.01,
+      f"at {W.MAGNETS[1][0]:.1f}, {W.MAGNETS[1][1]:.1f}")
 
 # ---- printing: overhangs and walls too thin to print
 def load(fn):
@@ -187,8 +216,14 @@ def load(fn):
 
 
 # allowed: back 9 (the USB socket's 5.9 bridge, and the jack circle's top arch
-# by the seam), keytops 40 (the plungers' sockets, 3.4 bridges)
-for fn, allow in (("front.stl", 0.5), ("back.stl", 9.0), ("lever.stl", 0.5), ("keytops.stl", 40.0)):
+# by the seam), keytops 40 (the plungers' sockets, 3.4 bridges); with the hook
+# (2026-11-25): the front its noses' flat catches, ledges HOOK_C + HOOK_N wide
+# (the user's wbitx printed its 0.85 ones), the back the bars over the
+# windows, ~3.5 bridges
+_ledges = sum((b - a) * (W.HOOK_C + W.HOOK_N) for a, b in W.HOOK_NOSES) * 1.05
+_bridges = sum((b - a + 2 * W.HOOK_C) * W.WALL for a, b in W.HOOK_NOSES) * 1.05
+for fn, allow in (("front.stl", round(0.5 + _ledges, 1)), ("back.stl", round(9.0 + _bridges, 1)),
+                  ("lever.stl", 0.5), ("keytops.stl", 40.0)):
     v = load(fn)
     nr = np.cross(v[:, 1] - v[:, 0], v[:, 2] - v[:, 0])
     L = np.linalg.norm(nr, axis=1)

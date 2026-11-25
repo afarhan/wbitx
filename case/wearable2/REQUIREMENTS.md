@@ -44,6 +44,10 @@ Read this before any change. Every revision must keep every item here. Add an it
 - Two 10 x 3 mm disc magnets in the back, so a steel plate holds it through a shirt.
 - **All screws M3**, length to fit the case. Top-left screw: option (b), the M3 head let into the left side wall.
 
+## 2026-11-25
+- The top right (the PTT's side) didn't close: a rigid hook as wbitx's on the right wall: tongues from the front inside the wall, three noses (above the PTT's T head; two between the hinge's neck and the bar's slot) out through windows in the back's wall. The back goes on tilted about its right edge, slides in onto the noses, swings shut. The hinge neck's point cut flat at the seam beside the wall for that.
+- Both magnets were low and it tipped forward off a shirt: the right magnet moved up to the top right, under the PTT (as far right as the lever's bar lets it). Top left has no room (the top-left screw's foot); centring the cell would block the top right.
+
 ## Working rules
 - Everything local; nothing published.
 - Commit only after the user has tried it.

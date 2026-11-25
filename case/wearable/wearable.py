@@ -126,12 +126,15 @@ CUT_CLR = SPK_CLR + 0.5            # the board's cut round the speaker
 RIB = 1.0
 # the finger's dish round each key, shallow: the keys are proud
 KEY_DISH = 0.4
+# the mic's hole through the face, no tube: 1.0 printed shut
+MIC_BORE = 2.0
 # the display's glass, 16.5 tall in all with the 3 strip at its top (the
 # user's measure; printed.py has it 14): its pocket in the face's inside
 # covers all of it, the face left over it as thin as it goes
 _gu0, _gu1, _gv0, _gv1 = P.OLED_GLASS
 OLED_GLASS = (_gu0, _gu1, _gv1 - 16.5, _gv1)
 GLASS_SKIN = 0.5
+INSET_TOP = 1.0                   # the pocket 1 more at the glass's top (the test print)
 RING_H = FRONT_H - 0.3            # down to just over the board, which it overlaps
 OPEN_IN = 2.0                            # the grille opens this far inside its rim
 assert SPK_W == SPK_W_
@@ -406,7 +409,7 @@ def grille():
             continue
         g0, g1, gv0, gv1 = OLED_GLASS
         m = hr + CLR + 0.6
-        if bx(g0) - m < x < bx(g1) + m and by(gv1) - m < y < by(gv0) + m:
+        if bx(g0) - m < x < bx(g1) + m and by(gv1) - m < y < by(gv0 - INSET_TOP) + m:
             continue
         if any(math.hypot(x - bx(u), y - by(v)) < P.DISH_D / 2 + hr + 0.8 for u, v in KEYS):
             continue
@@ -445,7 +448,6 @@ def front_shell():
     for (x, y) in SCREWS:
         s += cyl_z(x, y, POST_D / 2, Z_BF, ff + 0.5)
     mx, my = bx(P.MIC_UV[0]), by(P.MIC_UV[1])
-    s += cyl_z(mx, my, P.TUBE_OD / 2, Z_BF + P.GASKET, ff + 0.5)
 
 
     # ---- cuts
@@ -456,21 +458,19 @@ def front_shell():
     s -= inside(Z_SPLIT - 1, Z_SPLIT + TONGUE_H + 0.2, TONGUE_T + TONGUE_CLR)
     for (x, y) in SCREWS:
         s -= cyl_z(x, y, M3_PILOT / 2, Z_SPLIT - 6, D - PILOT_SKIN)
-    s -= cyl_z(mx, my, P.TUBE_ID / 2, Z_BF, ff + 0.01)
-    s -= cyl_z(mx, my, P.MIC_HOLE / 2, ff - 0.1, D + 1)
+    s -= cyl_z(mx, my, MIC_BORE / 2, ff - 1, D + 1)
 
     holes, dimples = grille()
     hr = G_HOLE / 2
     for (x, y) in holes:
         s -= cyl_z(x, y, hr, ff - 1, D + 1)
-    for (x, y) in dimples:
-        s -= cyl_z(x, y, hr, D - DIMPLE, D + 1)
+    # no dimples: the grille is over the speaker only
 
     x0, x1, v0, v1 = P.OLED_WIN
     s -= box(bx(x0), bx(x1), by(v1), by(v0), ff - 1, D + 1)
     pocket = FACE - GLASS_SKIN
     x0, x1, v0, v1 = OLED_GLASS
-    s -= box(bx(x0) - CLR, bx(x1) + CLR, by(v1) - CLR, by(v0) + CLR, ff - 1, ff + pocket)
+    s -= box(bx(x0) - CLR, bx(x1) + CLR, by(v1) - CLR, by(v0 - INSET_TOP) + CLR, ff - 1, ff + pocket)
     for (u, v) in KEYS:
         x, y = bx(u), by(v)
         s -= cyl_z(x, y, P.KEY_HOLE / 2, ff - 1, D + 1)
