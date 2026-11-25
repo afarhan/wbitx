@@ -42,6 +42,7 @@
 //     BATTERY <volts>|CLEAR     the cell is this, by a meter: the board's
 //                               offset is set to make it so (battery.c)
 //     STATUS                    all of it
+//     MEMORY                    the RAM free, and the settings' flash
 //     SLEEP                     sleep until a key is pressed (sleep.c)
 //     RESTART                   start the talkie again
 //
@@ -55,7 +56,9 @@
 #include <string.h>
 #include <strings.h>
 
+#include "esp_heap_caps.h"
 #include "esp_system.h"
+#include "nvs.h"
 #include "driver/gpio.h"
 
 #include "auth.h"
@@ -475,6 +478,16 @@ void verbs_do(const char *line, long now) {
 			say_battery();
 		return;
 	}
+	if (!strcmp(verb, "MEMORY")) {
+		nvs_stats_t nvs = {0};
+
+		nvs_get_stats(NULL, &nvs);
+		console_say("MEMORY HEAP FREE %u LEAST %u LARGEST %u  NVS ENTRIES USED %u FREE %u",
+			(unsigned)esp_get_free_heap_size(), (unsigned)esp_get_minimum_free_heap_size(),
+			(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
+			(unsigned)nvs.used_entries, (unsigned)nvs.free_entries);
+		return;
+	}
 	if (!strcmp(verb, "STATUS")) {
 		say_status();
 		return;
@@ -488,7 +501,7 @@ void verbs_do(const char *line, long now) {
 		esp_restart();
 		return;
 	}
-	console_say("? %s: WIFI SCAN LINK RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX GATE KEYS PIN SCREEN RECORD MICPIN DISPLAY AUDIO BATTERY STATUS SLEEP RESTART", verb);
+	console_say("? %s: WIFI SCAN LINK RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX GATE KEYS PIN SCREEN RECORD MICPIN DISPLAY AUDIO BATTERY STATUS MEMORY SLEEP RESTART", verb);
 }
 
 void verbs_poll(long now) {
