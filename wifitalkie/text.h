@@ -16,6 +16,8 @@ extern "C" {
 #define TEXT_RUN_ROOM 120
 #define TEXT_PARTIES 24
 #define TEXT_PLAY_ROOM 256
+// bit 7 of a character kept: the user sent it (screen.c)
+#define TEXT_MINE 0x80
 
 // words from one to another, in the order they came
 struct text_run {

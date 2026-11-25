@@ -197,6 +197,9 @@ static void say_status(void) {
 	console_say("LINK %s", settings.is_local ? "LOCAL" : "INTERNET");
 	network_describe(text, sizeof(text));
 	console_say("WIFI %s", text);
+	for (int i = 0; i < SETTINGS_KNOWN; i++)
+		if (settings.known_ssid[i][0] != 0)
+			console_say("WIFI KNOWN %d %s", i + 1, settings.known_ssid[i]);
 	console_say("CALL %s  GRID %s  FREQ %u", settings.callsign, settings.grid, (unsigned)settings.hz);
 	console_say("SERVER %s %u", settings.host, (unsigned)settings.port);
 	auth_cookie_show(settings.cookie, shown);

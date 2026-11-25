@@ -33,9 +33,9 @@
 //
 // TEXT (text.c, PROTOCOL.md "Text, a word at a time") goes a word at a
 // time over my.sbitx.net's line (service.c), to a callsign or a slot's
-// room. A word sent is kept once TEXT SENT says it went, in brackets if
-// nobody had it or it could not be sent. A word heard is kept, and played
-// as Morse at its sender's speed, at the sidetone's level, unless its
+// room. A word sent is kept at once, its characters with bit 7 set
+// (TEXT_MINE) to show it the user's. A word heard is kept, and played
+// as Morse at its sender's speed, at CW volume's level, unless that is 0 or its
 // contact, or the slot of its room, has Read text off; a blocked contact's
 // is dropped. All of it is kept in RAM only. The menu shows each contact's
 // time, UTC, of its last word or voice, by my.sbitx.net's clock.
@@ -51,9 +51,13 @@
 //     F1  21090      the three frequency slots, with their kHz
 //     F2   7074
 //     F3  14200
-//     VU2XZ          the contacts, in the order they were added; the
-//     ...            target has a * after its name, a blocked one Blocked
+//     VU2XZ          the contacts, the one heard from or spoken to last
+//     ...            first, by voice or text, then those never in the
+//                    order they were added; the target has a * after its
+//                    name, a blocked one Blocked
 //     Add Callsign...  a callsign entered, as the callsign is, below
+//     VU3ABC  + Add  the last STRANGERS who sent text and are not
+//                    contacts, newest first; ENTER adds one
 //
 // ENTER on a slot or a contact opens its menu, its name as the title; a
 // slot opened becomes the target then and there, a contact only by PTT:
@@ -62,11 +66,14 @@
 //                    in dial.c's kilohertz steps, faster the longer they
 //                    are held, and the room with it if it is the target
 //     PTT            makes it the target, and goes home
-//     Text...        its text, words heard and sent, under headers
-//                    from>to, the newest at the foot, UP and DOWN to
-//                    scroll; the PTT key turns to sending, a word at a
-//                    time, keyed (sent at the gap after it, or ENTER) or
-//                    on the keyboard (ENTER held), and back
+//     Text...        a chat under the callsign or the room: words heard,
+//                    and one's own in reverse video, the newest at the
+//                    foot, UP and DOWN to scroll; ENTER turns to sending
+//                    on the same page, a word at a time, keyed on the
+//                    paddles at the foot (sent at the gap after it), and
+//                    ENTER or MENU back to reading; MENU goes back. With
+//                    the keyboard for typing, the keyboard is up while
+//                    sending, ENTER held sends a word, MENU held stops
 //     Volume         the volume on its bar, UP and DOWN to step it
 //     Read text      On or Off: whether its text is to be heard as Morse
 //     Block          a contact's only, On or Off: not heard at all
@@ -92,6 +99,10 @@
 //     Sidetone       the Morse keyer's tone, 0 (off) to 10, on a bar as
 //                    the volume is (struct level); UP and DOWN step
 //                    it, and it is heard at each step
+//     CW volume      Morse heard, its level, 0 to 10 as the sidetone's;
+//                    at 0 words heard are kept and not played
+//     Grid           the grid square, MK97 or MK97FK, said to my.sbitx.net
+//                    for the map
 //     VOX            speaking by the voice, without the PTT (vox.c):
 //                    the sensitivity, Off or 1 to 10, large; UP and
 //                    DOWN step it; ENTER turns it off, or on again; below,
@@ -122,7 +133,8 @@
 // go home when idle.
 //
 // The callsign is entered on a page of its own, on the keyboard (entry.c,
-// draw_keyboard()) or, with settings.is_morse_typing, keyed as Morse:
+// draw_keyboard()) or, with settings.is_morse_typing, keyed as Morse; a
+// WiFi key is always typed on the keyboard:
 //
 //            CALLSIGN               the title
 //     -------------------------
@@ -153,6 +165,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "auth.h"
 #include "console.h"
@@ -247,6 +260,7 @@
 #define PAGE_UPDATE_LOCAL 31
 #define PAGE_WIFI_KEY 32
 #define PAGE_GRID 33
+#define PAGE_CW_VOLUME 34
 // a grid square of six, MK97FK; four will do
 #define GRID_LONGEST 6
 // the sidetone heard at each step of its level
@@ -273,7 +287,8 @@
 #define TARGET_EDIT 6
 #define TARGET_DELETE 7
 #define TARGET_ITEMS 8
-// the main menu's rows: Settings..., the slots, the contacts, Add Callsign...
+// the main menu's rows: Settings..., the slots, the contacts, Add Callsign...,
+// the strangers
 #define ROW_SLEEP 0
 #define ROW_SETTINGS 1
 #define ROW_SLOTS 2
@@ -300,6 +315,7 @@ static const struct item settings_items[] = {
 	{"Typing", PAGE_TYPING},
 	{"Morse speed", PAGE_WPM},
 	{"Sidetone", PAGE_SIDETONE},
+	{"CW volume", PAGE_CW_VOLUME},
 	{"VOX", PAGE_VOX},
 	{"Callsign", PAGE_CALLSIGN},
 	{"Grid", PAGE_GRID},
@@ -419,12 +435,10 @@ static int is_contact_gone;
 // the text, words heard and sent, and the player of those heard
 static struct text kept;
 static struct text_play play;
-// on the Text page: sending, and the PTT key as it was; the lines it shows
+// on the Text page: sending; the lines it shows
 // and how far they are scrolled back from the newest
 static int is_text_sending;
-static int was_ptt_key;
 static char text_lines[TEXT_LINES][TEXT_LINE_ROOM];
-static int text_is_header[TEXT_LINES];
 static int text_back;
 // the word last heard, for the home page
 static char heard_from[TEXT_PARTY_ROOM];
@@ -466,6 +480,12 @@ static void say_key(const struct key_press *press) {
 static void save_soon(long now) {
 	is_save_due = 1;
 	save_ms = now + SAVE_AFTER_MS;
+}
+
+// whether text is typed on the keyboard here, not keyed as Morse: as Typing
+// says, but a WiFi key always on the keyboard
+static int is_keyboard(void) {
+	return !settings.is_morse_typing || page == PAGE_WIFI_KEY;
 }
 
 static int is_entering(int on_page) {
@@ -547,23 +567,106 @@ static int target_items(int *items) {
 
 // the main menu's rows, and what a row is: ROW_SETTINGS, a target, or
 // -1 for Add Callsign...
-static int main_rows(void) {
+// those not in the contacts whose text came last, newest first, for the
+// menu to add with one press
+#define STRANGERS 5
+static char strangers[STRANGERS][TEXT_PARTY_ROOM];
+static int stranger_count;
+
+static void stranger_forget(const char *callsign) {
+	int i;
+
+	for (i = 0; i < stranger_count; i++) {
+		if (!strcasecmp(strangers[i], callsign)) {
+			stranger_count--;
+			memmove(strangers[i], strangers[i + 1], sizeof(strangers[0]) * (size_t)(stranger_count - i));
+			return;
+		}
+	}
+}
+
+static void stranger_heard(const char *callsign) {
+	stranger_forget(callsign);
+	if (stranger_count == STRANGERS)
+		stranger_count--;
+	memmove(strangers[1], strangers[0], sizeof(strangers[0]) * (size_t)stranger_count);
+	snprintf(strangers[0], sizeof(strangers[0]), "%s", callsign);
+	stranger_count++;
+}
+
+// the first row of the strangers, after Add Callsign... if it is there
+static int row_strangers(void) {
 	int count = contacts_count(&settings);
 
 	return ROW_CONTACTS + count + (count < SETTINGS_CONTACTS ? 1 : 0);
 }
 
+static int main_rows(void) {
+	return row_strangers() + stranger_count;
+}
+
+// the stranger a row is, or -1
+static int row_stranger(int row) {
+	int i = row - row_strangers();
+
+	return i >= 0 && i < stranger_count ? i : -1;
+}
+
+// the contacts in the menu's order, the one heard from or spoken to last
+// first, those never at all after in the order they were added. Sorted as
+// the menu opens and when one is added, not while it is up, so that the
+// row chosen stays the contact it was
+static int contact_order[SETTINGS_CONTACTS];
+static int contact_sorted = -1;
+
+static void contacts_sort(void) {
+	int count = contacts_count(&settings);
+	long long at[SETTINGS_CONTACTS];
+	int i;
+	int j;
+
+	for (i = 0; i < count; i++) {
+		contact_order[i] = i;
+		at[i] = text_last(&kept, settings.contacts[i]);
+	}
+	for (i = 1; i < count; i++) {
+		for (j = i; j > 0 && at[contact_order[j]] > at[contact_order[j - 1]]; j--) {
+			int swapped = contact_order[j];
+
+			contact_order[j] = contact_order[j - 1];
+			contact_order[j - 1] = swapped;
+		}
+	}
+	contact_sorted = count;
+}
+
+// the menu row of contact i
+static int row_of_contact(int contact) {
+	int i;
+
+	contacts_sort();
+	for (i = 0; i < contact_sorted; i++)
+		if (contact_order[i] == contact)
+			return ROW_CONTACTS + i;
+	return ROW_CONTACTS;
+}
+
 static int row_target(int row) {
 	if (row >= ROW_SLOTS && row < ROW_CONTACTS)
 		return row - ROW_SLOTS;
-	if (row >= ROW_CONTACTS && row < ROW_CONTACTS + contacts_count(&settings))
-		return SETTINGS_TARGET_CONTACT + row - ROW_CONTACTS;
+	if (row >= ROW_CONTACTS && row < ROW_CONTACTS + contacts_count(&settings)) {
+		if (contact_sorted != contacts_count(&settings))
+			contacts_sort();
+		return SETTINGS_TARGET_CONTACT + contact_order[row - ROW_CONTACTS];
+	}
 	return -1;
 }
 
 // to another page; ENTER is the screen's on every page, the PTT key the
 // talkie's
 static void go(int to) {
+	if (to == PAGE_MENU && page != PAGE_MENU)
+		contacts_sort();
 	if (to == PAGE_CALLSIGN || to == PAGE_CONTACT) {
 		entry_begin(&entry, ENTRY_CALLSIGN,
 			to == PAGE_CALLSIGN ? settings.callsign
@@ -578,10 +681,8 @@ static void go(int to) {
 	if (to == PAGE_WIFI_KEY)
 		entry_begin(&entry, ENTRY_ANY, page == PAGE_WIFI_JOINING ? wifi_key : "",
 			SETTINGS_PASSWORD_ROOM - 1);
-	if (to == PAGE_TEXT && page != PAGE_TEXT) {
+	if (to == PAGE_TEXT && page != PAGE_TEXT)
 		text_back = 0;
-		was_ptt_key = ptt_key_is_down();
-	}
 	if (to != PAGE_TEXT) {
 		is_text_sending = 0;
 		ptt_key_lend(0);
@@ -671,6 +772,14 @@ static const struct level volume_level = {"Vol", &settings.volume, 0, SETTINGS_L
 	VOLUME_STEP, NULL};
 static const struct level sidetone_level = {"Tone", &settings.sidetone, 0, SETTINGS_SIDETONE_MOST,
 	1, sidetone_heard};
+
+// Morse heard, at its new level
+static void cw_volume_heard(void) {
+	speaker_tone_at(SIDETONE_STEP_MS, settings.cw_volume);
+}
+
+static const struct level cw_volume_level = {"Vol", &settings.cw_volume, 0, SETTINGS_SIDETONE_MOST,
+	1, cw_volume_heard};
 
 // UP a step up, DOWN a step down, within the level's least and most
 static void level_step(const struct level *l, const struct key_press *press, long now) {
@@ -797,13 +906,30 @@ static void take_home(const struct key_press *press, long now) {
 		level_step(&volume_level, press, now);
 }
 
-// the Text page, reading: UP back to older lines, DOWN on to newer, MENU
-// back to the target's menu; the PTT key turns to sending (screen_poll())
-static void take_text(const struct key_press *press) {
+static void send_entry(long now);
+
+// the Text page turned to sending, or back to reading, the word typed so
+// far sent
+static void text_sending(int is_on, long now) {
+	if (is_text_sending && entry.length > 0)
+		send_entry(now);
+	is_text_sending = is_on;
+	entry_begin(&entry, ENTRY_ANY, "", TEXT_WORD_ROOM - 1);
+	morse_begin(&morse, (int)settings.wpm);
+	text_back = 0;
+	touched_ms = now;
+	drawn_ms = now - DRAW_EVERY_MS;
+}
+
+// the Text page, reading: UP back to older lines, DOWN on to newer, ENTER
+// to sending, MENU back to the target's menu
+static void take_text(const struct key_press *press, long now) {
 	if (press->key == KEY_UP)
 		text_back++;
 	if (press->key == KEY_DOWN && text_back > 0)
 		text_back--;
+	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED)
+		text_sending(1, now);
 	if (press->key == KEY_MENU && press->what == BUTTON_PRESSED)
 		go(PAGE_TARGET);
 }
@@ -844,6 +970,21 @@ static void take_main(const struct key_press *press) {
 		level = SETTINGS_MENU;
 		chosen[SETTINGS_MENU] = 0;
 		menu_top[SETTINGS_MENU] = 0;
+		return;
+	}
+	// a stranger added as a contact, its text kept already
+	if (row_stranger(*at) >= 0) {
+		char call[TEXT_PARTY_ROOM];
+
+		snprintf(call, sizeof(call), "%s", strangers[row_stranger(*at)]);
+		if (!contacts_add(&settings, call)) {
+			console_say("CONTACT %s NOT ADDED: FULL", call);
+			return;
+		}
+		stranger_forget(call);
+		settings_save();
+		console_say("CONTACT %s", call);
+		*at = row_of_contact(contacts_count(&settings) - 1);
 		return;
 	}
 	target = row_target(*at);
@@ -997,28 +1138,31 @@ static int contact_keep(long now) {
 		return 0;
 	}
 	if (contact_editing < 0)
-		chosen[MAIN_MENU] = ROW_CONTACTS + contacts_count(&settings) - 1;
+		chosen[MAIN_MENU] = row_of_contact(contacts_count(&settings) - 1);
+	stranger_forget(call);
 	settings_save();
 	console_say("CONTACT %s", call);
 	return 1;
 }
 
-// a word sent to a target, kept as sent once TEXT SENT says it went; one
-// that cannot be sent, the talkie not on line, kept at once in brackets
+// a word sent to a target, kept at once in the stream, its characters
+// marked the user's (TEXT_MINE)
 static void send_word(uint32_t target, const char *word, long now) {
 	char party[TEXT_PARTY_ROOM];
-	char shown[TEXT_WORD_ROOM + 2];
+	char mine[TEXT_WORD_ROOM];
 	struct pending *p;
+	int i;
 
 	if (word[0] == 0)
 		return;
 	target_party(target, party, sizeof(party));
 	text_touch(&kept, party, now);
-	if (pending_count == PENDING_MOST || service_send_word(party, (int)settings.wpm, word) < 0) {
-		snprintf(shown, sizeof(shown), "[%s]", word);
-		text_add(&kept, settings.callsign, party, shown);
+	for (i = 0; word[i] != 0 && i < TEXT_WORD_ROOM - 1; i++)
+		mine[i] = (char)(word[i] | TEXT_MINE);
+	mine[i] = 0;
+	text_add(&kept, settings.callsign, party, mine);
+	if (pending_count == PENDING_MOST || service_send_word(party, (int)settings.wpm, word) < 0)
 		return;
-	}
 	p = &pending[pending_count++];
 	snprintf(p->to, sizeof(p->to), "%s", party);
 	snprintf(p->word, sizeof(p->word), "%s", word);
@@ -1145,8 +1289,20 @@ static void take_keyboard(const struct key_press *press, long now) {
 }
 
 static void take_entry(const struct key_press *press, long now) {
-	if (!settings.is_morse_typing) {
+	if (is_keyboard()) {
 		take_keyboard(press, now);
+		return;
+	}
+	// sending on the Text page: ENTER or MENU back to reading, the word
+	// keyed so far sent; ENTER held takes the last letter off
+	if (page == PAGE_TEXT) {
+		if (press->what == BUTTON_PRESSED && (press->key == KEY_ENTER || press->key == KEY_MENU)) {
+			morse_abort(&morse);
+			text_sending(0, now);
+		} else if (press->key == KEY_ENTER) {
+			morse_abort(&morse);
+			entry_delete(&entry);
+		}
 		return;
 	}
 	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED) {
@@ -1264,6 +1420,10 @@ static void take_page(const struct key_press *press, long now) {
 		level_step(&sidetone_level, press, now);
 		return;
 	}
+	if (page == PAGE_CW_VOLUME && is_up_or_down(press)) {
+		level_step(&cw_volume_level, press, now);
+		return;
+	}
 	if (page == PAGE_WPM && is_up_or_down(press)) {
 		wpm_step(press, now);
 		return;
@@ -1285,7 +1445,7 @@ static int join_failed(long now);
 static void take(const struct key_press *press, long now) {
 	say_key(press);
 	touched_ms = now;
-	if (is_entering(page) && !settings.is_morse_typing) {
+	if (is_entering(page) && is_keyboard()) {
 		take_keyboard(press, now);
 		return;
 	}
@@ -1315,7 +1475,7 @@ static void take(const struct key_press *press, long now) {
 		return;
 	}
 	if (page == PAGE_TEXT) {
-		take_text(press);
+		take_text(press, now);
 		return;
 	}
 	if (press->key == KEY_ENTER && press->what != BUTTON_PRESSED)
@@ -1502,6 +1662,8 @@ static void item_value(int of_page, char *text, int room) {
 		snprintf(text, room, "%s", these->names[these->in_use()]);
 	if (of_page == PAGE_WPM)
 		snprintf(text, room, "%u", (unsigned)settings.wpm);
+	if (of_page == PAGE_CW_VOLUME)
+		snprintf(text, room, settings.cw_volume == 0 ? "Off" : "%u", (unsigned)settings.cw_volume);
 	if (of_page == PAGE_SIDETONE)
 		snprintf(text, room, settings.sidetone == 0 ? "Off" : "%u", (unsigned)settings.sidetone);
 	if (of_page == PAGE_VOX)
@@ -1685,7 +1847,7 @@ static void draw_entry(const char *heading, long now) {
 	char text[TEXT_ROOM];
 	int shown = entry.length;
 
-	if (!settings.is_morse_typing) {
+	if (is_keyboard()) {
 		draw_keyboard(heading, now);
 		return;
 	}
@@ -1987,6 +2149,9 @@ static void draw_main(void) {
 			snprintf(name, sizeof(name), "Sleep");
 		} else if (i == ROW_SETTINGS) {
 			snprintf(name, sizeof(name), "Settings...");
+		} else if (row_stranger(i) >= 0) {
+			snprintf(name, sizeof(name), "%s", strangers[row_stranger(i)]);
+			snprintf(value, sizeof(value), "+ Add");
 		} else if (target < 0) {
 			snprintf(name, sizeof(name), "Add Callsign...");
 		} else {
@@ -2039,83 +2204,154 @@ static void draw_target(void) {
 
 // a line put after the n there are, the oldest let go when they are full;
 // how many there are now
-static int text_line_add(int n, const char *line, int length, int is_header) {
+static int text_line_add(int n, const char *line, int length) {
 	if (n == TEXT_LINES) {
 		n--;
 		memmove(text_lines, text_lines[1], sizeof(text_lines[0]) * n);
-		memmove(text_is_header, text_is_header + 1, sizeof(text_is_header[0]) * n);
 	}
 	snprintf(text_lines[n], TEXT_LINE_ROOM, "%.*s", length, line);
-	text_is_header[n] = is_header;
 	return n + 1;
 }
 
-// the Text page's lines: the party's runs, each a header from>to and its
-// words wrapped to the display's width; how many
-static int text_wrap(const char *party) {
+// the Text page's stream, as a chat: the party's runs one after another,
+// and while sending, the word being keyed and a cursor. What the user sent
+// has bit 7 set on each character (TEXT_MINE), and is shown in reverse
+// video; in a room, whose a run heard is, before it
+static char text_stream[TEXT_RUNS * (TEXT_PARTY_ROOM + 3 + TEXT_RUN_ROOM) + TEXT_WORD_ROOM + 2];
+
+static void stream_put(int *at, const char *text, int is_mine) {
+	for (; *text != 0 && *at < (int)sizeof(text_stream) - 1; text++)
+		text_stream[(*at)++] = (char)(is_mine ? *text | TEXT_MINE : *text);
+	text_stream[*at] = 0;
+}
+
+static void stream_make(const char *party) {
 	int found[TEXT_RUNS];
 	int runs = text_runs_of(&kept, party, found, TEXT_RUNS);
-	int n = 0;
+	int is_room = party[0] >= '0' && party[0] <= '9';
+	int at = 0;
 	int i;
 
+	text_stream[0] = 0;
 	for (i = 0; i < runs; i++) {
 		const struct text_run *run = text_run(&kept, found[i]);
-		const char *at = run->words;
-		char header[TEXT_LINE_ROOM];
+		int is_mine = (run->words[0] & TEXT_MINE) != 0;
 
-		snprintf(header, sizeof(header), "%s>%s", run->from, run->to);
-		n = text_line_add(n, header, (int)strlen(header), 1);
-		while (*at != 0) {
-			char line[TEXT_LINE_ROOM];
-			int length = 0;
-			int fits = 0;
-
-			// as many words as fit, or as much of a long one
-			while (at[length] != 0 && length < TEXT_LINE_ROOM - 1) {
-				line[length] = at[length];
-				line[length + 1] = 0;
-				if (display_text_wide(line, 1) > DISPLAY_WIDE)
-					break;
-				length++;
-				if (at[length] == ' ' || at[length] == 0)
-					fits = length;
-			}
-			if (fits == 0)
-				fits = length > 0 ? length : 1;
-			n = text_line_add(n, at, fits, 0);
-			at += fits;
-			while (*at == ' ')
-				at++;
+		if (at > 0)
+			stream_put(&at, " ", 0);
+		if (is_room && !is_mine) {
+			stream_put(&at, run->from, 0);
+			stream_put(&at, ": ", 0);
 		}
+		stream_put(&at, run->words, 0);
+	}
+	if (is_text_sending && settings.is_morse_typing) {
+		if (at > 0)
+			stream_put(&at, " ", 0);
+		stream_put(&at, entry.text, 1);
+		stream_put(&at, "_", 1);
+	}
+}
+
+// text with bit 7 taken off, for the font
+static void unmarked(char *to, const char *from, int length) {
+	int i;
+
+	for (i = 0; i < length && from[i] != 0; i++)
+		to[i] = (char)(from[i] & ~TEXT_MINE);
+	to[i] = 0;
+}
+
+// the stream wrapped to the display's width, word by word, or as much of
+// a long one as fits; how many lines
+static int text_wrap(const char *party) {
+	const char *at = text_stream;
+	int n = 0;
+
+	stream_make(party);
+	while (*at != 0) {
+		char plain[TEXT_LINE_ROOM];
+		int length = 0;
+		int fits = 0;
+
+		while (at[length] != 0 && length < TEXT_LINE_ROOM - 1) {
+			unmarked(plain, at, length + 1);
+			if (display_text_wide(plain, 1) > DISPLAY_WIDE)
+				break;
+			length++;
+			if ((at[length] & ~TEXT_MINE) == ' ' || at[length] == 0)
+				fits = length;
+		}
+		if (fits == 0)
+			fits = length > 0 ? length : 1;
+		n = text_line_add(n, at, fits);
+		at += fits;
+		while ((*at & ~TEXT_MINE) == ' ')
+			at++;
 	}
 	return n;
 }
 
 static const char *text_help[] = {
 	"UP/DOWN: SCROLL",
-	"PTT: SEND",
+	"ENTER: SEND",
 	"MENU: BACK",
 };
 
 #define TEXT_HELPS ((int)(sizeof(text_help) / sizeof(text_help[0])))
 
-// the Text page: reading, the party's newest lines, or as far back as
-// scrolled, each header in reverse video; sending, the word being entered,
-// as the callsign is, headed with whom it goes to
+static const char *text_send_help[] = {
+	"UP: DIT  DOWN: DAH",
+	"ENTER/MENU: STOP",
+	"HOLD ENTER: DELETE",
+};
+
+#define TEXT_SEND_HELPS ((int)(sizeof(text_send_help) / sizeof(text_send_help[0])))
+
+// a line of the stream: its characters, and those marked the user's in
+// reverse video; a space between two of the user's is the user's too
+static void stream_line(int i, const char *text) {
+	char plain[TEXT_LINE_ROOM];
+	int length = (int)strlen(text);
+	int y = line_y(i);
+	int c;
+
+	unmarked(plain, text, length);
+	line(i, plain);
+	for (c = 0; c < length; c++) {
+		int is_mine = (text[c] & TEXT_MINE) != 0
+			|| (plain[c] == ' ' && c > 0 && c + 1 < length
+				&& (text[c - 1] & TEXT_MINE) && (text[c + 1] & TEXT_MINE));
+		char before[TEXT_LINE_ROOM];
+		int x;
+
+		if (!is_mine)
+			continue;
+		snprintf(before, sizeof(before), "%.*s", c, plain);
+		x = display_text_wide(before, 1);
+		snprintf(before, sizeof(before), "%.*s", c + 1, plain);
+		display_invert(x, y - 1, display_text_wide(before, 1) - x, LINE_PITCH);
+	}
+}
+
+// the Text page, a chat titled with the callsign or the room: the stream's
+// newest lines, or as far back as scrolled. Sending by the paddles, what is
+// keyed goes on the end of the stream as it is keyed, and the elements of
+// the letter being keyed are at the foot; by the keyboard, the keyboard
 static void draw_text(long now) {
 	char party[TEXT_PARTY_ROOM];
-	char heading[TEXT_ROOM];
 	int count;
 	int first;
 	int i;
 
 	target_party(opened, party, sizeof(party));
-	if (is_text_sending) {
-		snprintf(heading, sizeof(heading), "To %s", party);
-		draw_entry(heading, now);
+	if (is_text_sending && !settings.is_morse_typing) {
+		draw_entry(party, now);
 		return;
 	}
 	count = text_wrap(party);
+	if (is_text_sending)
+		text_back = 0;
 	if (text_back > count - TEXT_SHOWN)
 		text_back = count > TEXT_SHOWN ? count - TEXT_SHOWN : 0;
 	first = count - TEXT_SHOWN - text_back;
@@ -2124,13 +2360,14 @@ static void draw_text(long now) {
 	title(party);
 	if (count == 0)
 		line(1, "Nothing yet");
-	for (i = 0; i < TEXT_SHOWN && first + i < count; i++) {
-		if (text_is_header[first + i])
-			item(i, 1, text_lines[first + i], "");
-		else
-			line(i, text_lines[first + i]);
-	}
-	help(text_help[now / HELP_EVERY_MS % TEXT_HELPS]);
+	for (i = 0; i < TEXT_SHOWN && first + i < count; i++)
+		stream_line(i, text_lines[first + i]);
+	if (!is_text_sending)
+		help(text_help[now / HELP_EVERY_MS % TEXT_HELPS]);
+	else if (morse.code[0] != 0)
+		help(morse.code);
+	else
+		help(text_send_help[now / HELP_EVERY_MS % TEXT_SEND_HELPS]);
 }
 
 static void draw_contact_delete(void) {
@@ -2217,6 +2454,11 @@ static void draw(long now) {
 		level_bar(&sidetone_level, line_y(1));
 		help("UP/DOWN   MENU: BACK");
 	}
+	if (page == PAGE_CW_VOLUME) {
+		title("CW volume");
+		level_bar(&cw_volume_level, line_y(1));
+		help(settings.cw_volume == 0 ? "OFF: MORSE NOT PLAYED" : "UP/DOWN   MENU: BACK");
+	}
 	if (page == PAGE_VOX)
 		draw_vox();
 	if (page == PAGE_CALLSIGN)
@@ -2273,7 +2515,7 @@ void screen_poll(long now) {
 	}
 
 	{
-		int is_kb = is_entering(page) && !settings.is_morse_typing;
+		int is_kb = is_entering(page) && is_keyboard();
 
 		keys_set_kind(KEY_ENTER, is_kb ? BUTTON_HOLDING : BUTTON_HOLDING_REPEATING);
 	}
@@ -2295,29 +2537,13 @@ void screen_poll(long now) {
 		touched_ms = now;
 		go(PAGE_WIFI_JOINING);
 	}
-	// the PTT key, on the Text page, turns between reading and sending
-	if (page == PAGE_TEXT) {
-		int is_key = ptt_key_is_down();
-
-		ptt_key_lend(1);
-		if (is_key && !was_ptt_key) {
-			if (is_text_sending && entry.length > 0)
-				send_entry(now);
-			is_text_sending = !is_text_sending;
-			entry_begin(&entry, ENTRY_ANY, "", TEXT_WORD_ROOM - 1);
-			morse_begin(&morse, (int)settings.wpm);
-			touched_ms = now;
-			drawn_ms = now - DRAW_EVERY_MS;
-		}
-		was_ptt_key = is_key;
-	}
-	is_keying = is_entering(page) && settings.is_morse_typing;
+	is_keying = is_entering(page) && !is_keyboard();
 	// the paddles, each element heard as it begins
 	// the speaker held ready for a tone: on the home page only while the
 	// paddles are in use, the rest of the time it rests
 	speaker_ready((is_keying && (page != PAGE_HOME || keys_is_down(KEY_UP) || keys_is_down(KEY_DOWN)
 			|| morse.state != MORSE_IDLE || morse.length > 0 || entry.length > 0))
-		|| page == PAGE_SIDETONE || text_play_is_busy(&play));
+		|| page == PAGE_SIDETONE || page == PAGE_CW_VOLUME || text_play_is_busy(&play));
 	if (is_keying) {
 		switch (morse_keys(&morse, keys_is_down(KEY_UP), keys_is_down(KEY_DOWN), now, &letter)) {
 		case MORSE_DIT:
@@ -2356,7 +2582,7 @@ void screen_poll(long now) {
 	ms = text_play_next(&play, now, !is_hearing && !ptt_is_down()
 		&& !keys_is_down(KEY_UP) && !keys_is_down(KEY_DOWN));
 	if (ms > 0)
-		speaker_tone(ms);
+		speaker_tone_at(ms, settings.cw_volume);
 	// when each last spoke: the target as the PTT goes down, a voice as it
 	// is first heard
 	if (ptt_is_down() && !was_ptt) {
@@ -2426,6 +2652,8 @@ void screen_text_heard(const char *from, const char *to, int wpm, const char *wo
 		return;
 	text_add(&kept, from, to, word);
 	text_touch(&kept, from, now);
+	if (contact < 0 && strcasecmp(from, settings.callsign))
+		stranger_heard(from);
 	if (to[0] >= '0' && to[0] <= '9') {
 		text_touch(&kept, to, now);
 		for (i = 0; i < SETTINGS_SLOTS; i++)
@@ -2434,7 +2662,7 @@ void screen_text_heard(const char *from, const char *to, int wpm, const char *wo
 	} else if (contact >= 0) {
 		is_quiet_now = is_quiet(SETTINGS_TARGET_CONTACT + (uint32_t)contact);
 	}
-	if (!is_quiet_now)
+	if (!is_quiet_now && settings.cw_volume > 0)
 		text_play_add(&play, word, wpm);
 	snprintf(heard_from, sizeof(heard_from), "%s", from);
 	snprintf(heard_word, sizeof(heard_word), "%s", word);
@@ -2442,15 +2670,11 @@ void screen_text_heard(const char *from, const char *to, int wpm, const char *wo
 	drawn_ms = now - DRAW_EVERY_MS;
 }
 
-// the word sent first and not yet answered, kept as sent, or in brackets
-// if nobody had it
+// the word sent first answered, had or not; it is in the stream already
 static void pending_done(int is_had) {
-	char shown[TEXT_WORD_ROOM + 2];
-
+	(void)is_had;
 	if (pending_count == 0)
 		return;
-	snprintf(shown, sizeof(shown), is_had ? "%s" : "[%s]", pending[0].word);
-	text_add(&kept, settings.callsign, pending[0].to, shown);
 	pending_count--;
 	memmove(pending, pending + 1, sizeof(pending[0]) * (size_t)pending_count);
 }

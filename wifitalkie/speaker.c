@@ -62,7 +62,8 @@
 // made straight into the ring, not through the queue, so that it is not
 // held START_MS; its ends are ramped over SIDETONE_RAMP_MS, or they click.
 // Its level is settings.sidetone's tenths of full scale, not VOL's, and
-// at 0 it is not heard.
+// at 0 it is not heard; Morse heard, speaker_tone_at(), is the same tone
+// at settings.cw_volume's.
 // Speech playing comes first, and the tone is not made. speaker_ready()
 // holds the rest at the middle while the keying page is up, so that a tone
 // starts at once and not REST_UP_MS later.
@@ -140,6 +141,7 @@ static uint32_t count_gap_samples;
 static uint32_t count_cut;
 static int is_ready;
 static int32_t tone_left;
+static int32_t tone_level;
 static int32_t tone_made;
 static uint32_t tone_phase;
 static int16_t sine[SINE_STEPS];
@@ -326,7 +328,7 @@ static void tone_make(void) {
 		if (ramp > SIDETONE_RAMP)
 			ramp = SIDETONE_RAMP;
 		level = sine[tone_phase >> 26] * ramp / SIDETONE_RAMP;
-		level = level * (int32_t)settings.sidetone / SETTINGS_SIDETONE_MOST;
+		level = level * tone_level / SETTINGS_SIDETONE_MOST;
 		ring_put(playback_duty(&play, level));
 		tone_phase += step;
 		tone_made++;
@@ -335,12 +337,19 @@ static void tone_make(void) {
 	}
 }
 
-// a sidetone of ms, cutting short one that sounds
-void speaker_tone(int ms) {
-	if (settings.sidetone == 0 || is_muted)
+// a tone of ms at a level of 0 to SETTINGS_SIDETONE_MOST, cutting short
+// one that sounds
+void speaker_tone_at(int ms, uint32_t level) {
+	if (level == 0 || is_muted)
 		return;
+	tone_level = (int32_t)level;
 	tone_made = 0;
 	tone_left = (int32_t)ms * (PLAYBACK_RATE_HZ / 1000);
+}
+
+// the keyer's sidetone of ms
+void speaker_tone(int ms) {
+	speaker_tone_at(ms, settings.sidetone);
 }
 
 // 1 while a sidetone is being made
