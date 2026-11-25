@@ -51,13 +51,10 @@
 // address comes to /update, with no tabs, and the talkie's screen shows
 // the code it asks for.
 //
-// A talkie new from its box, with no callsign or no network, is taken
-// through the pages as a wizard of three steps, the author's of
-// 2026-11-09: STEP 1 the callsign, STEP 2 the network, and STEP 3, on the
-// page after JOIN, the activation code and what to do with it: back on
-// the telephone's usual WiFi, at my.sbitx.net, make an account for the
-// callsign, or sign in, and add a radio with this code. The code is also
-// on the talkie, at Settings, Activate.
+// A talkie new from its box is not set up here but on itself, the
+// author's flow of 2026-11-25: its WiFi page, then its code shown with
+// my.sbitx.net/wbitx, where the owner adds it (enrol.c, screen.c). These
+// pages are for what is set later.
 //
 // JOIN keeps the network with its key (known.c) as the one set, says on
 // the page that the talkie is joining it, and JOIN_CLOSE_MS later closes
@@ -619,11 +616,8 @@ static void show_activation(void) {
 	page += html(shown);
 	page += "</p><p>Take a screenshot of this page. Then:</p><ol>"
 		"<li>Put this phone back on its usual WiFi.</li>"
-		"<li>Go to <a style='color:#036' href=https://my.sbitx.net/><b>my.sbitx.net</b></a> and "
-		"make an account for <b>";
-	page += html(settings.callsign);
-	page += "</b>, or sign in if you have one.</li>"
-		"<li>Add a radio, and enter the code above.</li></ol>"
+		"<li>Go to <b>my.sbitx.net/wbitx</b>, sign in or make an account, "
+		"and enter the code above.</li></ol>"
 		"<p>The talkie comes online by itself within a minute. The code is also "
 		"on the talkie, at Settings, Activate.</p>";
 	end_page(page);

@@ -159,6 +159,7 @@
 #include "contacts.h"
 #include "dial.h"
 #include "display.h"
+#include "enrol.h"
 #include "entry.h"
 #include "font.h"
 #include "keys.h"
@@ -245,6 +246,9 @@
 #define PAGE_UPDATE_GITHUB 30
 #define PAGE_UPDATE_LOCAL 31
 #define PAGE_WIFI_KEY 32
+#define PAGE_GRID 33
+// a grid square of six, MK97FK; four will do
+#define GRID_LONGEST 6
 // the sidetone heard at each step of its level
 #define SIDETONE_STEP_MS 250
 // a word on the entry page, why the text was not kept, shown this long
@@ -298,6 +302,7 @@ static const struct item settings_items[] = {
 	{"Sidetone", PAGE_SIDETONE},
 	{"VOX", PAGE_VOX},
 	{"Callsign", PAGE_CALLSIGN},
+	{"Grid", PAGE_GRID},
 	{"Configure...", PAGE_SETUP},
 	{"Update...", PAGE_UPDATE},
 	{"Device key", PAGE_ACTIVATE},
@@ -398,6 +403,8 @@ static char wifi_ssid[SETTINGS_SSID_ROOM];
 static char wifi_key[SETTINGS_PASSWORD_ROOM];
 static int wifi_rssi;
 static long joining_since_ms;
+// the Activate page put up by itself, once, for a talkie with no callsign
+static int is_activate_shown;
 // the target opened, a slot or SETTINGS_TARGET_CONTACT + a contact's
 // place, for its menu and the pages it opens; and where its menu was
 // opened from, the menu or the home page
@@ -462,7 +469,7 @@ static void save_soon(long now) {
 }
 
 static int is_entering(int on_page) {
-	return on_page == PAGE_CALLSIGN || on_page == PAGE_CONTACT
+	return on_page == PAGE_CALLSIGN || on_page == PAGE_CONTACT || on_page == PAGE_GRID
 		|| on_page == PAGE_WIFI_KEY
 		|| (on_page == PAGE_TEXT && is_text_sending);
 }
@@ -563,6 +570,8 @@ static void go(int to) {
 			: contact_editing >= 0 ? settings.contacts[contact_editing] : "",
 			SETTINGS_CALLSIGN_ROOM - 1);
 	}
+	if (to == PAGE_GRID)
+		entry_begin(&entry, ENTRY_CALLSIGN, settings.grid, GRID_LONGEST);
 	if (to == PAGE_TEXT || to == PAGE_HOME)
 		entry_begin(&entry, ENTRY_ANY, "", TEXT_WORD_ROOM - 1);
 	// from a join that failed, the key that was tried, to be put right
@@ -1023,6 +1032,37 @@ static void send_entry(long now) {
 	morse_abort(&morse);
 }
 
+// the grid typed, MK97 or MK97FK, kept and said to the service, which puts
+// the talkie on the map by it; empty clears it. Anything else is refused
+static int is_grid(const char *grid) {
+	size_t length = strlen(grid);
+	size_t i;
+
+	if (length != 4 && length != GRID_LONGEST)
+		return 0;
+	for (i = 0; i < length; i++) {
+		char c = grid[i];
+		int is_ok = i == 2 || i == 3 ? c >= '0' && c <= '9'
+			: i < 2 ? c >= 'A' && c <= 'R' : c >= 'A' && c <= 'X';
+
+		if (!is_ok)
+			return 0;
+	}
+	return 1;
+}
+
+static int grid_keep(long now) {
+	if (entry.length > 0 && !is_grid(entry.text)) {
+		entry_said = "NOT A GRID";
+		entry_said_ms = now;
+		return 0;
+	}
+	snprintf(settings.grid, sizeof(settings.grid), "%s", entry.text);
+	settings_save();
+	console_say("GRID %s", settings.grid);
+	return 1;
+}
+
 // ENTER pressed on a page of text entry, no letter being chosen: the text
 // is kept
 static void accept(long now) {
@@ -1038,6 +1078,8 @@ static void accept(long now) {
 		send_entry(now);
 		return;
 	}
+	if (page == PAGE_GRID && !grid_keep(now))
+		return;
 	if (page == PAGE_CALLSIGN && entry.length > 0) {
 		snprintf(settings.callsign, sizeof(settings.callsign), "%s", entry.text);
 		settings_save();
@@ -1466,6 +1508,8 @@ static void item_value(int of_page, char *text, int room) {
 		snprintf(text, room, settings.vox == VOX_OFF ? "Off" : "%u", (unsigned)settings.vox);
 	if (of_page == PAGE_CALLSIGN)
 		snprintf(text, room, "%s", settings.callsign);
+	if (of_page == PAGE_GRID)
+		snprintf(text, room, "%s", settings.grid);
 	// the network joined, or the one being tried, which may be a
 	// remembered one and not the one set
 	if (of_page == PAGE_WIFI) {
@@ -1884,8 +1928,18 @@ static void draw_activate(void) {
 	char shown[AUTH_COOKIE_SHOWN_ROOM];
 	char text[TEXT_ROOM];
 
-	title("Device key");
 	service_code(shown);
+	// new from its box: where to add it, and the code to type there
+	if (settings.callsign[0] == 0) {
+		title("Activate");
+		line(0, "On a phone, go to");
+		line(1, "my.sbitx.net/wbitx");
+		line(2, "and enter the code");
+		line(3, shown);
+		help(network_is_up() ? "WAITING FOR IT..." : "JOIN A WIFI FIRST");
+		return;
+	}
+	title("Device key");
 	line(0, shown);
 	if (service_is_online()) {
 		line(1, "Registered");
@@ -2167,6 +2221,8 @@ static void draw(long now) {
 		draw_vox();
 	if (page == PAGE_CALLSIGN)
 		draw_entry("Callsign", now);
+	if (page == PAGE_GRID)
+		draw_entry("Grid square", now);
 	if (page == PAGE_CONTACT)
 		draw_entry(contact_editing < 0 ? "New contact" : "Contact", now);
 	if (page == PAGE_CONTACT_DELETE)
@@ -2223,6 +2279,17 @@ void screen_poll(long now) {
 	}
 	if (keys_poll(now, &press))
 		take(&press, now);
+	// on a network with no callsign: the code and where to add it, once;
+	// told its callsign (enrol.c), home
+	if (enrol_is_waiting() && !is_activate_shown
+			&& (page == PAGE_HOME || page == PAGE_WIFI_JOINING)) {
+		is_activate_shown = 1;
+		go(PAGE_ACTIVATE);
+	}
+	if (enrol_took()) {
+		is_activate_shown = 0;
+		go(PAGE_HOME);
+	}
 	if (portal_joined(wifi_ssid, sizeof(wifi_ssid))) {
 		joining_since_ms = now;
 		touched_ms = now;
@@ -2305,12 +2372,22 @@ void screen_poll(long now) {
 	if (!is_begun) {
 		is_begun = 1;
 		touched_ms = now;
-		if (settings.ssid[0] == 0 && known_count(&settings) == 0)
-			go(PAGE_SETUP);
+		// new from its box: the WiFi page, the key typed on the keyboard
+		if (settings.ssid[0] == 0 && known_count(&settings) == 0) {
+			network_scan_begin();
+			wifi_chosen = 0;
+			wifi_top = 0;
+			go(PAGE_WIFI);
+		}
 	}
 	if (page != PAGE_HOME && page != PAGE_INFO && page != PAGE_SETUP
 			&& page != PAGE_UPDATE_GITHUB && page != PAGE_UPDATE_LOCAL
-			&& page != PAGE_ACTIVATE && now - touched_ms >= MENU_IDLE_MS)
+			&& page != PAGE_ACTIVATE
+			// a talkie being set up, with no network yet, stays on the WiFi
+			// pages
+			&& !(settings.ssid[0] == 0 && known_count(&settings) == 0
+				&& (page == PAGE_WIFI || page == PAGE_WIFI_KEY || page == PAGE_WIFI_JOINING))
+			&& now - touched_ms >= MENU_IDLE_MS)
 		go(PAGE_HOME);
 	if (is_save_due && now >= save_ms) {
 		is_save_due = 0;

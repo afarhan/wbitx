@@ -39,7 +39,9 @@
 // ONCE IT IS UP
 //
 // The talkie says its grid, GRID with nothing after it if none is set, and
-// ALLOWS voip text, as a radio with VOIP online does, with text too, and
+// ALLOWS voip text streaming, as a radio with VOIP online does, with text
+// too, and anyone may listen to it, as to an sBitx (voip.c, WHAT IS
+// LISTENED TO: AUDIO ON and AUDIO OFF, and TUNED <FREQ> VOIP said here), and
 // then nothing but PING a minute, and the words of text the screen sends
 // (service_send_word()); a line not heard from for SILENCE_MOST_MS is
 // taken to be lost. The service answers ALLOWS with VOIP STREAM <id>
@@ -130,6 +132,9 @@ static long next_ping_ms;
 static long last_heard_ms;
 static char grid_told[SETTINGS_GRID_ROOM];
 static int is_grid_told;
+#define TUNED_EVERY_LEAST_MS 1000
+static uint32_t tuned_told;	// FREQ said in TUNED while the sound is on; 0 none
+static long tuned_told_ms;
 static int is_allows_told;
 static char name[NAME_ROOM];
 static char failed_because[TEXT_ROOM];
@@ -163,6 +168,7 @@ static void close_line(void) {
 	dialing_fd = NOT_OPEN;
 	gathered_used = 0;
 	voip_close();
+	voip_audio_off();
 }
 
 static int no_answer(const char *because) {
@@ -398,6 +404,7 @@ static void connected(long now) {
 	retry_after_ms = RETRY_FIRST_MS;
 	is_grid_told = 0;
 	is_allows_told = 0;
+	tuned_told = 0;
 	snprintf(said, sizeof(said), "ONLINE %s", name);
 	say_status(said);
 }
@@ -456,6 +463,15 @@ static void heard(const char *line, long now) {
 		voip_open(&service_address, token, nonce, settings.stretched);
 		return;
 	}
+	if (sscanf(line, "AUDIO ON %16s %64s", token, nonce) == 2) {
+		voip_audio_on(token, nonce, settings.stretched, now);
+		tuned_told = 0;
+		return;
+	}
+	if (!strcmp(line, "AUDIO OFF")) {
+		voip_audio_off();
+		return;
+	}
 	if (sscanf(line, "VOIP ROOM %ld %d", &channel, &count) == 2) {
 		voip_room_heard(channel, count);
 		return;
@@ -509,8 +525,19 @@ static void line_poll(long now) {
 	}
 	if (!is_allows_told) {
 		is_allows_told = 1;
-		if (send_text("ALLOWS voip text\n") < 0) {
+		if (send_text("ALLOWS voip text streaming\n") < 0) {
 			lost(now, "ALLOWS could not be sent");
+			return;
+		}
+	}
+	// where the talkie is tuned, for those listening; no oftener than a second
+	if (voip_audio_is_on() && settings.hz != 0 && settings.hz != tuned_told
+			&& now - tuned_told_ms >= TUNED_EVERY_LEAST_MS) {
+		snprintf(line, sizeof(line), "TUNED %u VOIP\n", (unsigned)settings.hz);
+		tuned_told = settings.hz;
+		tuned_told_ms = now;
+		if (send_text(line) < 0) {
+			lost(now, "TUNED could not be sent");
 			return;
 		}
 	}

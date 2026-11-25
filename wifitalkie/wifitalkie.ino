@@ -47,6 +47,7 @@
 #include "esp_task_wdt.h"
 
 #include "console.h"
+#include "enrol.h"
 #include "microphone.h"
 #include "network.h"
 #include "portal.h"
@@ -105,6 +106,7 @@ void loop() {
 	TIMED(ptt_poll(now));
 	TIMED(microphone_poll(now));
 	TIMED(service_poll(now));
+	TIMED(enrol_poll(now));
 	TIMED(voip_poll(now));
 	TIMED(speaker_poll(now));
 	TIMED(screen_poll(now));

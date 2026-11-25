@@ -53,6 +53,19 @@
 // when they begin, HEARD VU2ESE, and when they have been quiet for
 // OVER_GAP_MS, OVER VU2ESE.
 //
+// WHAT IS LISTENED TO
+//
+// The talkie is a radio like the others at my.sbitx.net (PROTOCOL.md,
+// "From the radio to the service"): it allows streaming, and while somebody
+// listens to it from the website the service says AUDIO ON <id> <nonce>,
+// and AUDIO OFF when the last has gone. Meanwhile what the talkie hears,
+// and what it says with the PTT down, goes to the service as an sBitx's
+// receiver does: twenty milliseconds at a time, an RTP packet of mu-law
+// between the stream's id and a tag of the "zbitx-audio-1" key, by UDP to
+// the same port as VoIP's. It goes steadily, one every twenty milliseconds,
+// silence between overs, for the website's player fills a gap with grain;
+// service.c says TUNED <FREQ> VOIP when it begins and when FREQ moves.
+//
 // LOCAL
 //
 // With the link set to Local the same packets go to local.c instead, as
@@ -77,6 +90,7 @@
 #include "microphone.h"
 #include "ptt.h"
 #include "settings.h"
+#include "sha256.h"
 #include "speaker.h"
 #include "telephone.h"
 #include "voip.h"
@@ -91,6 +105,16 @@
 #define VOX_QUIET_MS 600
 #define TEXT_ROOM 48
 #define TONE_STEPS 8
+#define AUDIO_KEY_WORDS "zbitx-audio-1"
+#define RTP_HEADER_BYTES 12
+#define AUDIO_PACKET_BYTES (VOIP_STREAM_ID_BYTES + RTP_HEADER_BYTES + VOIP_SOUND_BYTES + VOIP_TAG_BYTES)
+#define AUDIO_FRAME_MS 20
+// frames of sound kept for the stream, against the unevenness of their coming
+#define AUDIO_QUEUE 16
+// fallen this far behind, the stream's clock starts again from now
+#define AUDIO_BEHIND_MS 200
+#define AUDIO_SSRC 0x77626974u
+#define ULAW_SILENCE 0xff
 
 // 1 kHz at 8000 a second, about 10 dB below full scale
 static const int16_t tone_steps[TONE_STEPS] = {
@@ -130,6 +154,15 @@ static uint32_t count_sent;
 static uint32_t count_heard;
 static uint32_t count_refused;
 static uint32_t count_dropped;
+static int is_audio_on;
+static uint8_t audio_id[VOIP_STREAM_ID_BYTES];
+static char audio_key[SHA256_HEX_ROOM];
+static uint16_t audio_sequence;
+static uint32_t audio_timestamp;
+static long audio_due_ms;
+static uint8_t audio_queue[AUDIO_QUEUE][VOIP_SOUND_BYTES];
+static int audio_first;
+static int audio_count;
 
 void voip_open(const struct sockaddr_in *service, const char *id_hex, const char *nonce,
 		const char *stretched) {
@@ -152,6 +185,89 @@ void voip_open(const struct sockaddr_in *service, const char *id_hex, const char
 	is_tuned_begun = 0;
 	channel_told = -1;
 	console_say("VOIP STREAM OPEN");
+}
+
+// the sound asked for by the service, AUDIO ON, while somebody listens
+void voip_audio_on(const char *id_hex, const char *nonce, const char *stretched, long now) {
+	if (voip_id_of_hex(id_hex, audio_id) < 0) {
+		console_say("AUDIO ON NOT UNDERSTOOD");
+		return;
+	}
+	auth_stream_key(stretched, AUDIO_KEY_WORDS, nonce, audio_key);
+	is_audio_on = 1;
+	audio_count = 0;
+	audio_due_ms = now;
+	console_say("AUDIO ON: SOMEBODY IS LISTENING");
+}
+
+void voip_audio_off(void) {
+	if (is_audio_on)
+		console_say("AUDIO OFF");
+	is_audio_on = 0;
+}
+
+int voip_audio_is_on(void) {
+	return is_audio_on && fd != NOT_OPEN;
+}
+
+// twenty milliseconds heard or said, for the stream
+static void audio_keep(const uint8_t *sound) {
+	if (!is_audio_on)
+		return;
+	if (audio_count == AUDIO_QUEUE) {
+		audio_first = (audio_first + 1) % AUDIO_QUEUE;
+		audio_count--;
+	}
+	memcpy(audio_queue[(audio_first + audio_count) % AUDIO_QUEUE], sound, VOIP_SOUND_BYTES);
+	audio_count++;
+}
+
+static void audio_send(const uint8_t *sound) {
+	uint8_t packet[AUDIO_PACKET_BYTES];
+	uint8_t hash[SHA256_BYTES];
+	uint8_t *rtp = packet + VOIP_STREAM_ID_BYTES;
+
+	audio_sequence++;
+	audio_timestamp += VOIP_SOUND_BYTES;
+	memcpy(packet, audio_id, VOIP_STREAM_ID_BYTES);
+	rtp[0] = 0x80;
+	rtp[1] = 0;	// PCMU
+	rtp[2] = (uint8_t)(audio_sequence >> 8);
+	rtp[3] = (uint8_t)audio_sequence;
+	rtp[4] = (uint8_t)(audio_timestamp >> 24);
+	rtp[5] = (uint8_t)(audio_timestamp >> 16);
+	rtp[6] = (uint8_t)(audio_timestamp >> 8);
+	rtp[7] = (uint8_t)audio_timestamp;
+	rtp[8] = (uint8_t)(AUDIO_SSRC >> 24);
+	rtp[9] = (uint8_t)(AUDIO_SSRC >> 16);
+	rtp[10] = (uint8_t)(AUDIO_SSRC >> 8);
+	rtp[11] = (uint8_t)AUDIO_SSRC;
+	memcpy(rtp + RTP_HEADER_BYTES, sound, VOIP_SOUND_BYTES);
+	hmac_sha256((const uint8_t *)audio_key, strlen(audio_key), packet,
+		AUDIO_PACKET_BYTES - VOIP_TAG_BYTES, hash);
+	memcpy(packet + AUDIO_PACKET_BYTES - VOIP_TAG_BYTES, hash, VOIP_TAG_BYTES);
+	send(fd, packet, sizeof(packet), 0);
+}
+
+// a packet every twenty milliseconds while the sound is on: what was kept,
+// or silence
+static void audio_poll(long now) {
+	static const uint8_t silence[VOIP_SOUND_BYTES] = {[0 ... VOIP_SOUND_BYTES - 1] = ULAW_SILENCE};
+
+	if (!voip_audio_is_on() || settings.is_local)
+		return;
+	if (now - audio_due_ms > AUDIO_BEHIND_MS)
+		audio_due_ms = now;
+	while (now - audio_due_ms >= 0) {
+		audio_due_ms += AUDIO_FRAME_MS;
+		if (audio_count > 0) {
+			audio_send(audio_queue[audio_first]);
+			audio_first = (audio_first + 1) % AUDIO_QUEUE;
+			audio_count--;
+		} else {
+			audio_send(silence);
+		}
+	}
 }
 
 void voip_close(void) {
@@ -233,6 +349,7 @@ static void speak_frame(int16_t samples[TELEPHONE_FRAME_SAMPLES]) {
 		sound[i] = telephone_ulaw_of(samples[i]);
 	}
 	send_packet(VOIP_KIND_SPEECH, sound);
+	audio_keep(sound);
 }
 
 static void speak(int is_talking) {
@@ -294,6 +411,7 @@ static void take(const uint8_t *packet, int length, int is_talking, long now) {
 	}
 	count_heard++;
 	speaker_take(heard.sound, now);
+	audio_keep(heard.sound);
 	if (!is_hearing || strcmp(heard.callsign, speaker_callsign)) {
 		snprintf(speaker_callsign, sizeof(speaker_callsign), "%s", heard.callsign);
 		console_say("HEARD %s", speaker_callsign);
@@ -330,6 +448,7 @@ static void take_local(const uint8_t *packet, int is_talking, long now) {
 	number_taken = heard.number;
 	count_heard++;
 	speaker_take(heard.sound, now);
+	audio_keep(heard.sound);
 	if (!is_hearing) {
 		snprintf(speaker_callsign, sizeof(speaker_callsign), "%s", heard.callsign);
 		console_say("HEARD %s", speaker_callsign);
@@ -367,6 +486,7 @@ void voip_poll(long now) {
 		is_hearing = 0;
 		console_say("OVER %s", speaker_callsign);
 	}
+	audio_poll(now);
 	ptt_lamp(is_talking || is_hearing);
 }
 
