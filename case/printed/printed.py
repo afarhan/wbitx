@@ -341,10 +341,11 @@ _BY_CELL = (HX1 + HOLDER_CLR + 0.2 + STANDOFF_D / 2, by(0) + CLR + STANDOFF_D / 
 assert _clear_of_speaker(*_BY_CELL), "the screw by the cell meets the speaker's ring"
 
 # the screws: (x, y, through the board)
+MID_SCREW = False   # the one by the cell out (the user's, 2026-11-25): the holder on the front, the cell no longer pushes the halves apart
 SCREWS = [(bx(u), by(v), True) for (u, v) in HOLES] + [
-    _TOP_RIGHT + (False,),
+    _TOP_RIGHT + (False,)] + ([
     # right of the holder, under the speaker: the cell pushes the halves apart
-    _BY_CELL + (False,)]
+    _BY_CELL + (False,)] if MID_SCREW else [])
 
 LEV_IN = OW + LEV_GAP
 
@@ -386,7 +387,7 @@ assert PTT_Z + PTT_PLUNGER / 2 <= Z_BB - BAR_TOP, "the bar misses the plunger's 
 assert CSK_Z >= TUBE_TOP + 0.6, "the head's cone reaches the tube"
 assert LEV_END > by(JACK_V) + JACK_HOLE / 2 + 5, "the lever covers the jack"
 assert math.hypot(SCREWS[2][0] - SPK_X, SCREWS[2][1] - SPK_Y) >= SPK_R + RIB + POST_D / 2
-assert math.hypot(SCREWS[3][0] - SPK_X, SCREWS[3][1] - SPK_Y) >= SPK_R + RIB + POST_D / 2, \
+assert not MID_SCREW or math.hypot(SCREWS[3][0] - SPK_X, SCREWS[3][1] - SPK_Y) >= SPK_R + RIB + POST_D / 2, \
     "the top screw meets the speaker's ring"
 
 

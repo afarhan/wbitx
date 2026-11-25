@@ -30,6 +30,8 @@ Read this before any change. Every revision must keep every item here. Add an it
 15. M3 pilots 2.9 (2.6 printed too small; the screws wouldn't thread) (2026-11-25).
 16. The USB-C cutout 0.5 mm toward the PTT side (the socket sat off centre in the print, usb.jpeg) (2026-11-25).
 
+17. The middle screw (beside the holder) removed (2026-11-25): three case screws.
+
 ## Measured (the user's, on wearable2's board, same switches)
 - B3FS-1010P: body 3.0 off the board, plunger top 4.8, keytop flange rests at 3.8.
 
