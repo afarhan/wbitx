@@ -34,7 +34,6 @@
 //                               output, function, and the level read
 //     SCREEN                    the page shown, the last key, the display's
 //                               pages sent and failed
-//     RECORD                    3 s of the microphone, in hex, after
 //     MICPIN <0-4>              read the microphone on another ADC1 pin
 //     DISPLAY ON|OFF            the OLED, and its I2C, on or off
 //     AUDIO ON|OFF              GPIO1: the preamplifiers and the amplifier
@@ -48,7 +47,7 @@
 //
 // A verb that changes what the line to my.sbitx.net is made with, CALL,
 // SERVER, NEW_KEY and VOIP, has it made again. Whatever is set is kept
-// across power-ups, but PTT, TONE, LEVELS, RECORD, MICPIN, DISPLAY, AUDIO and RADIO, which are for now.
+// across power-ups, but PTT, TONE, LEVELS, MICPIN, DISPLAY, AUDIO and RADIO, which are for now.
 
 #include <ctype.h>
 #include <stdio.h>
@@ -470,10 +469,6 @@ void verbs_do(const char *line, long now) {
 		console_say("SCREEN %s", first);
 		return;
 	}
-	if (!strcmp(verb, "RECORD")) {
-		microphone_record();
-		return;
-	}
 	if (!strcmp(verb, "AUDIO") && is_on_off(first, &is_on)) {
 		microphone_power(is_on);
 		console_say("AUDIO %s", is_on ? "ON" : "OFF");
@@ -527,7 +522,7 @@ void verbs_do(const char *line, long now) {
 		esp_restart();
 		return;
 	}
-	console_say("? %s: WIFI SCAN LINK RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX GATE KEYS PIN SCREEN RECORD MICPIN DISPLAY AUDIO BATTERY STATUS MEMORY SLEEP RESTART", verb);
+	console_say("? %s: WIFI SCAN LINK RADIO CALL GRID FREQ SERVER KEY NEW_KEY VOIP PTT TONE VOL MIC LEVELS VOX GATE KEYS PIN SCREEN MICPIN DISPLAY AUDIO BATTERY STATUS MEMORY SLEEP RESTART", verb);
 }
 
 void verbs_poll(long now) {

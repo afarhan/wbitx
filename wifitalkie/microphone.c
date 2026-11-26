@@ -34,17 +34,10 @@
 // Each sample also goes to vox.c, before the gate, which keys the talkie
 // by the voice while settings.vox is on: microphone_vox() says whether it
 // has, and microphone_vox_hold() holds it off while voip.c hears a voice.
-// LEVELS measures before the gate, and RECORD keeps
-// what is sent.
+// LEVELS measures before the gate.
 //
 // microphone_pin() reads another pin from now on, until the next power-up:
 // GPIO0 to GPIO4 are ADC1's, for trying which is quietest.
-//
-// microphone_record() keeps the next RECORD_SECONDS of what goes out, at
-// 8000 a second, and then says it on the console a line of RECORD_LINE
-// samples at a time, one line a turn of the loop: RECORDING, lines of
-// "R" and four hex digits a sample, then RECORDED. It is for looking at
-// the microphone's noise from the laptop.
 //
 // The battery shares the ADC: PIN_BATTERY, behind a 100k and 100k divider
 // from the 5 V line, is the pattern's second channel, so the ADC runs at
@@ -108,9 +101,6 @@
 #define INT16_MOST 32767
 #define MS_A_SECOND 1000
 #define STALL_MS 500
-#define RECORD_SECONDS 3
-#define RECORD_SAMPLES (RECORD_SECONDS * TELEPHONE_RATE_HZ)
-#define RECORD_LINE 32
 #define ADC_CODES 4096
 #define BATTERY_SHIFT 10           // its mean's corner, well under 1 Hz
 #if BATTERY_DIVIDER_ON_CELL
@@ -148,10 +138,6 @@ static long last_result_ms;
 static unsigned restarts;
 static long second_began_ms;
 static struct microphone_levels last_second;
-static int16_t recorded[RECORD_SAMPLES];
-static int is_recording;
-static int record_filled;
-static int record_said;
 
 // a pin the ADC reads let float: neither pull, so that only what is on
 // it is read
@@ -300,8 +286,6 @@ static void take(int raw) {
 		vox_peak = vox_size(&vox);
 	if (settings.is_gate)
 		kept = speech_gate(&speech, kept, TELEPHONE_RATE_HZ);
-	if (is_recording && record_filled < RECORD_SAMPLES)
-		recorded[record_filled++] = kept;
 	frames[frame_in][filled++] = kept;
 	if (filled == TELEPHONE_FRAME_SAMPLES)
 		frame_full();
@@ -372,31 +356,6 @@ int microphone_battery(int *millivolts) {
 	return MICROPHONE_BATTERY;
 }
 
-static void record_say(void) {
-	char line[2 + RECORD_LINE * 4];
-	int n = 0;
-	int i;
-
-	if (!is_recording || record_filled < RECORD_SAMPLES)
-		return;
-	line[n++] = 'R';
-	for (i = 0; i < RECORD_LINE && record_said < RECORD_SAMPLES; i++, record_said++)
-		n += snprintf(&line[n], sizeof(line) - n, "%04x", (uint16_t)recorded[record_said]);
-	console_say("%s", line);
-	if (record_said < RECORD_SAMPLES)
-		return;
-	console_say("RECORDED %d SAMPLES AT %d A SECOND, THE ADC AT %d OF %d, ABOUT %d MV", RECORD_SAMPLES,
-		TELEPHONE_RATE_HZ, (int)(mean >> MEAN_FRACTION_SHIFT), ADC_CODES, adc_millivolts());
-	is_recording = 0;
-}
-
-void microphone_record(void) {
-	record_filled = 0;
-	record_said = 0;
-	is_recording = 1;
-	console_say("RECORDING %d SECONDS", RECORD_SECONDS);
-}
-
 void microphone_poll(long now) {
 	uint8_t results[FRAME_BYTES];
 	adc_digi_output_data_t *result;
@@ -426,7 +385,6 @@ void microphone_poll(long now) {
 		adc_continuous_start(handle);
 		last_result_ms = now;
 	}
-	record_say();
 	if (now - second_began_ms < MS_A_SECOND)
 		return;
 	last_second.results = results_a_second;
