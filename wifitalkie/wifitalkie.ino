@@ -48,6 +48,7 @@
 
 #include "console.h"
 #include "enrol.h"
+#include "power.h"
 #include "microphone.h"
 #include "network.h"
 #include "portal.h"
@@ -62,7 +63,6 @@
 #include "verbs.h"
 #include "voip.h"
 
-#define TICKS_GIVEN_UP 1
 #define WATCHDOG_MS 10000
 
 // a probe for now: any poll that keeps the loop SLOW_MS or more is said
@@ -80,6 +80,7 @@ void setup() {
 	microphone_open();
 	service_open();
 	network_open();
+	power_open();
 	esp_task_wdt_config_t watchdog = {
 		.timeout_ms = WATCHDOG_MS,
 		.idle_core_mask = 0,
@@ -110,9 +111,10 @@ void loop() {
 	TIMED(voip_poll(now));
 	TIMED(speaker_poll(now));
 	TIMED(screen_poll(now));
+	TIMED(power_poll(now));
 	TIMED(sleep_poll(now));
 	long turned = (long)millis();
-	vTaskDelay(TICKS_GIVEN_UP);
+	vTaskDelay(power_loop_ticks());
 	if ((long)millis() - turned >= SLOW_MS)
 		console_say("SLOW: vTaskDelay %ld MS", (long)millis() - turned);
 }

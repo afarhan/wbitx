@@ -34,6 +34,7 @@ void microphone_levels(struct microphone_levels *levels);
 void microphone_record(void);
 void microphone_pin(int pin);
 void microphone_power(int is_on);
+void microphone_idle(int is_idling);
 
 #define MICROPHONE_UNKNOWN 0
 #define MICROPHONE_BATTERY 1

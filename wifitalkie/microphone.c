@@ -83,6 +83,7 @@
 #include "esp_adc/adc_cali_scheme.h"
 #include "esp_adc/adc_continuous.h"
 #include "driver/gpio.h"
+#include "esp_timer.h"
 
 #include "battery.h"
 #include "console.h"
@@ -208,6 +209,25 @@ static void open_on(int pin) {
 // the preamplifiers and the PAM8403, on or off together
 void microphone_power(int is_on) {
 	gpio_set_level(PIN_MIC_POWER, is_on ? 1 : 0);
+}
+
+// idle (power.c): the preamplifiers and the PAM8403 off and the ADC
+// stopped; awake, both again
+static int is_idle;
+
+void microphone_idle(int is_idling) {
+	if (is_idling == is_idle)
+		return;
+	is_idle = is_idling;
+	microphone_power(!is_idle);
+	if (!is_open)
+		return;
+	if (is_idle) {
+		adc_continuous_stop(handle);
+	} else {
+		adc_continuous_start(handle);
+		last_result_ms = (long)(esp_timer_get_time() / 1000);
+	}
 }
 
 void microphone_open(void) {
@@ -383,7 +403,7 @@ void microphone_poll(long now) {
 	uint32_t got = 0;
 	uint32_t i;
 
-	if (!is_open)
+	if (!is_open || is_idle)
 		return;
 	while (adc_continuous_read(handle, results, sizeof(results), &got, 0) == ESP_OK) {
 		last_result_ms = now;

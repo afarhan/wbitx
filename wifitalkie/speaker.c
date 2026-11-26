@@ -362,6 +362,11 @@ void speaker_ready(int is_readying) {
 	is_ready = is_readying;
 }
 
+// 1 once the rest is at the middle, a tone to start at once
+int speaker_is_ready(void) {
+	return !is_muted && rest_duty == PWM_MIDDLE;
+}
+
 void speaker_poll(long now) {
 	int32_t level;
 	uint32_t step;
@@ -401,12 +406,16 @@ void speaker_mute(int is_muting) {
 	if (is_muting == is_muted)
 		return;
 	is_muted = is_muting;
+	// disabled, not only stopped, so that it lets go of its power
+	// management lock and the C3 may sleep while the talkie is idle
 	if (!is_muted) {
+		gptimer_enable(timer);
 		gptimer_start(timer);
 		return;
 	}
 	queue_empty();
 	gptimer_stop(timer);
+	gptimer_disable(timer);
 	ring_out = ring_in;
 	ledc_set_duty(PWM_MODE, PWM_LEFT, rest_duty);
 	ledc_update_duty(PWM_MODE, PWM_LEFT);

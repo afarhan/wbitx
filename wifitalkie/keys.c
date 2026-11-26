@@ -7,8 +7,7 @@
 // presses mean. UP and DOWN repeat while held; MENU is BACK when pressed and
 // HOME when held; ENTER is a press, given as it comes up, and held, which
 // takes a character off while text is entered, and goes on taking them off
-// while it is held. On the home page ENTER is the PTT as well; ptt.c reads
-// its level. keys_poll() gives at most one press a
+// while it is held. keys_poll() gives at most one press a
 // turn of the loop; two keys' presses in the same millisecond give the
 // first's, with how long its key has been held.
 

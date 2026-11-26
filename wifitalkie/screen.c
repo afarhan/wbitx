@@ -23,11 +23,9 @@
 //     Vol [#########     ] 50        the volume
 //
 // The PTT key speaks to the target (ptt.c); ENTER is the screen's on every
-// page. On the home page ENTER opens the target's menu, MENU opens the
-// menu, and UP and DOWN are the Morse paddles (morse.c): each word goes to
-// the target at the gap after it, the letters keyed shown in place of the
-// state line, "> HEL .-". A word heard is shown there for HEARD_SHOWN_MS,
-// "VU2XZ: HELLO". The volume is in the target's menu. Until calls by
+// page. On the home page ENTER opens the target's menu, Text chosen in it,
+// MENU opens the menu, and UP and DOWN set the volume. A word heard is
+// shown in place of the state line for HEARD_SHOWN_MS, "VU2XZ: HELLO". Until calls by
 // callsign are made, a contact as the target speaks in the room of the
 // slot last chosen.
 //
@@ -183,6 +181,7 @@
 #include "pins.h"
 #include "network.h"
 #include "portal.h"
+#include "power.h"
 #include "ptt.h"
 #include "service.h"
 #include "settings.h"
@@ -261,6 +260,9 @@
 #define PAGE_WIFI_KEY 32
 #define PAGE_GRID 33
 #define PAGE_CW_VOLUME 34
+// the tick after a Text page's title, all its words delivered
+#define TICK_WIDE 8
+#define TICK_GAP 3
 // a grid square of six, MK97FK; four will do
 #define GRID_LONGEST 6
 // the sidetone heard at each step of its level
@@ -451,16 +453,65 @@ struct pending {
 };
 static struct pending pending[PENDING_MOST];
 static int pending_count;
+// how the last word sent to each of the last DELIVERIES parties went: had
+// by someone, or not, for the tick in the Text page's title
+#define DELIVERIES 8
+struct delivery {
+	char party[TEXT_PARTY_ROOM];
+	int is_had;
+};
+static struct delivery deliveries[DELIVERIES];
+static int delivery_count;
+
+static void delivered(const char *party, int is_had) {
+	int i;
+
+	for (i = 0; i < delivery_count && strcmp(deliveries[i].party, party); i++)
+		;
+	if (i == delivery_count) {
+		if (delivery_count == DELIVERIES)
+			i = delivery_count - 1;
+		else
+			delivery_count++;
+	}
+	memmove(deliveries + 1, deliveries, sizeof(deliveries[0]) * (size_t)i);
+	snprintf(deliveries[0].party, sizeof(deliveries[0].party), "%s", party);
+	deliveries[0].is_had = is_had;
+}
+
+// 1 when every word sent to party has gone and the last was had by
+// someone; 0 while one waits, or if the last reached nobody, or none was
+// sent
+static void pending_done(int is_had);
+
+static int is_all_delivered(const char *party) {
+	int i;
+
+	for (i = 0; i < pending_count; i++)
+		if (!strcmp(pending[i].to, party))
+			return 0;
+	for (i = 0; i < delivery_count; i++)
+		if (!strcmp(deliveries[i].party, party))
+			return deliveries[i].is_had;
+	return 0;
+}
 // for the times: the PTT as it was, and the voice heard
 static int was_ptt;
 static char was_hearing[TEXT_PARTY_ROOM];
 static const char *entry_said;
 static long entry_said_ms;
 static int is_begun;
+// the paddles last in use, and how long the speaker is held ready after
+#define KEYING_READY_MS 1000
+static long keyed_ms = -KEYING_READY_MS;
+// a paddle pressed while the speaker woke, and since when it has woken; no
+// longer than WAKE_MOST_MS is waited for it
+#define WAKE_MOST_MS 300
+static int is_dit_waiting;
+static int is_dah_waiting;
+static long waking_ms;
 
 void screen_open(void) {
-	// ENTER is the PTT on the home page, the screen's on every other page
-	ptt_lend(page != PAGE_HOME);
 	keys_open();
 	display_open();
 	display_white(settings.is_white != 0);
@@ -708,7 +759,6 @@ static void go(int to) {
 	}
 	if (choices_of(to) != NULL)
 		marked = choices_of(to)->in_use();
-	ptt_lend(to != PAGE_HOME);
 	page = to;
 }
 
@@ -901,7 +951,19 @@ static void take_home(const struct key_press *press, long now) {
 		go(PAGE_MENU);
 		return;
 	}
-	// ENTER is the PTT here (ptt.c); UP and DOWN set the volume
+	// ENTER opens the target's menu, Text chosen; UP and DOWN set the volume
+	if (press->key == KEY_ENTER && press->what == BUTTON_PRESSED) {
+		int items[TARGET_ITEMS];
+		int count;
+		int i;
+
+		open_target(settings.target, PAGE_HOME);
+		count = target_items(items);
+		for (i = 0; i < count; i++)
+			if (items[i] == TARGET_TEXT)
+				target_chosen = i;
+		return;
+	}
 	if (is_up_or_down(press))
 		level_step(&volume_level, press, now);
 }
@@ -1161,8 +1223,10 @@ static void send_word(uint32_t target, const char *word, long now) {
 		mine[i] = (char)(word[i] | TEXT_MINE);
 	mine[i] = 0;
 	text_add(&kept, settings.callsign, party, mine);
-	if (pending_count == PENDING_MOST || service_send_word(party, (int)settings.wpm, word) < 0)
+	if (pending_count == PENDING_MOST || service_send_word(party, (int)settings.wpm, word) < 0) {
+		delivered(party, 0);
 		return;
+	}
 	p = &pending[pending_count++];
 	snprintf(p->to, sizeof(p->to), "%s", party);
 	snprintf(p->word, sizeof(p->word), "%s", word);
@@ -1529,6 +1593,19 @@ static void rule(int y) {
 // the title in the middle of the top, and the rule under it
 static void title(const char *text) {
 	display_text_at((DISPLAY_WIDE - display_text_wide(text, 1)) / 2, 0, 1, text);
+	rule(RULE_Y);
+}
+
+// the title with a tick after it, the two in the middle together
+static void title_ticked(const char *text) {
+	static const int tick_y[TICK_WIDE] = {4, 5, 6, 5, 4, 3, 2, 1};
+	int wide = display_text_wide(text, 1);
+	int x = (DISPLAY_WIDE - wide - TICK_GAP - TICK_WIDE) / 2;
+	int i;
+
+	display_text_at(x, 0, 1, text);
+	for (i = 0; i < TICK_WIDE; i++)
+		display_fill(x + wide + TICK_GAP + i, tick_y[i] - 1, 1, 2);
 	rule(RULE_Y);
 }
 
@@ -2357,7 +2434,10 @@ static void draw_text(long now) {
 	first = count - TEXT_SHOWN - text_back;
 	if (first < 0)
 		first = 0;
-	title(party);
+	if (is_all_delivered(party))
+		title_ticked(party);
+	else
+		title(party);
 	if (count == 0)
 		line(1, "Nothing yet");
 	for (i = 0; i < TEXT_SHOWN && first + i < count; i++)
@@ -2519,8 +2599,16 @@ void screen_poll(long now) {
 
 		keys_set_kind(KEY_ENTER, is_kb ? BUTTON_HOLDING : BUTTON_HOLDING_REPEATING);
 	}
-	if (keys_poll(now, &press))
-		take(&press, now);
+	// a key while idle wakes the talkie and does nothing else (power.c)
+	if (keys_poll(now, &press)) {
+		if (power_is_idle()) {
+			power_wake(now);
+			touched_ms = now;
+			drawn_ms = now - DRAW_EVERY_MS;
+		} else {
+			take(&press, now);
+		}
+	}
 	// on a network with no callsign: the code and where to add it, once;
 	// told its callsign (enrol.c), home
 	if (enrol_is_waiting() && !is_activate_shown
@@ -2537,15 +2625,44 @@ void screen_poll(long now) {
 		touched_ms = now;
 		go(PAGE_WIFI_JOINING);
 	}
+	// words awaiting TEXT SENT when the line went are not to be answered
+	// now; kept waiting, eight of them would stop every word after
+	while (!service_is_online() && pending_count > 0)
+		pending_done(0);
 	is_keying = is_entering(page) && !is_keyboard();
 	// the paddles, each element heard as it begins
-	// the speaker held ready for a tone: on the home page only while the
-	// paddles are in use, the rest of the time it rests
-	speaker_ready((is_keying && (page != PAGE_HOME || keys_is_down(KEY_UP) || keys_is_down(KEY_DOWN)
-			|| morse.state != MORSE_IDLE || morse.length > 0 || entry.length > 0))
+	// the speaker held ready for a tone while the paddles are in use and
+	// KEYING_READY_MS after, then let rest, so that it is not on and
+	// hissing while nothing is keyed
+	if (is_keying && (keys_is_down(KEY_UP) || keys_is_down(KEY_DOWN)
+			|| morse.state != MORSE_IDLE || morse.length > 0))
+		keyed_ms = now;
+	speaker_ready((is_keying && now - keyed_ms < KEYING_READY_MS)
 		|| page == PAGE_SIDETONE || page == PAGE_CW_VOLUME || text_play_is_busy(&play));
+	// a paddle pressed while the speaker wakes from rest, REST_UP_MS, is
+	// held until it is awake and then keyed, so that the first element's
+	// tone is not late and cut short by the next (V came out as 4,
+	// 2026-11-25)
 	if (is_keying) {
-		switch (morse_keys(&morse, keys_is_down(KEY_UP), keys_is_down(KEY_DOWN), now, &letter)) {
+		if (keys_is_down(KEY_UP))
+			is_dit_waiting = 1;
+		if (keys_is_down(KEY_DOWN))
+			is_dah_waiting = 1;
+		if ((is_dit_waiting || is_dah_waiting)
+				&& !speaker_is_ready() && settings.sidetone > 0 && morse.state == MORSE_IDLE
+				&& morse.length == 0 && now - waking_ms < WAKE_MOST_MS) {
+			is_keying = 0;
+		} else {
+			waking_ms = now;
+		}
+	}
+	if (is_keying) {
+		int is_dit = keys_is_down(KEY_UP) || is_dit_waiting;
+		int is_dah = keys_is_down(KEY_DOWN) || is_dah_waiting;
+
+		is_dit_waiting = 0;
+		is_dah_waiting = 0;
+		switch (morse_keys(&morse, is_dit, is_dah, now, &letter)) {
 		case MORSE_DIT:
 			speaker_tone((int)(MORSE_DIT_UNITS * morse.unit_ms));
 			drawn_ms = now - DRAW_EVERY_MS;
@@ -2619,7 +2736,7 @@ void screen_poll(long now) {
 		is_save_due = 0;
 		settings_save();
 	}
-	if (now - drawn_ms >= DRAW_EVERY_MS) {
+	if (now - drawn_ms >= DRAW_EVERY_MS && !power_is_idle()) {
 		drawn_ms = now;
 		draw(now);
 	}
@@ -2628,6 +2745,17 @@ void screen_poll(long now) {
 
 // for the verb SCREEN: the page shown, the last key, and the display's
 // pages sent
+// when a key was last pressed, for power.c
+long screen_touched_ms(void) {
+	return touched_ms;
+}
+
+// 1 on the home page with nothing keyed, typed or played, for power.c
+int screen_is_resting(void) {
+	return page == PAGE_HOME && entry.length == 0 && morse.length == 0
+		&& !text_play_is_busy(&play);
+}
+
 void screen_describe(char *text, int room) {
 	char shown[TEXT_ROOM];
 
@@ -2662,8 +2790,10 @@ void screen_text_heard(const char *from, const char *to, int wpm, const char *wo
 	} else if (contact >= 0) {
 		is_quiet_now = is_quiet(SETTINGS_TARGET_CONTACT + (uint32_t)contact);
 	}
-	if (!is_quiet_now && settings.cw_volume > 0)
+	if (!is_quiet_now && settings.cw_volume > 0) {
+		power_wake(now);
 		text_play_add(&play, word, wpm);
+	}
 	snprintf(heard_from, sizeof(heard_from), "%s", from);
 	snprintf(heard_word, sizeof(heard_word), "%s", word);
 	heard_ms = now;
@@ -2672,9 +2802,9 @@ void screen_text_heard(const char *from, const char *to, int wpm, const char *wo
 
 // the word sent first answered, had or not; it is in the stream already
 static void pending_done(int is_had) {
-	(void)is_had;
 	if (pending_count == 0)
 		return;
+	delivered(pending[0].to, is_had);
 	pending_count--;
 	memmove(pending, pending + 1, sizeof(pending[0]) * (size_t)pending_count);
 }

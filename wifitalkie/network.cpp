@@ -143,11 +143,22 @@ static void on_lost(arduino_event_id_t event, arduino_event_info_t info) {
 	console_say("WIFI NOT JOINED: REASON %d, RSSI %d", reason, (int)info.wifi_sta_disconnected.rssi);
 }
 
+// modem sleep while the talkie is idle (power.c): the radio off between
+// the access point's beacons, woken for each DTIM; off while it is awake,
+// for the speech's sake (above)
+static int is_saving_power;
+
+void network_save_power(int is_saving) {
+	is_saving_power = is_saving;
+	if (!is_off)
+		esp_wifi_set_ps(is_saving ? WIFI_PS_MIN_MODEM : WIFI_PS_NONE);
+}
+
 void network_open(void) {
 	WiFi.mode(WIFI_STA);
 	WiFi.setTxPower(TX_POWER);
 	WiFi.setHostname(HOSTNAME);
-	WiFi.setSleep(false);
+	network_save_power(is_saving_power);
 	WiFi.setAutoReconnect(true);
 	WiFi.onEvent(on_lost, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
 	if (settings.is_local)
@@ -294,7 +305,7 @@ void network_on(void) {
 	is_off = 0;
 	WiFi.mode(WIFI_STA);
 	WiFi.setTxPower(TX_POWER);
-	WiFi.setSleep(false);
+	network_save_power(is_saving_power);
 	console_say("RADIO ON");
 	network_join();
 	if (settings.is_local)

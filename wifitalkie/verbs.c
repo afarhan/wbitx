@@ -58,6 +58,8 @@
 
 #include "esp_heap_caps.h"
 #include "esp_system.h"
+#include "esp_pm.h"
+#include "esp_wifi.h"
 #include "nvs.h"
 #include "driver/gpio.h"
 
@@ -69,6 +71,7 @@
 #include "microphone.h"
 #include "local.h"
 #include "network.h"
+#include "power.h"
 #include "ptt.h"
 #include "screen.h"
 #include "service.h"
@@ -200,6 +203,8 @@ static void say_status(void) {
 	for (int i = 0; i < SETTINGS_KNOWN; i++)
 		if (settings.known_ssid[i][0] != 0)
 			console_say("WIFI KNOWN %d %s", i + 1, settings.known_ssid[i]);
+	power_describe(text, sizeof(text));
+	console_say("POWER %s", text);
 	console_say("CALL %s  GRID %s  FREQ %u", settings.callsign, settings.grid, (unsigned)settings.hz);
 	console_say("SERVER %s %u", settings.host, (unsigned)settings.port);
 	auth_cookie_show(settings.cookie, shown);
@@ -479,6 +484,24 @@ void verbs_do(const char *line, long now) {
 			battery_set(first);
 		else
 			say_battery();
+		return;
+	}
+	// the power management's locks, and who holds them: what keeps the
+	// C3 from sleeping while the talkie is idle (power.c)
+	if (!strcmp(verb, "LOCKS")) {
+		char dump[1024] = {0};
+		FILE *f = fmemopen(dump, sizeof(dump) - 1, "w");
+		char *line;
+		wifi_ps_type_t ps = WIFI_PS_NONE;
+
+		if (f != NULL) {
+			esp_pm_dump_locks(f);
+			fclose(f);
+		}
+		for (line = strtok(dump, "\n"); line != NULL; line = strtok(NULL, "\n"))
+			console_say("LOCKS %s", line);
+		esp_wifi_get_ps(&ps);
+		console_say("LOCKS WIFI POWER SAVE %d (0 NONE, 1 MIN MODEM, 2 MAX MODEM)", (int)ps);
 		return;
 	}
 	if (!strcmp(verb, "MEMORY")) {

@@ -88,6 +88,7 @@
 #include "console.h"
 #include "local.h"
 #include "microphone.h"
+#include "power.h"
 #include "ptt.h"
 #include "settings.h"
 #include "sha256.h"
@@ -410,6 +411,7 @@ static void take(const uint8_t *packet, int length, int is_talking, long now) {
 		return;
 	}
 	count_heard++;
+	power_wake(now);
 	speaker_take(heard.sound, now);
 	audio_keep(heard.sound);
 	if (!is_hearing || strcmp(heard.callsign, speaker_callsign)) {
@@ -447,6 +449,7 @@ static void take_local(const uint8_t *packet, int is_talking, long now) {
 	is_taken_begun = 1;
 	number_taken = heard.number;
 	count_heard++;
+	power_wake(now);
 	speaker_take(heard.sound, now);
 	audio_keep(heard.sound);
 	if (!is_hearing) {

@@ -15,7 +15,6 @@ int ptt_is_down(void);
 int ptt_is_vox(void);
 void ptt_lamp(int is_lit);
 int ptt_is_lit(void);
-void ptt_lend(int is_lending);
 void ptt_key_lend(int is_lending);
 int ptt_key_is_down(void);
 

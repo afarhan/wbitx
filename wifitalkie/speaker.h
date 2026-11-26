@@ -16,6 +16,7 @@ void speaker_take(const uint8_t *ulaw, long now);
 void speaker_poll(long now);
 void speaker_mute(int is_muted);
 void speaker_tone(int ms);
+int speaker_is_ready(void);
 void speaker_tone_at(int ms, uint32_t level);
 void speaker_ready(int is_readying);
 int speaker_is_toning(void);

@@ -3,11 +3,10 @@
 //
 // ptt.c — the push-to-talk, the button and the verb, and the lamp.
 //
-// The talkie speaks while the button is held, or from PTT ON on the console
-// until PTT OFF; either is the PTT. The button is the ENTER key: keys.c sets
-// its pin up and gives its presses to the screen, and this reads its level
-// through a debounce of its own: it has to have been the same for
-// DEBOUNCE_MS before a change is taken.
+// The talkie speaks while the PTT key is held, or from PTT ON on the console
+// until PTT OFF; either is the PTT. The key's level is read through a
+// debounce of its own: it has to have been the same for DEBOUNCE_MS before
+// a change is taken.
 //
 // A PTT left down is let go after ONE_OVER_MS, PTT ON is undone, and the
 // button has to be let go before it speaks again: my.sbitx.net gives a speaker a
@@ -20,11 +19,11 @@
 // minute, with ALWAYS_GAP_MS let go between, so that my.sbitx.net hears it
 // as overs. It is 0 in a talkie for use.
 //
-// ENTER speaks only on the home page; on every other page it is the
-// screen's, and the screen says so with ptt_lend(). The PTT key, PIN_KEY_PTT
-// on the right side, speaks on every page but the Text page, which takes it
-// with ptt_key_lend(), debounced the same way, and is set up here, an
-// input with its pull-up. The verb still speaks.
+// The PTT key, PIN_KEY_PTT on the right side, speaks on every page but one
+// that takes it with ptt_key_lend(), and is set up here, an input with its
+// pull-up. ENTER spoke on the home page until 2026-11-25, while the
+// enclosure's PTT lever did not reach its key; it is the screen's alone now.
+// The verb still speaks.
 //
 // VOX: the voice keys the talkie as the button does (vox.c, by way of
 // microphone.c), with the same minute at most; PTT ON (VOX) says so.
@@ -49,9 +48,6 @@
 #define ALWAYS_GAP_MS 2000
 
 static int is_verb_down;
-static int is_button_down;
-static int button_level_was = 1;
-static long button_changed_ms;
 static int is_key_down;
 static int key_level_was = 1;
 static long key_changed_ms;
@@ -61,7 +57,6 @@ static long down_since_ms;
 static int is_cut;
 static int is_lit;
 static long cut_ms;
-static int is_lent;
 static int is_key_lent;
 static int is_by_vox;
 
@@ -83,26 +78,19 @@ static void key_open(void) {
 }
 
 void ptt_poll(long now) {
-	int level = gpio_get_level(PIN_KEY_ENTER);
 	int key_level;
 	int is_wanted;
 
 	if (!is_key_open)
 		key_open();
 	key_level = gpio_get_level(PIN_KEY_PTT);
-	if (level != button_level_was) {
-		button_level_was = level;
-		button_changed_ms = now;
-	}
-	if (now - button_changed_ms >= DEBOUNCE_MS)
-		is_button_down = level == 0;
 	if (key_level != key_level_was) {
 		key_level_was = key_level;
 		key_changed_ms = now;
 	}
 	if (now - key_changed_ms >= DEBOUNCE_MS)
 		is_key_down = key_level == 0;
-	is_wanted = is_verb_down || (is_key_down && !is_key_lent) || (is_button_down && !is_lent);
+	is_wanted = is_verb_down || (is_key_down && !is_key_lent);
 	if (!is_wanted && !is_down)
 		is_by_vox = microphone_vox();
 	is_wanted = is_wanted || microphone_vox();
@@ -171,9 +159,3 @@ int ptt_key_is_down(void) {
 	return is_key_down;
 }
 
-// lent back still held, the button has to be let go before it speaks
-void ptt_lend(int is_lending) {
-	if (is_lent && !is_lending && is_button_down)
-		is_cut = 1;
-	is_lent = is_lending;
-}

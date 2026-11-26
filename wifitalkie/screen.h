@@ -11,6 +11,8 @@ extern "C" {
 
 void screen_open(void);
 void screen_poll(long now);
+long screen_touched_ms(void);
+int screen_is_resting(void);
 void screen_describe(char *text, int room);
 void screen_time_heard(long long unix_s, long now);
 void screen_text_heard(const char *from, const char *to, int wpm, const char *word, long now);
