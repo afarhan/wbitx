@@ -231,22 +231,33 @@ void display_letter_at(int x, int y, int scale, char c) {
 
 // a bar wide dots across, its top at y and as high as a capital, an
 // outline with filled of them lit
-void display_bar(int x, int y, int wide, int filled) {
+// filled from the left, or with is_leftward from the right
+static void bar(int x, int y, int wide, int filled, int is_leftward) {
 	int top = y;
 	int bottom = top + FONT_MAIN_HIGH - 1;
 	int i;
 	int j;
+	int is_in;
 
 	for (i = 0; i < wide; i++) {
 		dot(x + i, top);
 		dot(x + i, bottom);
-		for (j = top; j <= bottom && i < filled; j++)
+		is_in = is_leftward ? i >= wide - filled : i < filled;
+		for (j = top; j <= bottom && is_in; j++)
 			dot(x + i, j);
 	}
 	for (j = top; j <= bottom; j++) {
 		dot(x, j);
 		dot(x + wide - 1, j);
 	}
+}
+
+void display_bar(int x, int y, int wide, int filled) {
+	bar(x, y, wide, filled, 0);
+}
+
+void display_bar_leftward(int x, int y, int wide, int filled) {
+	bar(x, y, wide, filled, 1);
 }
 
 static void send_page(int page) {

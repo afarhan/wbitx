@@ -1637,13 +1637,14 @@ static void big_frequency(int y) {
 }
 
 // the level's label, its bar, filled from its least to its most, and its
-// value at the right
+// value at the right. The bar fills from the right: UP, which raises it,
+// is the left key and DOWN the right (the author's, 2026-11-26)
 static void level_bar(const struct level *l, int y) {
 	char text[TEXT_ROOM];
 	int value = (int)*l->value;
 
 	display_text_at(0, y, 1, l->label);
-	display_bar(BAR_X, y, BAR_WIDE, (value - l->least) * BAR_WIDE / (l->most - l->least));
+	display_bar_leftward(BAR_X, y, BAR_WIDE, (value - l->least) * BAR_WIDE / (l->most - l->least));
 	snprintf(text, sizeof(text), "%d", value);
 	display_text_at(DISPLAY_WIDE - display_text_wide(text, 1), y, 1, text);
 }

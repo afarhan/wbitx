@@ -35,6 +35,7 @@ void display_letter_at(int x, int y, int scale, char c);
 void display_fill(int x, int y, int wide, int high);
 void display_invert(int x, int y, int wide, int high);
 void display_bar(int x, int y, int wide, int filled);
+void display_bar_leftward(int x, int y, int wide, int filled);
 void display_poll(void);
 void display_describe(char *text, int room);
 void display_off(void);
