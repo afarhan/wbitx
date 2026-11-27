@@ -25,8 +25,7 @@ device. Commit only once the change has been tried on a real talkie.
 
 - `wifitalkie.ino`: `setup()` opens each module, and `loop()` calls each
   module's `*_poll(now)` in turn. Nothing may block the loop. Slow work, such as
-  a TLS request, goes on a FreeRTOS task of its own, as in `enrol.c` and
-  `update.cpp`. A poll that takes 150 ms or more is reported on the console as
+  a TLS request, goes on a FreeRTOS task of its own, as in `enrol.c`. A poll that takes 150 ms or more is reported on the console as
   `SLOW:`.
 - One module per file, a `.c`/`.cpp` with its `.h`. Each file opens with a
   comment that says what it does and why. Read it before changing the file,
