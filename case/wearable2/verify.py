@@ -14,7 +14,7 @@ from build123d import Pos, Rot, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import wearable2 as W  # noqa: E402
-from printed import whole, cyl_z, cyl_x, prism_xy, rrect  # noqa: E402
+from printed import whole, box, cyl_z, cyl_x, prism_xy, rrect  # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 fails = []
@@ -44,8 +44,16 @@ src = open(os.path.join(HERE, "wearable2.py")).read()
 check("screws are M3 only", not re.search(r"\bM[0-9](?!3)\b|M2_|M2\b", src.replace("M3", "")), "no other size named")
 check("mic: a hole only, 2 mm", abs(W.MIC_BORE - 2.0) < 1e-6, f"bore {W.MIC_BORE}")
 check("keytops 5 x 4", (W.CAP_W, W.CAP_H) == (5.0, 4.0), f"{W.CAP_W} x {W.CAP_H}")
-check("keytops 0.7 proud", abs(W.CAP_Z1 - W.D - 0.7) < 1e-6, f"{W.CAP_Z1 - W.D:.2f}")
+check("keytops 1.4 proud", abs(W.CAP_Z1 - W.D - 1.4) < 1e-6, f"{W.CAP_Z1 - W.D:.2f}")
 check("no lip at the seam (the user's)", W.TONGUE_T == 0, f"TONGUE_T {W.TONGUE_T}")
+# the BL-5C (the user's, 2026-11-26): 54 x 34, 6.2 deep for the thicker ones
+check("cell pocket BL-5C, 54 x 34 x 6.2, 0.4 round",
+      (W.CELL_L, W.CELL_W, W.CELL_T, W.CELL_CLR) == (54.0, 34.0, 6.2, 0.4),
+      f"{W.CELL_L} x {W.CELL_W} x {W.CELL_T}, {W.CELL_CLR}")
+check("the case grew on the left, 3.4 thicker (the user's)",
+      abs(W.LEFT_GROW - 4.7) < 1e-6 and abs(W.D - 21.6) < 1e-6, f"left {W.LEFT_GROW}, {W.D:.1f} thick")
+check("no magnets, no top-left screw (the user's)", not hasattr(W, "MAGNETS") and len(W.SCREWS) == 1,
+      f"{len(W.SCREWS)} screw")
 
 # ---- nothing overlaps (allowed: the bar's preload on the PTT, keytops on their plungers)
 allowed = {("lever", "ptt")}
@@ -61,7 +69,7 @@ for i, a in enumerate(names):
             over.append(f"{a}/{b} {v:.2f}")
 check("no overlaps", not over, ", ".join(over) or "none")
 
-# ---- screws: heads can't fall through; M3 x 12 fits each
+# ---- screws: heads can't fall through; M3 x SCREW_L fits each
 def seat(part, x, y):
     worst = 9.0
     for k in range(8):
@@ -73,7 +81,7 @@ def seat(part, x, y):
     return worst
 
 
-for name, (x, y), part in (("H1", W.SCREWS[0], back), ("top left", W.TL, back), ("hinge", W.PIV, lev)):
+for name, (x, y), part in (("H1", W.SCREWS[0], back), ("hinge", W.PIV, lev)):
     w = seat(part, x, y)
     check(f"{name} head held all round", w > 0.05, f"least material under the head {w:.2f} mm3")
 
@@ -86,10 +94,10 @@ def pilot_run(x, y):
     return min(zs), max(zs)
 
 
-for name, (x, y), need in (("H1", W.SCREWS[0], 3.4), ("top left", W.TL, 3.4), ("hinge", W.PIV, 5.0)):
+for name, (x, y), need in (("H1", W.SCREWS[0], 3.4), ("hinge", W.PIV, 5.0)):
     z0, z1 = pilot_run(x, y)
-    tip = W.M3_HEAD_H + 12
-    check(f"{name}: M3 x 12 fits", tip <= z1 - 0.2 and tip - z0 >= need,
+    tip = W.M3_HEAD_H + W.SCREW_L
+    check(f"{name}: M3 x {W.SCREW_L} fits", tip <= z1 - 0.2 and tip - z0 >= need,
           f"tip {tip:.1f}, pilot {z0:.1f}..{z1:.1f}, thread {tip - z0:.1f}")
 
 # ---- the lever: rest, stop, press, room, slot swing
@@ -103,14 +111,17 @@ def turned(t):
 for t, what in ((0.0, "at rest"), (0.35, "pressed 0.35"), (0.8, "pressed 0.8")):
     lp = turned(t)
     hit = {n: round(vol(lp, o), 2) for n, o in (("front", front), ("back", back), ("board", P["board"]),
-                                                 ("magnets", P["magnets"]))}
+                                                 ("cell", P["cell"]))}
     check(f"lever {what} touches nothing but the PTT", max(hit.values()) <= 0.01, str(hit))
+# the lever not obstructed (the user's): pressed its whole travel, the cell
+# where it is and slid 0.4 to the right wall
+_slid = Pos(W.CELL_CLR, 0, 0) * P["cell"]
 check("lever's T head stops it on the wall", 0.05 <= gap(lev, back) <= 0.15, f"head to wall {gap(lev, back):.2f}")
 check("an air gap at rest between the bar and the plunger (the user's)", 0.3 <= gap(lev, P["ptt"]) <= 0.5,
       f"{gap(lev, P['ptt']):.2f}")
 
 # the hinge doesn't rattle (the user's): tight round the column and the screw
-check("lever 0.2 round its column, 3.2 hole on its M3", W.LEV_CLR == 0.2 and W.LEV_SCREW == 3.2,
+check("lever 0.2 round its column, 3.3 hole on its M3 (3.4 rattled, 3.2 tight)", W.LEV_CLR == 0.2 and W.LEV_SCREW == 3.3,
       f"{W.LEV_CLR}, {W.LEV_SCREW}")
 # the display's cutout 1 mm toward the glass's top (the user's)
 check("display cutout moved up 1 mm", W.WIN_UP == 1.0, f"{W.WIN_UP}")
@@ -134,8 +145,41 @@ check("collar round each key hole", W.COLLAR_H >= 0.25, f"{W.COLLAR_H:.1f} tall"
 check("OLED clear of the front", gap(P["oled"], front) >= 0.2, f"{gap(P['oled'], front):.2f}")
 check("glass clear of the front", gap(P["glass"], front) >= 0.19, f"{gap(P['glass'], front):.2f}")
 far = whole(P["board"]) - cyl_z(W.SCREWS[0][0], W.SCREWS[0][1], 4.0, -5, 30)
-check("board touches the case only at H1 (ribs 0.1 off its edges)", min(gap(far, front), gap(far, back)) >= 0.08,
+for a, b in W.BOARD_RIBS:
+    far = far - box(a - 0.5, b + 0.5, -5, W.BOARD_RIB_Y + 0.5, -5, 30)
+for x, y in W.FRONT_PROPS:
+    far = far - cyl_z(x, y, W.FRONT_PROP_R + 0.5, -5, 30)
+for a, b in W.TOP_RIBS:
+    far = far - box(a - 0.5, b + 0.5, W.by(0) - W.TOP_RIB_IN - 0.5, 60, -5, 30)
+for a, b, c, d in W.FRONT_PADS:
+    far = far - box(a - 0.5, b + 0.5, c - 0.5, d + 0.5, -5, 30)
+for x, y in W.CORNER_SCREWS:      # its standoff under the board's corner
+    far = far - cyl_z(x, y, W.STANDOFF_D / 2 + 0.5, -5, 30)
+check("board touches the case only at H1 and, behind it, its ribs (ribs 0.1 off its edges)",
+      min(gap(far, front), gap(far, back)) >= 0.08,
       f"elsewhere {min(gap(far, front), gap(far, back)):.2f}")
+_rest = vol(Pos(0, 0, -W.BOARD_RIB_DROP - 0.05) * P["board"] & W.box(0, 60, 0, W.BOARD_RIB_Y, -5, 30), back)
+check("the board stops on its ribs under the keys, BOARD_RIB_DROP in (the user's)", _rest > 0.05 and W.BOARD_RIB_DROP <= 0.8,
+      f"{W.BOARD_RIB_DROP} in: {_rest:.2f} mm3")
+_prop = vol(Pos(0, 0, 0.05) * P["board"], front) - vol(Pos(0, 0, 0.05) * P["board"] - cyl_z(*W.FRONT_PROPS[0], 2.0, -5, 30), front)
+check("the board held off the front by the prop beside R21 (the user's)", _prop > 0.05, f"0.05 out: {_prop:.2f} mm3")
+# held both ways at its corners (the user's, 2026-11-27: it tipped, the
+# bottom-left to the face, the top-right off it and the PTT off the lever)
+_b = P["board"]
+_bk = {n: vol(Pos(0, 0, -0.05) * _b & box(*q, -5, 30), back) for n, q in
+       (("bottom", (0, 60, 0, 10)), ("top", (0, 60, 40, 60)))}
+_fr = {n: vol(Pos(0, 0, 0.05) * _b & box(*q, -5, 30), front) for n, q in
+       (("bottom-left", (0, 12, 0, 10)), ("top-right", (40, 60, 38, 60)), ("left", (0, 12, 20, 30)))}
+check("the board can't tip: the back behind it top and bottom, the front at its corners",
+      min(_bk.values()) > 0.05 and min(_fr.values()) > 0.02,
+      ", ".join(f"{k} {v:.2f}" for k, v in {**_bk, **_fr}.items()))
+_cx, _cy = W.CORNER_SCREWS[0]
+_tip = W.M3_HEAD_H + W.SCREW_L
+check("bottom-left corner: M3 x SCREW_L, 4+ of thread in the front's post, short of its face (the user's)",
+      _tip - W.Z_SPLIT >= 4.0 and _tip <= W.D - W.PILOT_SKIN - 0.3,
+      f"thread {_tip - W.Z_SPLIT:.1f}, tip {W.D - W.PILOT_SKIN - _tip:.1f} short of the pilot's end")
+check("the corner's post clear of the board's edge", gap(front, P["board"]) >= 0 and
+      min(abs(_cx + W.CORNER_POST_R - (W.bx(W.SAW_U))), 9) >= 0.2, f"{W.bx(W.SAW_U) - _cx - W.CORNER_POST_R:.2f}")
 
 # the board can't turn about H1 enough to move the PTT more than 0.15
 # worst case at rest: the board turned within the ribs plus H1's slack in the
@@ -148,64 +192,64 @@ check("PTT not touched at rest, the board shifted", _shift < W.AIR_GAP, f"board 
 # and it clicks, the board shifted away, before the lever meets the case
 _need = W.AIR_GAP + 0.25 + _shift
 _hit = [t for t in np.arange(0.1, 2.01, 0.05)
-        if max(vol(turned(t), o) for o in (front, back, P["board"])) > 0.01]
+        if max(vol(turned(t), o) for o in (front, back, P["board"], P["cell"], _slid)) > 0.01]
 _room = _hit[0] if _hit else 2.0
 check("PTT clicks before the lever meets the case", _need + 0.15 <= _room,
       f"needs {_need:.2f} at the bar (gap + 0.25 + shift), room {_room:.2f}")
+# pressed as far as it goes (its paddle on the case), the cell where it is
+# and slid to the right wall
+_hit2 = [t for t in np.arange(0.1, 2.01, 0.05)
+         if max(vol(turned(t), o) for o in (front, back, P["board"])) > 0.01]
+_stop = _hit2[0] if _hit2 else 2.0
+_least = min(gap(turned(t), c) for t in list(np.arange(0, _stop, 0.1)) + [_stop] for c in (P["cell"], _slid))
+check("the battery clear of the lever over its whole press (the user's)", _least >= 0.25,
+      f"least {_least:.2f}, pressed to its stop at {_stop:.2f}")
 
 # ---- ports
 zj = W.z_back(W.JACK_UP)
 plug = cyl_x(W.bx(W.BW), W.OW + 15, W.JACK_Y, zj, 3.0)
 check("jack: 7.0 circle at 2.9 off the board", W.JACK_BODY_D == 7.0 and W.JACK_UP == 2.9, f"{W.JACK_BODY_D}, {W.JACK_UP}")
 check("jack: a 6.0 plug body clears everything",
-      min(gap(plug, o) for o in (front, back, lev, P["magnets"])) >= 0.15,
-      f"{min(gap(plug, o) for o in (front, back, lev, P['magnets'])):.2f}")
+      min(gap(plug, o) for o in (front, back, lev, P["cell"])) >= 0.15,
+      f"{min(gap(plug, o) for o in (front, back, lev, P['cell'])):.2f}")
 _zt = zj + 3.5 + 0.2   # just over the circle: the front if over the seam
 jack_cut = (front if _zt > W.Z_SPLIT else back).is_inside(Vector(W.OW - 0.6, W.JACK_Y, _zt))
 check("jack: no slot to the seam", jack_cut, "wall solid just above the circle" if jack_cut else "cut")
-ux, zu = W.bx(W.P.USB_U), W.z_back(W.P.USB_UP)
+ux, zu = W.bx(W.P.USB_U) + W.USB_FIX, W.z_back(W.P.USB_UP)
 holes = [(dx, dz) for dx in np.arange(-6.5, 6.6, 0.5) for dz in np.arange(-3.5, 3.6, 0.5)
          if zu + dz < W.Z_SPLIT and not back.is_inside(Vector(ux + dx, W.USB_FACE_Y - 0.5, zu + dz))
          and (abs(dx) > W.USB_SHELL_W / 2 or abs(dz) > W.USB_SHELL_H / 2)]
 check("USB: closed round the socket", not holes, f"{len(holes)} open spots")
 
-# ---- assembly: the back (with the cell and magnets) goes on over the front,
-# board, keytops (the lever goes on after): tilted 5 degrees about its right
-# edge, HOOK_SLIDE out to the right, lowered, slid in onto the hook's noses,
-# swung shut (2026-11-25). Allowed: 0.05 mm3 a pose, the top-left standoff
-# brushing the front's left wall by ~0.02 mm mid-swing
-fixed = {"front": front, "keytops": caps, **{n: s for n, s in P.items() if n not in ("cell", "magnets")}}
-moving = [whole(back), P["cell"], P["magnets"]]
-_xp, _zp = W.OW, W.Z_SPLIT
-
-
-def _rot(a):
-    return Pos(_xp, 0, _zp) * Rot(0, a, 0) * Pos(-_xp, 0, -_zp)
-
-
-_sg = 1 if (_rot(3) * Pos(0, 0, _zp)).position.Z < _zp else -1
-
-
-def _hits(T):
-    return sum(vol(T * m, o) for m in moving for o in fixed.values())
-
-
+# ---- assembly: the back (with the cell) pushed straight on over the
+# front, board, keytops (the lever goes on after), the hooks' tongues flexed
+# in (their noses left out); at home the noses sit in their windows clear.
+# Allowed: 0.05 mm3 a pose (2026-11-26, snap hooks)
+_flexed = front
+for a, b in W.HOOK_NOSES:
+    _flexed = _flexed - W.box(a - 0.01, b + 0.01, W.OH - W.WALL - W.HOOK_C, W.OH,
+                            W.HOOK_TIP_Z - 0.01, W.HOOK_CATCH_Z + 0.01)
+fixed = {"keytops": caps, **{n: s for n, s in P.items() if n != "cell"}}
+moving = [whole(back), P["cell"]]
 bad = []
-poses = ([(f"down {dz}", Pos(W.HOOK_SLIDE, 0, -dz) * _rot(5 * _sg)) for dz in (9, 6, 3, 1.5, 0.5, 0)]
-         + [(f"slide {s}", Pos(s, 0, 0) * _rot(5 * _sg)) for s in (0.9, 0.6, 0.3, 0)]
-         + [(f"swing {a}", _rot(a * _sg)) for a in (4, 3, 2, 1, 0.5, 0)])
-for what, T in poses:
-    v = _hits(T)
+for dz in (9, 6, 3, 1.5, 0.5, 0):
+    T = Pos(0, 0, -dz)
+    v = sum(vol(T * m, o) for m in moving for o in list(fixed.values()) + [_flexed])
+    if dz == 0:
+        v += sum(vol(m, front) for m in moving)
     if v > 0.05:
-        bad.append(f"{what}: {v:.2f}")
-check("the back goes on (tilt, slide onto the hook, swing shut)", not bad, ", ".join(bad[:5]) or "clear all the way")
-_pull = vol(whole(back).translate((0, 0, -0.2)), front)
-check("the hook holds: pulled 0.2 apart, the noses bear on the bars", _pull >= 0.5, f"{_pull:.2f} mm3")
-_straight = vol(whole(back).translate((0, 0, -1.0)), front)
-check("the hook is real: straight on, the noses block", _straight >= 1.0, f"{_straight:.2f} mm3")
-check("a magnet at the top right, under the PTT (the user's)",
-      W.MAGNETS[1][1] >= W.OH - W.WALL - W.MAG_D / 2 - W.MAG_CLR - W.MAG_RIM - 0.01,
-      f"at {W.MAGNETS[1][0]:.1f}, {W.MAGNETS[1][1]:.1f}")
+        bad.append(f"down {dz}: {v:.2f}")
+check("the back goes on straight, the tongues flexed, and sits clear", not bad, ", ".join(bad) or "clear all the way")
+_pull = vol(whole(back).translate((0, 0, -0.2 - W.HOOK_WIN_Z)), front)
+check("the hooks hold: pulled apart, the catches bear on the windows' edges", _pull >= 0.3, f"{_pull:.2f} mm3")
+check("the tongues flex within PLA's (strain <= 2.5%)", W.HOOK_STRAIN <= 0.025 and W.ARM_STRAIN <= 0.025,
+      f"hooks {W.HOOK_STRAIN:.3f}, cell arms {W.ARM_STRAIN:.3f}")
+_cl = vol(Pos(0, 0, W.CELL_HELD - W.CELL_NOM + 0.05) * P["cell"], back)
+check("the cell held: lips 0.1 over a 6.0 cell (the user's rattle)", _cl > 0.1 and vol(P["cell"], back) < 0.01,
+      f"lifted 0.15 it meets the lips: {_cl:.2f} mm3")
+check("hooks on the top wall, both ends, none on the right (the user's)",
+      len(W.HOOK_NOSES) == 2 and W.HOOK_NOSES[0][1] < W.OW / 2 < W.HOOK_NOSES[1][0],
+      f"x {W.HOOK_NOSES}")
 
 # ---- printing: overhangs and walls too thin to print
 def load(fn):
@@ -216,14 +260,20 @@ def load(fn):
 
 
 # allowed: back 9 (the USB socket's 5.9 bridge, and the jack circle's top arch
-# by the seam), keytops 40 (the plungers' sockets, 3.4 bridges); with the hook
-# (2026-11-25): the front its noses' flat catches, ledges HOOK_C + HOOK_N wide
-# (the user's wbitx printed its 0.85 ones), the back the bars over the
-# windows, ~3.5 bridges
-_ledges = sum((b - a) * (W.HOOK_C + W.HOOK_N) for a, b in W.HOOK_NOSES) * 1.05
-_bridges = sum((b - a + 2 * W.HOOK_C) * W.WALL for a, b in W.HOOK_NOSES) * 1.05
+# by the seam), keytops 40 (the plungers' sockets, 3.4 bridges); with the
+# hooks: the front its noses' flat catches, ledges HOOK_C + HOOK_N wide (the
+# user's wbitx printed its 0.85 ones), the back the bars over the windows;
+# the lever (2026-11-26) the bar's flat ledge under the T head, BAR_LEDGE
+# long, BAR_W wide, where it passes over the cell
+_ledges = sum((b - a) * (W.HOOK_P + 0.1) for a, b in W.HOOK_NOSES) * 1.05
+# the back: the bars over the windows, and the cell's lips (1.2 wide) and
+# the arms' (1.0), short ledges
+_bridges = (sum((b - a + 2 * W.HOOK_WIN_X) * W.WALL for a, b in W.HOOK_NOSES)
+            + sum((b - a) * (W.CELL_CLR + W.LIP_OVER) for a, b in W.TOP_LIPS)
+            + sum((b - a) * (W.CELL_CLR + W.ARM_OVER) for a, b in W.ARMS)
+            + sum((b - a) * 0.3 for a, b in W.TOP_RIBS)) * 1.05
 for fn, allow in (("front.stl", round(0.5 + _ledges, 1)), ("back.stl", round(9.0 + _bridges, 1)),
-                  ("lever.stl", 0.5), ("keytops.stl", 40.0)):
+                  ("lever.stl", round(0.5 + W.BAR_LEDGE * W.BAR_W * 1.05, 1)), ("keytops.stl", 40.0)):
     v = load(fn)
     nr = np.cross(v[:, 1] - v[:, 0], v[:, 2] - v[:, 0])
     L = np.linalg.norm(nr, axis=1)

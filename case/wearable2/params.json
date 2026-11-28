@@ -1,47 +1,83 @@
 {
  "AIR_GAP": 0.4,
+ "ARMS": [
+  [
+   5.0,
+   13.0
+  ],
+  [
+   19.0,
+   27.0
+  ]
+ ],
+ "ARM_OVER": 0.5,
+ "ARM_STRAIN": 0.023,
+ "ARM_T": 0.7,
  "BACK": 1.0,
  "BAR_CLR": 0.3,
- "BAR_TOP": 9.6,
+ "BAR_LEDGE": 4.55,
+ "BAR_LEDGE_X": 56.25,
+ "BAR_TOP": 13.0,
  "BAR_TRAVEL": 1.6,
  "BAR_UNDER": 0.3,
+ "BAR_UNDER_Z": 9.15,
  "BAR_W": 2.0,
  "BH": 42.11,
+ "BOARD_RIBS": [
+  [
+   12.75,
+   14.55
+  ],
+  [
+   34.75,
+   36.0
+  ]
+ ],
+ "BOARD_RIB_DROP": 0.8,
+ "BOARD_RIB_Y": 7.2,
  "BOSS_D": 10.5,
- "BOSS_D_": 10.5,
  "BOSS_SKIN": 0.8,
  "BT": 1.6,
  "BW": 58.3,
  "CAP_CLR": 0.3,
  "CAP_FLANGE_T": 1.0,
  "CAP_H": 4.0,
- "CAP_PROUD": 0.7,
+ "CAP_PROUD": 1.4,
  "CAP_R": 0.6,
  "CAP_ROUND": 0.4,
  "CAP_SOCKET": 1.0,
  "CAP_SOCKET_D": 3.4,
  "CAP_W": 5.0,
- "CAP_Z0": 15.3,
- "CAP_Z1": 18.9,
+ "CAP_Z0": 18.7,
+ "CAP_Z1": 23.0,
  "CELL_CLR": 0.4,
  "CELL_GAP": 0.3,
- "CELL_L": 31.0,
+ "CELL_HELD": 5.6,
+ "CELL_L": 54.0,
+ "CELL_NOM": 5.5,
  "CELL_T": 6.2,
  "CELL_T_": 6.2,
- "CELL_W": 20.5,
+ "CELL_W": 34.0,
  "CLR": 0.4,
  "COLLAR_H": 0.3,
  "COLLAR_T": 0.8,
  "COL_H": 7.0,
  "COL_R": 3.2,
- "COL_Z": 11.2,
+ "COL_Z": 14.6,
  "CORNER": 3.0,
- "CX0": 7.4,
- "CX1": 27.9,
- "CY0": 13.0,
- "CY1": 44.0,
+ "CORNER_POST_R": 2.4,
+ "CORNER_SCREWS": [
+  [
+   3.7,
+   4.6
+  ]
+ ],
+ "CX0": 1.6,
+ "CX1": 55.6,
+ "CY0": 9.8,
+ "CY1": 43.8,
  "CZ1": 7.2,
- "D": 18.2,
+ "D": 21.6,
  "DIMPLE": 0.6,
  "EAR_OUT": 0.4,
  "EAR_R": 1.2,
@@ -51,12 +87,33 @@
  "FACE_R": 0.8,
  "FLANGE_H": 5.4,
  "FLANGE_W": 6.4,
- "FLOOR_SLOT": 2.3,
+ "FLOOR_SLOT": 0.0,
  "FRAME_GAP": 0.45,
  "FRAME_T": 0.6,
  "FRAME_W": 0.8,
  "FRONT_H": 5.5,
  "FRONT_H_": 5.5,
+ "FRONT_PADS": [
+  [
+   5.0,
+   8.2,
+   2.2,
+   6.0
+  ],
+  [
+   43.95,
+   45.45,
+   42.3,
+   44.21
+  ]
+ ],
+ "FRONT_PROPS": [
+  [
+   8.1,
+   25.2
+  ]
+ ],
+ "FRONT_PROP_R": 1.4,
  "G_EDGE": 2.6,
  "G_HOLE": 2.4,
  "G_PITCH": 3.6,
@@ -65,31 +122,33 @@
  "HEAD_W": 4.0,
  "HOLE_H": 4.6,
  "HOLE_W": 5.6,
- "HOOK_C": 0.1,
- "HOOK_L": 3.0,
- "HOOK_N": 1.05,
- "HOOK_NH": 1.2,
+ "HOOK_C": 0.4,
+ "HOOK_CATCH_Z": 9.1,
+ "HOOK_E": 0.5,
+ "HOOK_F": 0.4,
+ "HOOK_L": 5.5,
  "HOOK_NOSES": [
   [
-   39.845,
-   43.0
+   2.4,
+   9.65
   ],
   [
-   26.5,
-   29.847
-  ],
-  [
-   31.247,
-   34.593
+   51.7,
+   54.8
   ]
  ],
- "HOOK_SLIDE": 1.25,
- "HOOK_T": 1.0,
- "HOOK_X0": 49.2,
+ "HOOK_P": 0.9,
+ "HOOK_STRAIN": 0.02,
+ "HOOK_T": 0.8,
+ "HOOK_TIP_Z": 7.8,
+ "HOOK_WIN_X": 0.4,
+ "HOOK_WIN_Z": 0.3,
+ "HOOK_X0": 53.9,
  "IH": 43.0,
  "IN_CORNER": 1.0,
- "IN_D": 16.0,
- "IW": 50.1,
+ "IN_D": 19.4,
+ "IW": 54.8,
+ "IW_BOARD": 50.1,
  "JACK_BODY_D": 7.0,
  "JACK_UP": 2.9,
  "JACK_Y": 13.0,
@@ -114,6 +173,7 @@
  "KEY_BODY": 3.0,
  "KEY_DISH": 0.4,
  "KEY_TOP": 4.8,
+ "LEFT_GROW": 4.7,
  "LEVER": [
   0.8,
   0.15,
@@ -122,36 +182,21 @@
  "LEV_CLR": 0.2,
  "LEV_FLARE": 2.0,
  "LEV_GAP": 2.0,
- "LEV_IN": 54.5,
- "LEV_SCREW": 3.2,
+ "LEV_IN": 59.2,
+ "LEV_SCREW": 3.3,
  "LEV_T": 3.0,
  "LEV_TOP": 42.4,
+ "LIP_OVER": 0.8,
+ "LIP_T": 0.8,
  "LOCATE_GAP": 0.1,
  "LOCATE_X": [
-  6.0,
-  40.0
+  10.7,
+  44.7
  ],
  "M3_CLEAR": 3.4,
  "M3_HEAD_D": 6.2,
  "M3_HEAD_H": 3.0,
  "M3_PILOT": 2.6,
- "MAGNETS": [
-  [
-   8.5,
-   6.6
-  ],
-  [
-   38.9,
-   37.8
-  ]
- ],
- "MAG_CLR": 0.2,
- "MAG_D": 10.0,
- "MAG_RIM": 1.2,
- "MAG_SKIN": 0.6,
- "MAG_T": 3.0,
- "MAG_TOP": 3.8,
- "MAG_X": 8.5,
  "MIC_BORE": 2.0,
  "NECK_CLR": 0.3,
  "NECK_W": 3.0,
@@ -163,35 +208,36 @@
   23.1
  ],
  "OPEN_IN": 2.0,
- "OW": 52.5,
+ "OW": 57.2,
  "PILOT_SKIN": 1.0,
  "PIV": [
-  58.1,
+  62.8,
   23.7
  ],
  "PIV_R": 5.2,
  "PLUG_HEAD": 10.0,
- "POCKET_X1": 50.7,
+ "POCKET_X1": 55.4,
  "PORT_RECESS": 0.4,
  "PORT_WALL": 0.8,
  "POST_D": 6.0,
  "POST_D_": 6.0,
  "PRELOAD": -0.4,
- "PTT_X": 46.6,
+ "PTT_X": 51.3,
  "PTT_Y": 37.545,
- "PTT_Z": 8.2,
+ "PTT_Z": 11.6,
  "RIB": 1.0,
  "RIDGE_H": 2.0,
  "RIDGE_T": 1.2,
- "RIGHT_TEST_X": 38.0,
+ "RIGHT_TEST_X": 42.7,
  "RING_H": 5.2,
  "SAW_U": 13.3,
  "SCREWS": [
   [
-   42.85,
+   47.55,
    5.5
   ]
  ],
+ "SCREW_L": 16.0,
  "SHELL": [
   0.3,
   0.32,
@@ -212,35 +258,63 @@
  "SPK_V": 18.8,
  "SPK_W": 20.0,
  "SPK_W_": 20.0,
- "SPK_X": 40.99,
+ "SPK_X": 45.69,
  "SPK_Y": 25.0,
- "SPK_Z0": 11.9,
- "SPK_Z1": 17.0,
+ "SPK_Z0": 15.3,
+ "SPK_Z1": 20.4,
  "STANDOFF_D": 6.5,
  "TL": [
-  3.0,
+  7.7,
   35.2
  ],
  "TL_POST_R": 2.0,
- "TL_SLEEVE": 0.6,
  "TL_V": 8.6,
- "TL_Z": 11.3,
+ "TL_Z": 14.7,
  "TONGUE_CLR": 0.3,
  "TONGUE_H": 1.2,
  "TONGUE_T": 0.0,
  "TOOTH_W": 1.5,
- "UNDER_CELL": 2.4,
+ "TOP_LIPS": [
+  [
+   16.0,
+   24.0
+  ],
+  [
+   30.0,
+   34.5
+  ]
+ ],
+ "TOP_RIBS": [
+  [
+   10.6,
+   15.0
+  ],
+  [
+   24.0,
+   27.0
+  ],
+  [
+   45.5,
+   50.8
+  ]
+ ],
+ "TOP_RIB_IN": 0.8,
+ "TOP_RIB_Z": 9.0,
+ "UNDER_CELL": 5.8,
  "USB_BODY_H": 7.3,
- "USB_BODY_W": 13.15,
+ "USB_BODY_W": 14.35,
  "USB_FACE_Y": 1.39,
+ "USB_FIX": 0.35,
  "USB_MATE": 0.9,
+ "USB_PLAY": 0.6,
  "USB_SHELL_H": 3.2,
- "USB_SHELL_W": 9.05,
+ "USB_SHELL_W": 10.25,
  "USB_SKIN": 0.8,
+ "USB_SKIN_GAP": 0.1,
  "WALL": 1.2,
  "WIN_UP": 1.0,
- "Z_BB": 9.9,
- "Z_BF": 11.5,
- "Z_FACE_IN": 17.0,
- "Z_SPLIT": 9.9
+ "Z_BB": 13.3,
+ "Z_BF": 14.9,
+ "Z_FACE_IN": 20.4,
+ "Z_SPLIT": 13.3
 }

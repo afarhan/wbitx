@@ -13,10 +13,12 @@ face holding it in, 0.8 proud.
 The PTT lever hinged near the middle of the right side, above the jack, so
 a plug goes straight into the jack's hole; its bar reaches in to the PTT
 under the board's edge, ending in a T head across the way it slides as the
-lever turns. A 602030 cell flat on the back's floor behind the board's
-left part, upright; two 10 x 3 disc magnets in the back where the cell is
-not. The halves close on an M3 screw through H1 and an M3 in a post in the
-board's notch, at the top left.
+lever turns. A BL-5C cell (54 x 34 x 6, the user's, 2026-11-26) flat on
+the back's floor behind the whole board, along the top wall, across the
+case: the case 4.7 wider on the left for it and 3.4 thicker, the jack and
+J6 over it, held down by lips and snap arms; no magnets. The halves close
+on snap hooks on the top wall, at both ends, the back pushed straight on,
+and an M3 screw through H1 at the bottom right.
 
     make wearable2    wearable2/*.stl and pieces/*.glb; open wearable2/viewer.html
     python wearable2.py check    the overlap check
@@ -51,15 +53,23 @@ SPK_W_, SPK_L_, SPK_T_, SPK_CLR_ = 20.0, 30.0, 5.1, 0.3
 SPK_U = P.OLED_PCB[1] + 0.3 + SPK_CLR_ + SPK_W_ / 2
 IW = math.ceil((SPK_U + SPK_W_ / 2 + SPK_CLR_ - (SAW_U - CLR)) * 10) / 10
 # the depth from the stack, back to face: the cell on the floor, 0.3, the
-# tallest part over it (the SuperMini's antenna, ~2.3, ASSUMED), the board,
-# the speaker over the board's front and 0.2 behind it
-CELL_T_, UNDER_CELL, CELL_GAP = 6.2, 2.4, 0.3
+# deepest part over it (the headset jack's barrel, JACK_UP + its 2.9 radius,
+# 5.8 off the board), the board, the speaker over the board's front and 0.2
+# behind it. The cell 6.2 deep: BL-5Cs are sold 5.8 to 6.2 thick
+CELL_T_, UNDER_CELL, CELL_GAP = 6.2, 2.9 + 2.9, 0.3
 SPK_BACK = 0.4                    # the user's: the face's inside, on the speaker's rim, 5.5 off the board
 # the keys (B3FS-1010P, the user's, 2026-11-23): the body 3.0 off the board;
 # a keytop's flange rests 3.8 off it, so the plunger's top is 3.8 + the socket
 KEY_BODY, KEY_TOP = 3.0, 4.8
 FRONT_H_ = SPK_T_ + SPK_BACK
 IH = 43.0
+# the BL-5C (the user's: 6 x 34 x 54) across the case along the top wall,
+# 0.4 round it: the inside widened for it, on the left (the user's), so the
+# right side (the jack, the PTT, the lever) stays as it was against the board
+CELL_L, CELL_W, CELL_CLR = 54.0, 34.0, 0.4
+IW_BOARD = IW
+IW = max(IW_BOARD, round(CELL_L + 2 * CELL_CLR, 2))
+LEFT_GROW = round(IW - IW_BOARD, 2)
 IN_D = round(CELL_T_ + CELL_GAP + UNDER_CELL + P.BT + FRONT_H_, 2)
 OW, OH = IW + 2 * WALL, IH + 2 * WALL
 D = BACK + IN_D + FACE
@@ -70,17 +80,22 @@ PORT_WALL, PORT_RECESS = 0.8, 0.4
 # USB-C: any compliant cable. The standard's largest plug body is 12.35 x
 # 6.5; the socket's face is in from the outside, so that body goes into the
 # wall: the opening is its size, 0.4 a side, through the wall
-USB_BODY_W, USB_BODY_H = 12.35 + 0.8, 6.5 + 0.8
+# the SuperMini is soldered by hand, it lands a little off from board to
+# board (the user's, 2026-11-27): USB_PLAY more a side across, for the
+# socket and the plug
+USB_PLAY = 0.6
+USB_BODY_W, USB_BODY_H = 12.35 + 0.8 + 2 * USB_PLAY, 6.5 + 0.8
 # ...but only USB_MATE short of the socket's face: behind that a skin, 0.8
 # thick, with a hole only for the plug's metal end (8.25 x 2.4, 0.4 a side),
 # so the case is closed round the socket; no notch to the seam
-USB_SHELL_W, USB_SHELL_H = 8.25 + 0.8, 2.4 + 0.8
+USB_SHELL_W, USB_SHELL_H = 8.25 + 0.8 + 2 * USB_PLAY, 2.4 + 0.8
 USB_MATE = 0.9         # ASSUMED: a plug's metal end shows >= 0.9 past its body when mated
 USB_SKIN = 0.8
+USB_SKIN_GAP = 0.1     # the skin short of the socket's face (the back goes on straight)
 LOCATE_GAP = 0.1
 WIN_UP = 1.0           # the display's cutout up toward the glass's top (the user's: it clipped the top row)
-LOCATE_X = (6.0, 40.0)  # clear of the USB (12.7..25.9) and the power switch's openings
-RIGHT_TEST_X = 38.0     # the right-side test pieces from here out (H1's boss is from 39.6)
+LOCATE_X = (6.0 + LEFT_GROW, 40.0 + LEFT_GROW)  # clear of the USB and the power switch's openings
+RIGHT_TEST_X = 38.0 + LEFT_GROW     # the right-side test pieces from here out (H1's boss is left of it)
 # the headset's plug: its body 6.2 across (the user's); the jack's nose is
 # in from the outside, so the body goes into the wall: 0.4 a side, through
 JACK_BODY_D = 7.0                # the user's: 7 for badly moulded plugs (bodies 6.0)
@@ -97,7 +112,7 @@ Z_SPLIT = Z_BB
 
 
 def bx(u):
-    return WALL + CLR + u - SAW_U
+    return WALL + LEFT_GROW + CLR + u - SAW_U
 
 
 def by(v):
@@ -128,11 +143,11 @@ KEY_DISH = 0.4
 # the mic's hole through the face, no tube: 1.0 printed shut
 MIC_BORE = 2.0
 # the keytops: a flange under the face (it keeps them in) on the plunger,
-# a stem through the face's hole, 0.8 proud
+# a stem through the face's hole, 1.4 proud (the user, 2026-11-26: keytops 4.3 tall)
 # printed holes come out small and pins large: 0.4 a side between them
 # the keytops 5 wide, 4 tall (the user's), through a hole in the face 0.4
 # bigger each side; a flange 0.4 past the hole each side under the face
-CAP_PROUD, CAP_FLANGE_T, CAP_CLR = 0.7, 1.0, 0.3   # the flange holds the plunger's socket; 0.3 a side (the user's: 0.4 holes too big, 0.2 too tight)
+CAP_PROUD, CAP_FLANGE_T, CAP_CLR = 1.4, 1.0, 0.3   # the flange holds the plunger's socket; 0.3 a side (the user's: 0.4 holes too big, 0.2 too tight)
 CAP_W, CAP_H, CAP_R = 5.0, 4.0, 0.6
 HOLE_W, HOLE_H = CAP_W + 2 * CAP_CLR, CAP_H + 2 * CAP_CLR
 FLANGE_W, FLANGE_H = HOLE_W + 0.8, HOLE_H + 0.8
@@ -160,53 +175,50 @@ SPK_Z1 = Z_FACE_IN
 SPK_Z0 = SPK_Z1 - SPK_T
 
 # ---------------------------------------------------------------- cell
-# 602030, 300 mAh: 6 x 20 x 30, with room for its tape and protection board;
-# upright (its length down the case) against the top wall, right of the top-left
-# post, over the low parts and the SuperMini's top end, left of J6
-CELL_L, CELL_W, CELL_T = 31.0, 20.5, CELL_T_
-CELL_CLR, RIDGE_T, RIDGE_H = 0.4, 1.2, 2.0
-
-# ---------------------------------------------------------------- magnets
-MAG_D, MAG_T, MAG_SKIN, MAG_CLR = 10.0, 3.0, 0.6, 0.2
-MAG_RIM = 1.2
-BOSS_D_ = 10.5
-MAG_X = 8.5                         # in from the side walls, the same each side
-MAG_TOP = MAG_SKIN + MAG_T + 0.2
+# BL-5C (above): its length across the case, against the top wall, over
+# everything behind the board; under it at the bottom, H1's foot
+CELL_T = CELL_T_
+CELL_NOM = 5.5          # the user's BL-5C, measured (2026-11-27); CELL_T leaves room over it
+RIDGE_T, RIDGE_H = 1.2, 2.0
 
 # ---------------------------------------------------------------- screws
 M3_CLEAR, M3_PILOT, M3_HEAD_D, M3_HEAD_H = P.M3_CLEAR, P.M3_PILOT, P.M3_HEAD_D, P.M3_HEAD_H
 POST_D, STANDOFF_D, PILOT_SKIN = 6.0, 6.5, 1.0
+# H1's and the hinge's: M3 x 16 (x 12 until 2026-11-26; the case 3.4 thicker
+# for the BL-5C left an x 12 0.1 of thread in H1's post)
+SCREW_L = 16
 BOSS_D, BOSS_SKIN = 10.5, 0.8
 SCREWS = [(bx(u), by(v)) for (u, v) in [P.uv("H1")]]     # H2 is sawn off
-# the top-left post in the board's notch (empty), against the left wall,
-# clear of the display's module; an M3 from the back, its head let into the
-# left side wall (the user's choice: the gap is narrower than the head)
+# the bottom-left corner (the user's, 2026-11-27: loose there, nothing held
+# the halves): an M3 x SCREW_L from the back into a post on the front, in
+# the strip the case grew by, left of the board's edge, below the cell
+CORNER_SCREWS = [(3.7, 4.6)]
+CORNER_POST_R = 2.4                      # its post on the front, clear of the board's edge
+# the board held off the front by a prop on the face (the user's, 2026-11-27:
+# it rose and the keytops held the key down): by R21, which is under the
+# OLED's module, so left of the module, on the board's front over R21's row
+FRONT_PROPS = [(8.1, 25.2)]
+FRONT_PROP_R = 1.4
+# and props at the corners it tipped about (the user's, 2026-11-27: the
+# bottom-left dipped toward the face, the top-right rose): the bottom-left
+# one off the corner's post, the top-right the top rib at LOCATE_X[1]
+# carried in over the board's edge, right of the OLED's module
+FRONT_PADS = [(5.0, 8.2, 2.2, 6.0), (LOCATE_X[1] - 0.75, LOCATE_X[1] + 0.75, 42.3, OH - WALL + 0.01)]
+# the top-left post in the board's notch (empty), on the front, a locating
+# pin now: its M3 is gone (the user's, 2026-11-26: the cell is under it),
+# and the hooks on the top wall hold the halves there. Tied to the left wall
+# across the strip the case grew by
 TL_POST_R = 2.0
-TL_SLEEVE = 0.6                    # the post's wall outside the screw, the notch kept off it
 TL_V = 8.6
-TL_Z = Z_SPLIT + TONGUE_H + 0.2      # the back's standoff to here, the front's post on
-TL = (WALL - 0.2 + TL_POST_R, by(TL_V))
+TL_Z = Z_SPLIT + TONGUE_H + 0.2      # the front's post down to here
+TL = (bx(SAW_U) - CLR - 0.2 + TL_POST_R, by(TL_V))
 assert bx(P.OLED_PCB[0]) - (TL[0] + TL_POST_R) >= 0.45, "the top-left post meets the display's module"
 assert bx(P.NOTCH_U) >= TL[0] + TL_POST_R + 0.5 and by(P.NOTCH_V) <= TL[1] - TL_POST_R - 0.5
-CX0 = TL[0] + M3_HEAD_D / 2 + BOSS_SKIN + 0.1 + CELL_CLR      # off the top-left foot
-CX1 = CX0 + CELL_W
-CY1 = OH - WALL - 0.2
-CY0 = CY1 - CELL_L
+CX0 = WALL + CELL_CLR
+CX1 = CX0 + CELL_L
+CY1 = OH - WALL - CELL_CLR
+CY0 = CY1 - CELL_W
 CZ1 = BACK + CELL_T
-# the magnets: one under the cell's lower end at the left, one clear of H1's
-# foot at the right
-_mr = MAG_D / 2 + MAG_CLR
-MAGNETS = [(MAG_X, (WALL + _mr + CY0 - CELL_CLR - _mr - 0.6) / 2),
-           (OW - MAG_X, SCREWS[0][1] + math.sqrt((BOSS_D_ / 2 + _mr + MAG_RIM + 0.1) ** 2
-                                                  - (OW - MAG_X - SCREWS[0][0]) ** 2))]
-# the right one up under the PTT (the user's, 2026-11-25: both low, it tipped
-# forward off a shirt): as far right as the lever's bar lets it (the bar's 45
-# degree underside, pressed in its travel, 0.3 over the boss), its rim to the
-# top wall
-MAG_TOP_RIGHT = True
-if MAG_TOP_RIGHT:
-    MAGNETS[1] = ((OW - WALL) - (MAG_TOP + 0.3) - 1.6 - 0.3 - _mr - MAG_RIM,
-                  OH - WALL - _mr - MAG_RIM)
 
 # the keys exactly where the board's switches are
 KEYS = list(P.KEYS)
@@ -239,6 +251,9 @@ CAP_Z1 = D + CAP_PROUD
 # top, a claw over the case's top: a tooth on it drops into a pocket in the
 # back's top wall, the outward stop that keeps the lever on. A bar on the
 # lever reaches in through the wall onto the PTT.
+# the SuperMini sits USB_FIX further right than its footprint (the user's
+# photo, 2026-11-27: the socket against the cutout's right end)
+USB_FIX = 0.35          # halfway to the user's 0.7, USB_PLAY either way
 USB_FACE_Y = by(BH) - 0.3     # the socket face, 0.3 past the board edge (the SuperMini model; its footprint drawing says 0.15 in)
 PTT_X, PTT_Y, PTT_Z = bx(BW), by(P.PTT_V), z_back(P.PTT_UP)
 JACK_Y = by(P.JACK_V)
@@ -259,14 +274,25 @@ HEAD_W = 4.0
 # HEAD_GAP off the wall's inside, the bar AIR_GAP off the plunger
 HEAD_GAP = 0.1
 HEAD_T = (OW - WALL - HEAD_GAP) - (PTT_X - PRELOAD)
-# inside the wall the bar's underside rises at 45 degrees (it prints): the
-# slot opens FLOOR_SLOT into the floor under it
-FLOOR_SLOT = 2.3                  # 0.5 longer: the bar presses AIR_GAP + the switch's travel
+# the bar passes over the cell (2026-11-26): its web comes off the lever's
+# back face and its underside rises at 45 degrees (it prints) to pass the
+# cell's end, then runs flat under the T head, a short ledge (BAR_LEDGE);
+# the slot is through the back's wall only, no longer into the floor
+FLOOR_SLOT = 0.0
 # the bar swings round the hinge: pressed in BAR_TRAVEL at the switch it
 # also slides toward the hinge, most at the slot's inner end; the slot is
 # that much wider on the hinge's side
 BAR_TRAVEL = 1.6
 BAR_TOP = Z_BB - BAR_UNDER
+# under the T head the wedge's foot, BAR_W wide: the bar's flat underside
+# there, out to where its 45 degree underside, rising from the lever, passes
+# 0.3 over the cell's end with the cell slid to the right wall, the lever
+# pressed its whole BAR_TRAVEL and 0.3 more (2026-11-26, the user: the lever
+# must not be obstructed)
+BAR_UNDER_Z = PTT_Z - P.PTT_PLUNGER / 2 - 0.5 - (HEAD_W - BAR_W) / 2
+BAR_LEDGE_X = (OW - WALL) + (BAR_TRAVEL + 0.3) - (BAR_UNDER_Z - (CZ1 + 0.3))
+BAR_LEDGE = BAR_LEDGE_X - (PTT_X - PRELOAD)
+assert 0 <= BAR_LEDGE, "the bar's 45 degree underside reaches the T head"
 LEV_GAP = 2.0                     # the lever off the wall at rest, room to press in (the user: the bar longer than the switch-to-wall distance)
 LEV_T, LEV_FLARE = 3.0, 2.0          # the paddle 5.0 thick
 LEV_IN = OW + LEV_GAP
@@ -284,46 +310,136 @@ TOOTH_W = 1.5
 HOOK_X0 = POCKET_X1 - TOOTH_W
 LEV_CLR = 0.2                     # the lever round its column (the user's: it rattled at 0.4)
 NECK_CLR = 0.3                    # round the column's neck, over the lever's whole swing
-LEV_SCREW = 3.2                   # the lever turns on its M3: 0.1 a side (it rattled at 3.4)
+LEV_SCREW = 3.3                   # the lever turns on its M3: rattled at 3.4, tight at 3.2 (2026-11-27)
 
-# ---------------------------------------------------------------- right-wall hook
-# (the user's, 2026-11-25: the top right didn't close; as wbitx's): a tongue
-# from the front stands inside the right wall below the seam, noses out
-# through windows in the back's wall, the full wall over each as its bar.
-# The back goes on tilted about its right edge (left side up), HOOK_SLIDE
-# out to the right, slides in onto the noses, swings shut
-HOOK_T, HOOK_L, HOOK_NH, HOOK_C = 1.0, 3.0, 1.2, 0.1
-HOOK_N = WALL - HOOK_C - 0.05              # through the wall to 0.05 short of the outside
-HOOK_SLIDE = HOOK_C + HOOK_N + 0.1
-# where the inside of the right wall is free: above the T head to the top
-# wall; between the hinge's neck and the bar's slot (two noses)
-_hw = BAR_W / 2 + BAR_CLR
-_sw = BAR_TRAVEL * (PIV[0] - (OW - WALL - FLOOR_SLOT)) / (PTT_Y - PIV[1])
-_b0, _b1 = PIV[1] + NECK_W / 2 + NECK_CLR + 1.0, PTT_Y - _hw - _sw - 0.6
-HOOK_NOSES = [(PTT_Y + HEAD_W / 2 + 0.3, OH - WALL - IN_CORNER - 0.2),
-              (_b0, (_b0 + _b1) / 2 - 0.7), ((_b0 + _b1) / 2 + 0.7, _b1)]
+# ---------------------------------------------------------------- top-wall hooks
+# (the user's, 2026-11-26: the top-left screw gone; only hooks on the top
+# wall, at both ends; the right wall's are gone). Snap-fits, the back pushed
+# straight on (2026-11-26: the slide-on hooks, 0.1 clear, never went in and
+# one snapped; the back sat skewed on them): a tongue from the front, thin
+# enough to flex, stands HOOK_C inside the top wall below the seam; its nose
+# has a 45 degree lead-in below, which the back's wall pushes in as it
+# comes, and a flat catch above, which springs out into a window through
+# the back's wall. Where the board isn't against the top wall: at the left,
+# the strip the case grew by and the board's notch, short of the top-left
+# rib; at the right, past the board's edge to the corner
+HOOK_T, HOOK_L, HOOK_C = 0.8, 5.5, 0.4     # thick, long below the seam, off the wall
+HOOK_E = 0.5                               # the nose's catch into the wall
+HOOK_P = HOOK_C + HOOK_E                   # the nose out from the tongue
+HOOK_F = 0.4                               # the nose's flat, at full height
+HOOK_WIN_Z, HOOK_WIN_X = 0.3, 0.4          # the window round the nose
+HOOK_NOSES = [(WALL + IN_CORNER + 0.2, min(bx(P.NOTCH_U) - 0.5, LOCATE_X[0] - 0.75 - 0.3)),
+              (bx(BW) + 0.4, OW - WALL - IN_CORNER - 0.2)]
+HOOK_TIP_Z = Z_SPLIT - HOOK_L
+HOOK_CATCH_Z = HOOK_TIP_Z + HOOK_P + HOOK_F
+# the tongue's strain as the nose passes the wall: 1.5 x deflection x
+# thickness / length^2, PLA's snaps ~2.5% at most
+HOOK_STRAIN = 1.5 * HOOK_E * HOOK_T / HOOK_L ** 2
 assert all(b - a >= 2.5 for a, b in HOOK_NOSES), HOOK_NOSES
+assert HOOK_STRAIN <= 0.025, HOOK_STRAIN
+
+
+def hook_noses():
+    """The noses alone (for the check of the back going on, the tongues
+    flexed): out from the tongue's outer face, 45 degrees below."""
+    yt = OH - WALL - HOOK_C
+    out = []
+    for (a, b) in HOOK_NOSES:
+        prof = [(yt - 0.01, HOOK_TIP_Z), (yt + HOOK_P, HOOK_TIP_Z + HOOK_P),
+                (yt + HOOK_P, HOOK_CATCH_Z), (yt - 0.01, HOOK_CATCH_Z)]
+        out.append(Pos(a, 0, 0) * Rot(90, 90, 0) * prism_xy(prof, 0, b - a))
+    return out
 
 
 def hook_front():
-    zs, x1 = Z_SPLIT, OW - WALL - HOOK_C
+    zs, y1 = Z_SPLIT, OH - WALL - HOOK_C
     # above the seam the tongue joins the front's wall by a 45 degree gusset
     # (the front prints face down: a flat shelf there would hang)
-    xi, xw = x1 - HOOK_T, OW - WALL + 0.4
+    yi, yw = y1 - HOOK_T, OH - WALL + 0.4
     out = []
-    for (a, b) in HOOK_NOSES:
-        gusset = prism_xy([(xi, zs), (xw, zs), (xw, zs + 0.5 + (xw - xi)), (xi, zs + 0.5)],
-                          -(b - a) / 2, (b - a) / 2)
-        out.append(box(xi, x1, a, b, zs - HOOK_L, zs + 0.5)
-                   .fuse(Pos(0, (a + b) / 2, 0) * Rot(90, 0, 0) * gusset)
-                   .fuse(box(x1 - 0.01, x1 + HOOK_C + HOOK_N, a, b, zs - HOOK_L, zs - HOOK_L + HOOK_NH)))
+    for (a, b), nose in zip(HOOK_NOSES, hook_noses()):
+        # built in (y, z) and swept along x: the profile's x is y, its y is z
+        gusset = Pos(a, 0, 0) * Rot(90, 90, 0) * prism_xy(
+            [(yi, zs), (yw, zs), (yw, zs + 0.5 + (yw - yi)), (yi, zs + 0.5)], 0, b - a)
+        out.append(box(a, b, yi, y1, HOOK_TIP_Z, zs + 0.5).fuse(gusset).fuse(nose))
     return out
 
 
 def hook_back_cuts():
-    zs, c = Z_SPLIT, HOOK_C
-    return [box(OW - WALL - 0.01, OW + 1, a - c, b + c, zs - HOOK_L - c, zs - HOOK_L + HOOK_NH + c)
+    zw, xw = HOOK_WIN_Z, HOOK_WIN_X
+    z0 = HOOK_CATCH_Z - HOOK_F - HOOK_E - zw      # the nose where it is into the wall
+    return [box(a - xw, b + xw, OH - WALL - 0.01, OH + 1, z0, HOOK_CATCH_Z + zw)
             for (a, b) in HOOK_NOSES]
+
+
+# ---------------------------------------------------------------- the cell held
+# (the user's, 2026-11-26: it rattled, room over it): its top edge under two
+# fixed lips on the top wall, its bottom edge snapped under two arms standing
+# on the floor, their lips ramped 45 degrees on top. In: the top edge under
+# the lips, the bottom edge pressed down past the arms. The lips' undersides
+# CELL_HELD off the floor: the user's cell is 6.0 (a 6.2 one won't go under)
+CELL_HELD = CELL_NOM + 0.1
+LIP_T, LIP_OVER = 0.8, 0.8                 # the lips' thickness; over the cell, it in the middle
+TOP_LIPS = [(16.0, 24.0), (30.0, 34.5)]     # x, clear of the tongues, J6 above is higher
+ARM_T, ARM_OVER = 0.7, 0.5                 # the arms flex; their lips over the cell
+ARMS = [(5.0, 13.0), (19.0, 27.0)]         # x, clear of the jack's barrel and H1's foot
+ARM_STRAIN = 1.5 * (CELL_CLR + ARM_OVER) * ARM_T / (BACK + CELL_HELD + LIP_T - BACK) ** 2
+assert ARM_STRAIN <= 0.025, ARM_STRAIN
+
+
+# the board held up under the keys (the user's, 2026-11-27: the DOWN key
+# pushed the board in, nothing under it since the top-left screw went):
+# ribs off the bottom wall up to the board's back, either side of the
+# SuperMini, between it and the 0805s at the left and the power switch at
+# the right; the cell fills the rest
+BOARD_RIBS = [(12.75, 14.55), (34.75, 36.0)]  # x (the right one off the SuperMini, moved USB_FIX)
+BOARD_RIB_Y = 7.2                             # out from the wall, short of the cell's arms
+BOARD_RIB_DROP = 0.8     # their tops under the board's back (the user's, 2026-11-27: at it, they held the seam 0.75 open)
+
+
+# and along the top edge (the user's, 2026-11-27: the screws at the bottom
+# drew it in there and its top rose off the front, the PTT missed the
+# lever): ribs off the top wall over its back's edge, between the hooks'
+# tongues, the 0805s and J6, hung from the wall on 45 degree gussets
+TOP_RIBS = [(10.6, 15.0), (24.0, 27.0), (45.5, 50.8)]   # x
+TOP_RIB_IN = 0.8                                        # over the board's back
+TOP_RIB_Z = 9.0                                         # their foot, over the cell
+
+
+def board_ribs():
+    s = [box(a, b, WALL - 0.01, BOARD_RIB_Y, BACK - 0.5, Z_BB - BOARD_RIB_DROP) for a, b in BOARD_RIBS]
+    y0, yw = by(0) - TOP_RIB_IN, OH - WALL + 0.01
+    for a, b in TOP_RIBS:
+        rib = box(a, b, y0, yw, TOP_RIB_Z, Z_BB)
+        gus = Pos(a, 0, 0) * Rot(90, 90, 0) * prism_xy(
+            [(y0, TOP_RIB_Z + 0.01), (yw, TOP_RIB_Z + 0.01), (yw, TOP_RIB_Z - (yw - y0))], 0, b - a)
+        s.append(rib.fuse(gus))
+    return s
+
+
+def cell_holders():
+    z = BACK + CELL_HELD
+    g = CELL_CLR
+    s = []
+    for (a, b) in TOP_LIPS:
+        y0 = CY1 + g - g - LIP_OVER                 # from the wall over the cell
+        lip = box(a, b, y0, OH - WALL + 0.01, z, z + LIP_T)
+        # its top a 45 degree gusset to the wall (it prints, and it is stiff)
+        gus = Pos(a, 0, 0) * Rot(90, 90, 0) * prism_xy(
+            [(y0, z + LIP_T - 0.01), (OH - WALL + 0.01, z + LIP_T - 0.01),
+             (OH - WALL + 0.01, z + LIP_T + (OH - WALL - y0))], 0, b - a)
+        s.append(lip.fuse(gus))
+    for (a, b) in ARMS:
+        yi = CY0 - g                                  # the arm's inner face at the pocket
+        arm = box(a, b, yi - ARM_T, yi, BACK - 0.5, z + LIP_T)
+        over = g + ARM_OVER
+        # its lip: flat under, over the cell; 45 degrees on top, the ramp
+        lip = Pos(a, 0, 0) * Rot(90, 90, 0) * prism_xy(
+            [(yi - 0.01, z), (yi + over, z), (yi + over, z + 0.3), (yi - 0.01, z + 0.3 + over + 0.01)],
+            0, b - a)
+        s.append(arm.fuse(lip))
+    return s
+
 
 # ---------------------------------------------------------------- grille
 G_PITCH, G_HOLE, G_EDGE, DIMPLE = 3.6, 2.4, 2.6, 0.6
@@ -377,16 +493,15 @@ assert Z_FACE_IN - RING_H >= Z_BF + 0.3 - 1e-9, "the ring meets the board"
 assert SPK_Z0 >= Z_BF + SPK_BACK - 1e-9, "the speaker meets the board"
 assert CAP_Z0 + CAP_FLANGE_T <= Z_FACE_IN - 0.05, "the keytop's flange reaches the face"
 assert CZ1 + CELL_GAP <= Z_BB - UNDER_CELL + 1e-9, "the cell meets the parts over it"
-assert bx(P.uv("J6")[0]) - 4.6 >= CX1 + CELL_CLR, "the cell meets J6"
-assert MAGNETS[0][1] + _mr <= CY0 - CELL_CLR - 0.5, "the left magnet meets the cell"
-assert MAGNETS[0][1] - _mr >= WALL, "the left magnet meets the bottom wall"
-assert MAGNETS[1][0] - _mr - MAG_RIM >= CX1 + CELL_CLR + RIDGE_T - 0.01, "the right magnet meets the cell"
-assert MAG_TOP <= z_back(5.0) - 0.5, "a magnet meets the jack"
+assert CZ1 + CELL_GAP <= Z_BB - (JACK_UP + 2.9) + 1e-9, "the cell meets the jack"
+assert CZ1 + CELL_GAP <= Z_BB - 4.6 + 1e-9, "the cell meets J6"
+assert SCREWS[0][1] + STANDOFF_D / 2 + 0.3 <= CY0 - CELL_CLR + 1e-9, "H1's standoff meets the cell"
+assert CX1 + CELL_CLR <= OW - WALL + 1e-9 and CY1 + CELL_CLR <= OH - WALL + 1e-9, "the cell meets a wall"
 assert BACK + IN_D == Z_FACE_IN
 assert BAR_TOP >= PTT_Z + P.PTT_PLUNGER / 2 + 0.2, "the bar's roof leaves the pedestal's top"
 assert PIV[1] - PIV_R >= JACK_Y + PLUG_HEAD / 2 + 0.5 - 1e-9, "the lever meets the plug's head"
 assert PIV_R - (COL_R + LEV_CLR) >= 1.2, "the lever's wall round its pocket"
-assert (OW - WALL) - (PTT_X - PRELOAD) + 0.4 <= Z_BB - UNDER_CELL, "the bar's 45 degree underside"
+assert BAR_LEDGE_X <= LEV_IN - 0.5, "the bar's ledge reaches the lever's face"
 
 
 def obround(cx, cy, w, l, z0, z1):
@@ -419,7 +534,7 @@ def ports():
     zj, zu, zk = z_back(JACK_UP), z_back(P.USB_UP), z_back(P.KNOB_UP)
     xr0, xr1 = OW - WALL - 1, OW + 1
     yb0, yb1 = -1, WALL + 1
-    ux, kx = bx(P.USB_U), bx(P.KNOB_U)
+    ux, kx = bx(P.USB_U) + USB_FIX, bx(P.KNOB_U)
     w = BAR_W / 2 + BAR_CLR
     sw = BAR_TRAVEL * (PIV[0] - (OW - WALL - FLOOR_SLOT)) / (PTT_Y - PIV[1])
     slot = box(OW - WALL - FLOOR_SLOT, xr1, PTT_Y - w - sw, PTT_Y + w, -1, Z_SPLIT)
@@ -478,9 +593,14 @@ def tooth_pocket():
 
 # ---------------------------------------------------------------- grille
 def lattice():
-    nx = int((OW - 2 * G_EDGE) // G_PITCH) + 1
+    # laid out on the case as it was before it grew LEFT_GROW on the left,
+    # moved with the board: the holes over the speaker as they were (the
+    # user's, 2026-11-26: centred on the wider case, the lowest row was one
+    # orphan hole)
+    ow = OW - LEFT_GROW
+    nx = int((ow - 2 * G_EDGE) // G_PITCH) + 1
     ny = int((OH - 2 * G_EDGE) // G_PITCH) + 1
-    x0 = (OW - (nx - 1) * G_PITCH) / 2
+    x0 = LEFT_GROW + (ow - (nx - 1) * G_PITCH) / 2
     y0 = (OH - (ny - 1) * G_PITCH) / 2
     return [(x0 + i * G_PITCH, y0 + j * G_PITCH) for i in range(nx) for j in range(ny)]
 
@@ -514,7 +634,7 @@ def grille():
             continue
         if x + hr > POCKET_X1 - 3.5 - 0.6 and y + hr > OH - WALL + 0.3 - 0.6:
             continue
-        if any(math.hypot(x - sx, y - sy) < M3_PILOT / 2 + hr + 0.6 for sx, sy in SCREWS + [TL]):
+        if any(math.hypot(x - sx, y - sy) < M3_PILOT / 2 + hr + 0.6 for sx, sy in SCREWS + CORNER_SCREWS + [TL]):
             continue
         # not over the speaker's rim, where the ring stands under the face
         if in_obround(x, y, SPK_X, SPK_Y, SPK_W + 2 * (SPK_CLR + RIB) + G_HOLE,
@@ -547,6 +667,12 @@ def front_shell():
 
     for (x, y) in SCREWS:
         s += cyl_z(x, y, POST_D / 2, Z_BF, ff + 0.5)
+    for (x, y) in CORNER_SCREWS:
+        s += cyl_z(x, y, CORNER_POST_R, Z_SPLIT, ff + 0.5) & inside(0, D, 0.5)
+    for (x, y) in FRONT_PROPS:
+        s += cyl_z(x, y, FRONT_PROP_R, Z_BF, ff + 0.5)
+    for (a, b, c, d) in FRONT_PADS:
+        s += box(a, b, c, d, Z_BF, ff + 0.5) & inside(0, D, 0.5)
     s += cyl_z(TL[0], TL[1], TL_POST_R, TL_Z, ff + 0.5) + box(0, TL[0], TL[1] - TL_POST_R, TL[1] + TL_POST_R, TL_Z, ff + 0.5)
     mx, my = bx(P.MIC_UV[0]), by(P.MIC_UV[1])
 
@@ -557,9 +683,8 @@ def front_shell():
     # room for the back's tongue
     if TONGUE_T > 0:
         s -= inside(Z_SPLIT - 1, Z_SPLIT + TONGUE_H + 0.2, TONGUE_T + TONGUE_CLR)
-    for (x, y) in SCREWS:
+    for (x, y) in SCREWS + CORNER_SCREWS:
         s -= cyl_z(x, y, M3_PILOT / 2, Z_SPLIT - 6, D - PILOT_SKIN)
-    s -= cyl_z(TL[0], TL[1], M3_PILOT / 2, Z_SPLIT - 6, D - PILOT_SKIN)
     s -= cyl_z(mx, my, MIC_BORE / 2, ff - 1, D + 1)
 
     holes, dimples = grille()
@@ -588,10 +713,7 @@ def front_shell():
         s += box(x - 0.75, x + 0.75, by(0) + LOCATE_GAP, OH - WALL + 0.01, Z_SPLIT, Z_FACE_IN + 0.01)
     # the hinge's column (the back's wall and tongue below the seam are left
     # alone), the screw's pilot up it from its point, closed at the face
-    s += ((column() & box(0, OW + 20, -20, OH + 20, 0, D)) - box(-1, OW, -1, OH + 1, -1, Z_SPLIT + TONGUE_H + 0.3)
-          # the neck's point flat at the seam by the wall: the back's wall
-          # passes under it, held out to the right, as it goes on (the hook)
-          - box(OW - 0.01, OW + HOOK_SLIDE + 0.3, -1, OH + 1, -1, Z_SPLIT + 0.1))
+    s += ((column() & box(0, OW + 20, -20, OH + 20, 0, D)) - box(-1, OW, -1, OH + 1, -1, Z_SPLIT + TONGUE_H + 0.3))
     s -= cyl_z(PIV[0], PIV[1], M3_PILOT / 2, COL_Z - COL_R - 1, D - PILOT_SKIN)
     for tongue in hook_front():
         s = s.fuse(tongue)
@@ -612,52 +734,42 @@ def back_tray():
         top = M3_HEAD_H + BOSS_SKIN
         foot = (cyl_z(x, y, BOSS_D / 2, floor, top)
                 + cone_z(x, y, BOSS_D / 2, STANDOFF_D / 2, top - 0.01, top + (BOSS_D - STANDOFF_D) / 2))
+        # kept off the cell, which lies over its top side
+        foot -= box(CX0 - CELL_CLR, CX1 + CELL_CLR, CY0 - CELL_CLR, CY1 + CELL_CLR, 0, D)
         s += foot & inside(0, D, 0.5)
 
-    # the top-left standoff, its foot round the head's pocket
-    # the same standoff and foot as H1's (the front's post is the narrow
-    # one, beside the display), kept off the cell and inside the case
-    x, y = TL
-    top = M3_HEAD_H + BOSS_SKIN
-    so = (cyl_z(x, y, STANDOFF_D / 2, floor, TL_Z)
-          + cyl_z(x, y, BOSS_D / 2, floor, top)
-          + cone_z(x, y, BOSS_D / 2, STANDOFF_D / 2, top - 0.01, top + (BOSS_D - STANDOFF_D) / 2))
-    so -= box(CX0 - CELL_CLR, CX1 + CELL_CLR, CY0 - CELL_CLR, CY1 + CELL_CLR, 0, D)
-    s += so & (outside(0, Z_SPLIT) + inside(Z_SPLIT - 0.01, TL_Z, TONGUE_T))
-
-    for (x, y) in MAGNETS:
-        s += (cyl_z(x, y, MAG_D / 2 + MAG_CLR + MAG_RIM, floor, MAG_TOP)
-              - box(CX0 - CELL_CLR, CX1 + CELL_CLR, CY0 - CELL_CLR, CY1 + CELL_CLR, 0, D)) & inside(0, D, 0.5)
+    for (x, y) in CORNER_SCREWS:
+        s += cyl_z(x, y, STANDOFF_D / 2, floor, Z_SPLIT) & inside(0, D, 0.5)
+        top = M3_HEAD_H + BOSS_SKIN
+        foot = (cyl_z(x, y, BOSS_D / 2, floor, top)
+                + cone_z(x, y, BOSS_D / 2, STANDOFF_D / 2, top - 0.01, top + (BOSS_D - STANDOFF_D) / 2))
+        # off the cell, and off the snap arms' feet, which flex
+        foot -= box(CX0 - CELL_CLR, CX1 + CELL_CLR, CY0 - CELL_CLR - ARM_T - 0.5, OH, 0, D)
+        s += foot & inside(0, D, 0.5)
 
     # the cell: an outline ridge round its foot
     g = CELL_CLR
     ridge = (box(CX0 - g - RIDGE_T, CX1 + g + RIDGE_T, CY0 - g - RIDGE_T, CY1 + g + RIDGE_T,
                  floor, BACK + RIDGE_H)
              - box(CX0 - g, CX1 + g, CY0 - g, CY1 + g, 0, D))
+    for (a, b) in ARMS:          # the arms flex from the floor, the ridge kept off them
+        ridge -= box(a - 0.5, b + 0.5, -1, CY0, -1, D)
     s += ridge & inside(0, D, 0.5)
+    for h in cell_holders():
+        s = s.fuse(h & inside(0, D, 0.5))
+    for rb in board_ribs():
+        s = s.fuse(rb & inside(0, D, 0.5))
 
 
 
     # ---- cuts
-    for (x, y) in SCREWS:
+    for (x, y) in SCREWS + CORNER_SCREWS:
         s -= cyl_z(x, y, M3_CLEAR / 2, -1, D)
         s -= head_pocket(x, y)
-    s -= cyl_z(TL[0], TL[1], M3_CLEAR / 2, -1, D)
-    # the head's notch open to the left side, its roof 45 degrees (it prints)
-    h = M3_HEAD_H
-    xn = TL[0] - M3_CLEAR / 2 - TL_SLEEVE          # a full sleeve round the screw
-    notch = prism_xy([(-1, -1), (xn, -1), (xn, h), (-1, h + xn + 1)],
-                     -M3_HEAD_D / 2, M3_HEAD_D / 2)
-    s -= Pos(0, TL[1], 0) * Rot(90, 0, 0) * notch
-    s -= (cyl_z(TL[0], TL[1], M3_HEAD_D / 2, -1, M3_HEAD_H)
-          + cone_z(TL[0], TL[1], M3_HEAD_D / 2, (M3_CLEAR - 0.2) / 2, M3_HEAD_H - 0.01,
-                   M3_HEAD_H + (M3_HEAD_D - M3_CLEAR + 0.2) / 2))
-    for (x, y) in MAGNETS:
-        s -= cyl_z(x, y, MAG_D / 2 + MAG_CLR, MAG_SKIN, MAG_TOP + 1)
     # the USB's skin: the wall thickened inward to just short of the socket's
     # face, below the seam (the board's edge is above it)
-    ux, zu = bx(P.USB_U), z_back(P.USB_UP)
-    s += box(ux - USB_BODY_W / 2 - 1.0, ux + USB_BODY_W / 2 + 1.0, WALL - 0.01, USB_FACE_Y - 0.1,
+    ux, zu = bx(P.USB_U) + USB_FIX, z_back(P.USB_UP)
+    s += box(ux - USB_BODY_W / 2 - 1.0, ux + USB_BODY_W / 2 + 1.0, WALL - 0.01, USB_FACE_Y - USB_SKIN_GAP,
              BACK - 0.01, Z_SPLIT)
     # clear of the jack's body (5.8 deep, its barrel JACK_UP off the board): H1's foot
     s -= box(bx(BW) - 0.1 - 2.0 - 11.8 - 0.3, bx(BW) + 0.3, JACK_Y - 2.9 - 0.3, JACK_Y + 2.9 + 0.3,
@@ -706,14 +818,15 @@ def lever():
     s -= lever_pocket()
     s -= cyl_z(PIV[0], PIV[1], LEV_SCREW / 2, -1, D + 1)
     s -= head_pocket(PIV[0], PIV[1])
-    # the bar onto the PTT: from the lever's back face (the bed) through the
-    # wall, inside it its underside rising at 45 degrees; a 45 degree roof
+    # the bar onto the PTT: from the lever's back face through the wall, a
+    # 45 degree roof; its underside rises at 45 degrees from the lever to
+    # pass the cell's end, then runs flat under the T head (BAR_LEDGE)
     x0 = PTT_X - PRELOAD
-    xi = OW - WALL
     roof = BAR_W / 2
     zt = BAR_TOP - roof
-    side = prism_xy([(x0, xi - x0), (xi, 0), (L + 0.5, 0), (L + 0.5, zt), (x0, zt)],
-                    -BAR_W / 2, BAR_W / 2)
+    zp = BAR_UNDER_Z - (L + 0.5 - BAR_LEDGE_X)      # the underside at the lever's face
+    side = prism_xy([(x0, BAR_UNDER_Z), (BAR_LEDGE_X, BAR_UNDER_Z), (L + 0.5, max(zp, 0.0)),
+                     (L + 0.5, zt), (x0, zt)], -BAR_W / 2, BAR_W / 2)
     s += Pos(0, PTT_Y, 0) * Rot(90, 0, 0) * side
     s += (Pos(x0, PTT_Y, zt) * Rot(45, 0, 0)
           * Box(L + 0.5 - x0, BAR_W / 2 ** 0.5, BAR_W / 2 ** 0.5,
@@ -732,7 +845,7 @@ def lever():
 # ---------------------------------------------------------------- keytops
 def keytops():
     """One on each key, printed on its flange: the flange on the plunger
-    under the face, the stem through the face's hole, 0.8 proud."""
+    under the face, the stem through the face's hole, 1.4 proud."""
     s = None
     for (u, v) in KEYS:
         x, y = bx(u), by(v)
@@ -805,7 +918,7 @@ def parts():
     jz = z_back(JACK_UP)
     jack = (box(bx(BW) - 0.1 - 2.0 - 11.8, bx(BW) - 0.1 - 2.0, JACK_Y - 2.9, JACK_Y + 2.9, Z_BB - JACK_UP - 2.9, Z_BB)   # to its barrel's far side
             + cyl_x(bx(BW) - 2.2, bx(BW) - 0.1, JACK_Y, jz, 2.3))
-    ux, uz = bx(P.USB_U), z_back(P.USB_UP)
+    ux, uz = bx(P.USB_U) + USB_FIX, z_back(P.USB_UP)
     mini = (box(ux - 9.175, ux + 9.175, by(BH) + 0.15, by(BH) + 22.65, Z_BB - 1.0, Z_BB)
             + box(ux - 4.47, ux + 4.47, by(BH) - 0.3, by(BH) + 7.0, uz - 1.6, uz + 1.6))
     kx = bx(P.KNOB_U)
@@ -820,12 +933,8 @@ def parts():
                )
     if HAS_EAR:
         speaker += ear(0, zf - EAR_T, zf)
-    cell = box(CX0, CX1, CY0, CY1, BACK, CZ1)
+    cell = box(CX0, CX1, CY0, CY1, BACK, BACK + CELL_NOM)
     j6 = box(bx(42.3), bx(51.5), by(10.2), by(0.0), Z_BB - 4.6, Z_BB)    # JST PH, ~4.6 (ASSUMED)
-    mags = None
-    for (x, y) in MAGNETS:
-        m = cyl_z(x, y, MAG_D / 2, MAG_SKIN, MAG_SKIN + MAG_T)
-        mags = m if mags is None else mags + m
     return [(board, "board", (0.10, 0.40, 0.25)),
             (oled, "oled", (0.10, 0.25, 0.65)),
             (glass, "glass", (0.01, 0.01, 0.01)),
@@ -837,8 +946,7 @@ def parts():
             (pam, "pam8403", (0.1, 0.1, 0.1)),
             (speaker, "speaker", (0.55, 0.55, 0.55)),
             (cell, "cell", (0.70, 0.72, 0.75)),
-            (j6, "j6", (0.95, 0.95, 0.9)),
-            (mags, "magnets", (0.6, 0.6, 0.65))]
+            (j6, "j6", (0.95, 0.95, 0.9))]
 
 
 SHELL = (0.30, 0.32, 0.35)
@@ -859,7 +967,7 @@ def check(front, back, lev, caps):
             if a[1] == b[1] or k in seen or k in allowed:
                 continue
             seen.add(k)
-            if a in things and b in things and not ({a[1], b[1]} & {"cell", "speaker", "magnets", "j6"}):
+            if a in things and b in things and not ({a[1], b[1]} & {"cell", "speaker", "j6"}):
                 continue
             i = whole(a[0]).intersect(whole(b[0]))
             v = sum(s.volume for s in i.solids()) if i else 0
@@ -915,20 +1023,9 @@ def main():
     export_stl(Pos(0, 0, D) * Rot(180, 0, 0) * front, os.path.join(OUT, "front.stl"))
     export_stl(back, os.path.join(OUT, "back.stl"))
     export_stl(lev, os.path.join(OUT, "lever.stl"))
-    ux = bx(P.USB_U)            # a quick test of the USB wall, to try cables against the board
-    export_stl(back & box(ux - 9, ux + 9, -1, 5, 0, Z_SPLIT), os.path.join(OUT, "usb_test.stl"))
     export_stl(whole(caps).translate((0, 0, -CAP_Z0)), os.path.join(OUT, "keytops.stl"))
-    # the right side alone, front and back: the hinge, H1 (the board clamps on
-    # with its M3 x 12), the jack, the PTT's slot; to try the lever, the PTT,
-    # a plug and that side's seam on the real board
-    strip = box(RIGHT_TEST_X, OW + 20, -20, OH + 20, -1, D + 1)
-    export_stl(Pos(0, 0, D) * Rot(180, 0, 0) * (front & strip), os.path.join(OUT, "right_front_test.stl"))
-    export_stl(back & strip, os.path.join(OUT, "right_back_test.stl"))
-    test = test_piece(front)
-    export_stl(Pos(0, 0, D) * Rot(180, 0, 0) * test, os.path.join(OUT, "front_test.stl"))
-    bb = test.bounding_box()
-    print(f"wrote {OUT}/front.stl back.stl lever.stl keytops.stl front_test.stl "
-          f"(the test piece {bb.size.X:.1f} x {bb.size.Y:.1f} x {bb.size.Z:.1f})")
+    # no test pieces (the user's, 2026-11-27: only the parts to print)
+    print(f"wrote {OUT}/front.stl back.stl lever.stl keytops.stl")
     report_changes()
     pieces = ([(front, "front", SHELL), (back, "back", SHELL), (lev, "lever", LEVER),
                (caps, "keytops", (0.9, 0.9, 0.9))] + parts())
