@@ -1,0 +1,173 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>wbitx2</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #f4f4f2; font-family: sans-serif; overflow: hidden; }
+    canvas { display: block; }
+    #bar { position: fixed; left: 12px; top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+    button { padding: 6px 12px; border: 1px solid #999; background: #fff;
+             border-radius: 4px; cursor: pointer; font-size: 14px; }
+    button.on { background: #333; color: #fff; }
+    #pieces { position: fixed; left: 12px; top: 52px; display: flex; flex-direction: column;
+              gap: 4px; background: #fffc; padding: 8px 10px; border-radius: 4px;
+              border: 1px solid #ccc; font-size: 14px; }
+    #pieces label { cursor: pointer; user-select: none; }
+    #pieces .row { display: flex; gap: 6px; margin-top: 4px; }
+    #pieces .row button { padding: 2px 8px; font-size: 12px; }
+    #hint { position: fixed; left: 12px; bottom: 10px; color: #555; font-size: 13px; }
+  </style>
+  <script type="importmap">
+    { "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+  </script>
+</head>
+<body>
+  <div id="bar">
+    <button data-m="closed" class="on">closed</button>
+    <button data-m="exploded">exploded</button>
+    <button data-m="inside">front off</button>
+    <button data-m="back">back only</button>
+    <button data-m="backlever">back + lever</button>
+    <button id="edges" class="on">outlines</button>
+  </div>
+  <div id="pieces"></div>
+  <div id="hint">drag = rotate · scroll = zoom · right-drag = pan · click a name to show only it</div>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // case colours as on the microphone's viewer; parts keep the colours
+    // printed.py gave them
+    const COLOURS = { front: 0x6b7a8c, back: 0xd9d9d6, lever: 0xff4a1c, keytops: 0xffc21c };
+    const SHELLS = ['front', 'back', 'lever', 'keytops'];
+    // root turns glTF's y-up back to the CAD frame: x right, y up the
+    // talkie, z out of its face; mm
+    const EXPLODE = { front: [0, 35, 0], back: [0, -35, 0], lever: [15, 0, 0], keytops: [0, 18, 0] };  // in glTF axes: y is CAD z
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setClearColor(0xf4f4f2);
+    document.body.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x999999, 2.0));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+    sun.position.set(1, 3, 2);
+    scene.add(sun);
+    const fill = new THREE.DirectionalLight(0xffffff, 0.7);
+    fill.position.set(-2, -1, -2);
+    scene.add(fill);
+
+    const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.1, 5000);
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    const root = new THREE.Group();
+    root.rotation.x = Math.PI / 2;
+    scene.add(root);
+    const objs = {}, boxes = {}, lines = [];
+    let names = [];
+
+    const load = url => new Promise((ok, bad) =>
+      new GLTFLoader().load(`${url}?v=${Date.now()}`, g => ok(g.scene), undefined, bad));
+
+    function dress(name, o) {
+      o.traverse(m => {
+        if (!m.isMesh) return;
+        const c = COLOURS[name] ?? m.material.color.getHex();
+        m.material = new THREE.MeshStandardMaterial({
+          color: c, roughness: name === 'lever' ? 0.45 : 0.7, metalness: 0,
+          polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+        const e = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry, 30),
+          new THREE.LineBasicMaterial({ color: 0x222222 }));
+        m.add(e);
+        lines.push(e);
+      });
+    }
+
+    function frame() {
+      const box = new THREE.Box3();
+      for (const n of names) if (objs[n].visible) box.expandByObject(objs[n]);
+      const c = box.getCenter(new THREE.Vector3());
+      const r = box.getSize(new THREE.Vector3()).length() / 2;
+      const d = r / Math.sin(THREE.MathUtils.degToRad(camera.fov / 2));
+      controls.target.copy(c);
+      camera.position.copy(c).add(new THREE.Vector3(0.45, 0.3, 1).normalize().multiplyScalar(d));
+      camera.near = d / 100; camera.far = d * 10;
+      camera.updateProjectionMatrix();
+    }
+
+    function setShown(n, v) { objs[n].visible = v; boxes[n].checked = v; }
+
+    function mode(m) {
+      for (const n of names) {
+        const off = m === 'exploded' ? (EXPLODE[n] || [0, 0, 0]) : [0, 0, 0];
+        objs[n].position.set(...off.map(v => v / 1000));   // the .glb is in metres
+        const shell = SHELLS.includes(n);
+        setShown(n, m === 'exploded' || (m === 'closed' && shell)
+                    || (m === 'inside' && n !== 'front') || (m === 'back' && n === 'back')
+                    || (m === 'backlever' && (n === 'back' || n === 'lever')));
+      }
+      frame();
+    }
+
+    async function start() {
+      names = await (await fetch(`pieces/list.json?v=${Date.now()}`)).json();
+      const panel = document.getElementById('pieces');
+      for (const n of names) {
+        const o = await load(`pieces/${n}.glb`);
+        dress(n, o);
+        objs[n] = o;
+        root.add(o);
+        const lab = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = true;
+        cb.onchange = () => { o.visible = cb.checked; };
+        boxes[n] = cb;
+        const t = document.createElement('span');
+        t.textContent = n; t.title = 'show only this';
+        t.onclick = e => { e.preventDefault(); for (const m of names) setShown(m, m === n); };
+        lab.append(cb, ' ', t);
+        panel.append(lab);
+      }
+      const row = document.createElement('div');
+      row.className = 'row';
+      for (const [txt, v] of [['all', true], ['none', false]]) {
+        const b = document.createElement('button');
+        b.textContent = txt;
+        b.onclick = () => names.forEach(m => setShown(m, v));
+        row.append(b);
+      }
+      panel.append(row);
+      const m = new URLSearchParams(location.search).get('m') || 'closed';
+      document.querySelectorAll('#bar button[data-m]').forEach(x => x.classList.toggle('on', x.dataset.m === m));
+      mode(m);
+      document.title = 'wbitx2';
+      window.READY = names.length;
+    }
+
+    for (const b of document.querySelectorAll('#bar button[data-m]')) {
+      b.onclick = () => {
+        document.querySelectorAll('#bar button[data-m]').forEach(x => x.classList.toggle('on', x === b));
+        mode(b.dataset.m);
+      };
+    }
+    document.getElementById('edges').onclick = e => {
+      const on = e.target.classList.toggle('on');
+      lines.forEach(l => { l.visible = on; });
+    };
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+    start();
+  </script>
+</body>
+</html>
